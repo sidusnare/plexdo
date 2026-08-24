@@ -3,7 +3,6 @@
 """User lookup, per-user servers, and account classification."""
 
 from typing import Any, List, Optional, Tuple
-import argparse
 import sys
 
 from plexapi.exceptions import BadRequest, NotFound, Unauthorized

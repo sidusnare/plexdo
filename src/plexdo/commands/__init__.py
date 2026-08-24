@@ -20,12 +20,14 @@ Adding a command means adding a module here - ``cli`` needs no edit.
 import argparse
 from typing import Any, Callable, Dict, FrozenSet, List, Tuple
 
-from plexdo.commands import (auth, build, copy, libraries, metadata, playlists,
-                             rescan, search, status, stream, users, watched)
+from plexdo.commands import (auth, build, copy, libraries, metadata, missing,
+                             playlists, rescan, search, status, stream, users,
+                             watched)
 
 # Order determines the order subcommands appear in --help.
 MODULES = (
     libraries,
+    missing,
     search,
     users,
     playlists,

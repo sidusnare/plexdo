@@ -113,7 +113,7 @@ function __plexdo_positionals
             continue
         end
         switch $t
-            case --m3u --album --sort --media-type --library-id -l --library -t --title -u --username -p --password -c --code -f --format --section -p --prefix
+            case --m3u --album --sort --media-type --library-id -l --library -t --title -u --username -p --password -c --code -f --format --section -p --prefix --throttle
                 set skip 1
                 continue
             case '-*'
@@ -202,9 +202,9 @@ end
 # Commands
 # ---------------------------------------------------------------------------
 
-set -l plexdo_cmds list-libraries list-titles list-show export-titles search status \
+set -l plexdo_cmds list-libraries list-titles list-library list-show export-titles search status find-missing \
     list-users list-playlists list-playlist export-playlist remove-playlist \
-    append-playlist show-metadata read rescan status build-interleaved \
+    append-playlist show-metadata read rescan status find-missing build-interleaved \
     build-chronological build-randomize copy-playlist-all-users \
     copy-playlist-to-user copy-watched login write-config-example
 
@@ -219,6 +219,7 @@ end
 for prog in plexdo
     complete -c $prog -n __plexdo_no_subcommand -a list-libraries -d 'List all Plex libraries'
     complete -c $prog -n __plexdo_no_subcommand -a list-titles -d 'List titles in a library'
+    complete -c $prog -n __plexdo_no_subcommand -a list-library -d 'List titles in a library (alias)'
     complete -c $prog -n __plexdo_no_subcommand -a list-show -d 'List all episodes in a show'
     complete -c $prog -n __plexdo_no_subcommand -a export-titles -d 'Export a library to M3U or an HTML gallery'
     complete -c $prog -n __plexdo_no_subcommand -a search -d 'Search Plex for titles matching a query'
@@ -232,6 +233,7 @@ for prog in plexdo
     complete -c $prog -n __plexdo_no_subcommand -a read -d 'Stream a media file to stdout'
     complete -c $prog -n __plexdo_no_subcommand -a rescan -d 'Trigger a library rescan or show scan status'
     complete -c $prog -n __plexdo_no_subcommand -a status -d 'Show server identity, sessions, users, scans, and tasks'
+    complete -c $prog -n __plexdo_no_subcommand -a find-missing -d 'Find gaps in episode numbering across every show'
     complete -c $prog -n __plexdo_no_subcommand -a build-interleaved -d 'Round-robin playlist from shows'
     complete -c $prog -n __plexdo_no_subcommand -a build-chronological -d 'Date-sorted playlist from shows and movies'
     complete -c $prog -n __plexdo_no_subcommand -a build-randomize -d 'Randomize a playlist into a new one'
@@ -246,13 +248,16 @@ for prog in plexdo
     complete -c $prog -s v -l verbose -d 'Print high-level progress to stderr'
     complete -c $prog -l debug -d 'Print detailed internal logs to stderr'
     complete -c $prog -l dry-run -d 'Show what would happen without mutating Plex'
+    complete -c $prog -x -l throttle -d 'Seconds between requests in per-item operations; 0 disables'
     complete -c $prog -s h -l help -d 'Show this help message and exit'
 
     # -- positional arguments ------------------------------------------------
-    complete -c $prog -n "__fish_seen_subcommand_from list-titles export-titles read; and __plexdo_at 0" \
+    complete -c $prog -n "__fish_seen_subcommand_from list-titles list-library export-titles read; and __plexdo_at 0" \
         -a '(__plexdo_libraries)' -d 'library'
-    complete -c $prog -n "__fish_seen_subcommand_from rescan; and __plexdo_at 0" \
+    complete -c $prog -n "__fish_seen_subcommand_from rescan find-missing; and __plexdo_at 0" \
         -a '(__plexdo_libraries)' -d 'library'
+    complete -c $prog -l include-specials -n '__fish_seen_subcommand_from find-missing' \
+        -d 'Also check season 0'
     complete -c $prog -n "__fish_seen_subcommand_from list-show show-metadata; and __plexdo_at 0" \
         -a '(__plexdo_rating_keys)' -d 'item'
     complete -c $prog -n "__fish_seen_subcommand_from read; and __plexdo_at 1" \
@@ -284,7 +289,7 @@ for prog in plexdo
     complete -c $prog -rF -l m3u \
         -n '__fish_seen_subcommand_from list-playlist list-show build-interleaved build-chronological build-randomize' \
         -d 'Also export an M3U file using Plex server paths'
-    complete -c $prog -x -l album -n '__fish_seen_subcommand_from list-titles export-titles' \
+    complete -c $prog -x -l album -n '__fish_seen_subcommand_from list-titles list-library export-titles' \
         -a '(__plexdo_albums 0)' -d 'Restrict to a single photo album'
     complete -c $prog -x -l sort -n '__fish_seen_subcommand_from export-titles' \
         -a 'alpha date random' -d 'Sort order'

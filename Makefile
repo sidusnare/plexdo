@@ -189,7 +189,7 @@ build_parser(); \
 h, n = build_registry(); \
 missing = [m.__name__ for m in MODULES if not hasattr(m, 'register') or not getattr(m, 'COMMANDS', None)]; \
 assert not missing, 'modules missing register()/COMMANDS: %s' % missing; \
-assert len(h) >= 23, 'only %d commands registered' % len(h); \
+assert len(h) >= 24, 'only %d commands registered' % len(h); \
 print('smoke: %d commands across %d modules' % (len(h), len(MODULES)))"
 
 # The completions and man page are mirrored into the package as data files;

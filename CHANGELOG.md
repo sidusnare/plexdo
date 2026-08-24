@@ -4,6 +4,51 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.10] - 2026-08-14
+
+### Added
+- Global `--throttle SECONDS` (default 0.25) paces operations that issue one
+  request per item once there are more than 50 of them: the seasons walk in
+  `list-titles`, `find-missing`, applying watched state in `copy-watched`,
+  reading photo albums, and copying to every user. Pass 0 to disable. Smaller
+  runs are never paced, since the delay would be latency for no benefit.
+
+## [1.1.9] - 2026-08-14
+
+### Added
+- `find-missing` reports seasons whose episode numbering has holes, across
+  every show library or one named library. Season 0 is skipped unless
+  `--include-specials` is given.
+- `list-titles` now shows release date, rating, and studio alongside the
+  rating key and title in table output.
+- A machine-readable format carries every field the library listing returned
+  for each item, and for a show library nests each show's episodes under a
+  `seasons` object keyed by season name.
+
+### Notes
+- Listing records are built from the attributes plexapi has already loaded.
+  Reading a missing attribute triggers a reload, which would mean one HTTP
+  request per item across a whole library, so the listing reports what the
+  server sent and `show-metadata` remains the route to the full picture for a
+  single item.
+
+## [1.1.8] - 2026-08-14
+
+### Changed
+- Reworded the `read` help, manual page, and README to describe the condition
+  (a display attached, no desktop environment) rather than calling the machine
+  a headless server, which is both self-contradictory and an assumption about
+  its role.
+
+## [1.1.7] - 2026-08-14
+
+### Added
+- `list-library` as an alias for `list-titles`, recognised by all four shell
+  completions.
+- The `read` command's help now shows worked examples, including
+  `mpv --vo=drm -` for playing on Linux with a display but no desktop
+  environment, which needs neither X nor Wayland.
+
 ## [1.1.6] - 2026-08-14
 
 ### Added
@@ -92,6 +137,10 @@ multi-user token handling, watched-state synchronisation, a status report,
 photo galleries, YAML/CSV/CLIXML output, shell completions for bash, zsh, and
 fish, a manual page, and packaging for PyPI. See the commit history.
 
+[1.1.10]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.10
+[1.1.9]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.9
+[1.1.8]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.8
+[1.1.7]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.7
 [1.1.6]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.6
 [1.1.5]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.5
 [1.1.4]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.4

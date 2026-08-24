@@ -265,14 +265,14 @@ PYEOF
 # ---------------------------------------------------------------------------
 
 _plexdo_commands() {
-    echo "list-libraries list-titles list-users list-playlists list-playlist \
-list-show show-metadata search read rescan status build-interleaved build-chronological build-randomize \
+    echo "list-libraries list-titles list-library list-users list-playlists list-playlist \
+list-show show-metadata search read rescan status find-missing build-interleaved build-chronological build-randomize \
 copy-playlist-all-users copy-playlist-to-user export-playlist remove-playlist \
 append-playlist export-titles copy-watched login write-config-example"
 }
 
 _plexdo_global_flags() {
-    echo "-f --format --json -v --verbose --debug --dry-run -V --version -h --help"
+    echo "-f --format --json -v --verbose --debug --dry-run --throttle -V --version -h --help"
 }
 
 _plexdo_output_formats() {
@@ -299,7 +299,7 @@ _plexdo_positional_count() {
     for (( i=1; i < cword; i++ )); do
         word="${words[$i]}"
         if (( skip_next )); then skip_next=0; continue; fi
-        case "$word" in --m3u|-f|--format|--section|-p|--prefix) skip_next=1; continue ;; esac
+        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle) skip_next=1; continue ;; esac
         if [[ "$word" == -* ]]; then continue; fi
         if (( ! found_cmd )); then
             [[ "$word" == "$cmd" ]] && found_cmd=1
@@ -317,7 +317,7 @@ _plexdo_nth_positional() {
     for (( i=1; i < cword; i++ )); do
         word="${words[$i]}"
         if (( skip_next )); then skip_next=0; continue; fi
-        case "$word" in --m3u|-f|--format|--section|-p|--prefix) skip_next=1; continue ;; esac
+        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle) skip_next=1; continue ;; esac
         if [[ "$word" == -* ]]; then continue; fi
         if (( ! found_cmd )); then
             [[ "$word" == "$cmd" ]] && found_cmd=1
@@ -375,7 +375,7 @@ _plexdo_complete() {
             COMPREPLY=() ;;
 
         # <library_id> [--album ALBUM]
-        list-titles)
+        list-titles|list-library)
             if [[ "$prev" == "--album" ]]; then
                 lib_id="$(_plexdo_nth_positional "$cmd" 0)"
                 _plexdo_complete_album "$lib_id"
@@ -419,6 +419,17 @@ _plexdo_complete() {
                 COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --section" -- "$cur") )
             else
                 COMPREPLY=()
+            fi ;;
+
+        # [library_id] [--include-specials]
+        find-missing)
+            if [[ "$cur" == -* ]]; then
+                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --include-specials" -- "$cur") )
+            else
+                case $pos in
+                    0) _plexdo_complete_library_id ;;
+                    *) COMPREPLY=() ;;
+                esac
             fi ;;
 
         # [library_id] [-s/--status] [-n/--now]

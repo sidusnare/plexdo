@@ -3,7 +3,6 @@
 """Library section lookup shared by the library, search, and sync commands."""
 
 from typing import Any, List, Optional, Tuple
-import argparse
 import sys
 
 from plexapi.exceptions import NotFound

@@ -14,7 +14,6 @@ import io
 import json
 
 
-
 Record = Dict[str, Any]
 Payload = Union[Record, List[Record], Any]
 

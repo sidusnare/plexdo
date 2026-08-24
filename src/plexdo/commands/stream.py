@@ -2,10 +2,10 @@
 
 """Media streaming to stdout."""
 
-from typing import List
 import argparse
 import os
 import sys
+import textwrap
 
 import requests
 from plexapi.server import PlexServer
@@ -100,6 +100,28 @@ def register(
             "Stream a media file to stdout. Pipe into a player: "
             "plexdo read <lib> <key> | mpv -"
         ),
+        description=textwrap.fill(
+            "Stream a media file to standard output, for piping into a player "
+            "or redirecting to a file. Quitting the player early is not an "
+            "error.",
+            width=78,
+        ),
+        epilog=(
+            "examples:\n"
+            "  plexdo read 3 12345 > episode.mkv\n"
+            "  plexdo read 3 12345 | mpv -\n"
+            "\n"
+            "On Linux with a display attached but no desktop environment, mpv\n"
+            "can draw straight to the console through the kernel modesetting\n"
+            "driver, so playback needs neither X nor Wayland:\n"
+            "\n"
+            "  plexdo read 3 12345 | mpv --vo=drm -\n"
+            "\n"
+            "Run it from a virtual terminal rather than a terminal emulator,\n"
+            "and make sure your user can reach the DRM device (usually via the\n"
+            "video group)."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "library_id", metavar="LIBRARY",

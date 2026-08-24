@@ -19,13 +19,14 @@ $script:PlexdoCacheDir = $null
 # Options that consume the following token, so it is not counted as positional.
 $script:PlexdoValueOptions = @(
     '--m3u', '--album', '--sort', '--media-type', '--library-id', '--section',
-    '--prefix', '-p', '-l', '--library', '-t', '--title', '-u', '--username',
+    '--prefix', '--throttle', '-p', '-l', '--library', '-t', '--title', '-u', '--username',
     '-c', '--code', '-f', '--format'
 )
 
 $script:PlexdoCommands = [ordered]@{
     'list-libraries'          = 'List all Plex libraries'
     'list-titles'             = 'List titles in a library'
+    'list-library'            = 'List titles in a library (alias for list-titles)'
     'list-show'               = 'List all episodes in a show'
     'export-titles'           = 'Export a library to M3U or an HTML gallery'
     'search'                  = 'Search Plex for titles matching a query'
@@ -39,6 +40,7 @@ $script:PlexdoCommands = [ordered]@{
     'read'                    = 'Stream a media file to stdout'
     'rescan'                  = 'Trigger a library rescan or show scan status'
     'status'                  = 'Show server identity, sessions, users, and tasks'
+    'find-missing'            = 'Find gaps in episode numbering across every show'
     'build-interleaved'       = 'Round-robin playlist from shows'
     'build-chronological'     = 'Date-sorted playlist from shows and movies'
     'build-randomize'         = 'Randomize a playlist into a new one'
@@ -55,6 +57,7 @@ $script:PlexdoGlobalFlags = [ordered]@{
     '--verbose' = 'Print high-level progress to stderr'
     '--debug'   = 'Print detailed internal logs to stderr'
     '--dry-run' = 'Show what would happen without mutating Plex'
+    '--throttle' = 'Seconds between requests in per-item operations; 0 disables'
     '--version' = 'Show the installed version and exit'
     '--help'    = 'Show help and exit'
 }
@@ -317,11 +320,12 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
                 '^(list-playlist|list-show|build-)' { $flags['--m3u'] = 'Also export an M3U file'; $flags['--prefix'] = 'Rewrite exported paths onto this prefix' }
                 '^(export-playlist|export-titles)$' { $flags['--prefix'] = 'Rewrite exported paths onto this prefix' }
                 '^(build-|copy-playlist-)'          { $flags['--overwrite'] = 'Replace an existing playlist of the same name' }
-                '^(list-titles|export-titles)$'     { $flags['--album'] = 'Restrict to a single photo album' }
+                '^(list-titles|list-library|export-titles)$' { $flags['--album'] = 'Restrict to a single photo album' }
                 '^export-titles$'                   { $flags['--sort'] = 'Sort order' }
                 '^search$'                          { $flags['--media-type'] = 'Restrict to one media type'; $flags['--library-id'] = 'Restrict to one library' }
                 '^rescan$'                          { $flags['--status'] = 'Print all active scan jobs'; $flags['--now'] = 'Cancel pending scans first' }
                 '^status$'                          { $flags['--section'] = 'Show only one section' }
+                '^find-missing$'                    { $flags['--include-specials'] = 'Also check season 0' }
                 '^copy-watched$'                    { $flags['--one-way'] = 'Only write to the second user'; $flags['--library'] = 'Restrict to one library'; $flags['--title'] = 'Restrict to one item'; $flags['--unwatch'] = 'Propagate the unwatched state instead' }
                 '^login$'                           { $flags['--username'] = 'Plex username or email'; $flags['--password'] = 'Plex password (INSECURE)'; $flags['--code'] = 'Two-factor code'; $flags['--two-factor'] = 'Prompt for a two-factor code' }
             }
@@ -329,9 +333,10 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
         } else {
             $user = if ($positionals.Count) { $positionals[0] } else { '' }
             switch ($command) {
-                'list-titles'    { if ($index -eq 0) { $results = Get-PlexdoLibraries } }
+                { $_ -in 'list-titles', 'list-library' } { if ($index -eq 0) { $results = Get-PlexdoLibraries } }
                 'export-titles'  { if ($index -eq 0) { $results = Get-PlexdoLibraries } }
                 'rescan'         { if ($index -eq 0) { $results = Get-PlexdoLibraries } }
+                'find-missing'   { if ($index -eq 0) { $results = Get-PlexdoLibraries } }
                 'read'           { if ($index -eq 0) { $results = Get-PlexdoLibraries }
                                    elseif ($index -eq 1) { $results = Get-PlexdoRatingKeys } }
                 'list-show'      { if ($index -eq 0) { $results = Get-PlexdoRatingKeys } }

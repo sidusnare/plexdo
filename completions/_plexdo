@@ -168,7 +168,7 @@ _plexdo_positional() {
     if (( skip )); then skip=0; continue; fi
     case ${words[i]} in
       --m3u|--album|--sort|--media-type|--library-id|-l|--library|-t|--title|\
-      -u|--username|-p|--password|-c|--code|-f|--format|--section|-p|--prefix) skip=1; continue ;;
+      -u|--username|-p|--password|-c|--code|-f|--format|--section|-p|--prefix|--throttle) skip=1; continue ;;
       -*) continue ;;
     esac
     if (( count == want )); then print -r -- ${words[i]}; return; fi
@@ -181,6 +181,7 @@ _plexdo_commands() {
   cmds=(
     'list-libraries:List all Plex libraries'
     'list-titles:List titles in a library'
+    'list-library:List titles in a library (alias for list-titles)'
     'list-show:List all episodes in a show'
     'export-titles:Export an entire library to M3U or an HTML gallery'
     'search:Search Plex for titles matching a query'
@@ -194,6 +195,7 @@ _plexdo_commands() {
     'read:Stream a media file to stdout'
     'rescan:Trigger a library rescan or show scan status'
     'status:Show server identity, sessions, users, scans, and tasks'
+    'find-missing:Find gaps in episode numbering across every show'
     'build-interleaved:Round-robin interleaved playlist from shows'
     'build-chronological:Date-sorted playlist from shows and movies'
     'build-randomize:Randomize a playlist into a new one'
@@ -211,6 +213,7 @@ _plexdo_global_opts=(
   '--verbose[Print high-level progress to stderr]'
   '--debug[Print detailed internal logs to stderr]'
   '--dry-run[Show what would happen without mutating Plex]'
+  '--throttle[Seconds between requests in per-item operations; 0 disables]:seconds:'
   '(-h --help)'{-h,--help}'[Show this help message and exit]'
 )
 
@@ -218,7 +221,7 @@ _plexdo_subcommand() {
   local m3u='--m3u[Also export an M3U file using Plex server paths]:m3u path:_files'
   local pfx='(-p --prefix)'{-p,--prefix}'[Rewrite exported paths onto this prefix]:prefix:'
   case ${words[1]} in
-    list-titles)
+    list-titles|list-library)
       _arguments $_plexdo_global_opts \
         '--album[Photo libraries only: restrict to one album]:album:{_plexdo_albums $(_plexdo_positional 0)}' \
         '1:library id:_plexdo_libraries'
@@ -279,6 +282,11 @@ _plexdo_subcommand() {
       _arguments $_plexdo_global_opts \
         '1:library id:_plexdo_libraries' \
         '2:rating key:_plexdo_rating_keys'
+      ;;
+    find-missing)
+      _arguments $_plexdo_global_opts \
+        '--include-specials[Also check season 0]' \
+        '1:library id:_plexdo_libraries'
       ;;
     rescan)
       _arguments $_plexdo_global_opts \

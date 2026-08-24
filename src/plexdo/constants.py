@@ -13,7 +13,6 @@ from plexapi.photo import Photo
 from plexapi.video import Episode, Movie
 
 
-
 DateInput = Union[str, datetime.date, datetime.datetime, None]
 
 

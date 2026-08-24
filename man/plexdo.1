@@ -1,7 +1,7 @@
 .\" Man page for plexdo (plexdo).
 .\" Regenerate or edit alongside AI.prompt.md; the .TH version must match
 .\" __version__ in src/plexdo/__init__.py.
-.TH PLEXDO 1 "2026-08-14" "plexdo 1.1.6" "User Commands"
+.TH PLEXDO 1 "2026-08-14" "plexdo 1.1.10" "User Commands"
 .
 .SH NAME
 plexdo \- command\-line interface for Plex Media Server
@@ -64,6 +64,12 @@ Print detailed internal logs to standard error.
 .B \-\-dry\-run
 Show what would happen without mutating Plex.
 .TP
+.BI \-\-throttle " SECONDS"
+Seconds to wait between requests in operations that query once per item, when
+there are more than 50 of them. Defaults to 0.25; pass 0 to disable. Walking
+every season of a large library, or writing watched state item by item, is
+otherwise enough traffic to slow a server down or trip its rate limiting.
+.TP
 .BR \-V ", " \-\-version
 Print the installed version and exit.
 .TP
@@ -100,7 +106,14 @@ PowerShell CLIXML with typed properties, for \fBImport\-Clixml\fR.
 List every library with its ID, type, and title.
 .TP
 .BI list\-titles " library " [ \-\-album " ALBUM" ]
-List the titles in a library. \fB\-\-album\fR restricts a photo library to one
+.RB ( list\-library
+is an alias.)
+List the titles in a library. Table output shows the rating key, title,
+release date, rating, and studio; a machine\-readable format carries every
+field the server returned for each item, and for a show library nests each
+show\(aqs episodes under a
+.B seasons
+object keyed by season name. \fB\-\-album\fR restricts a photo library to one
 album and is ignored elsewhere.
 .TP
 .BI list\-show " ratingKey " [ \-\-m3u " PATH" ]
@@ -222,6 +235,36 @@ separately if they are mounted apart.
 .BI read " library ratingKey"
 Stream a media file to standard output, for piping into a player or
 redirecting to a file. Quitting the player early is not an error.
+.RS
+.PP
+.EX
+plexdo read 3 12345 | mpv \-
+plexdo read 3 12345 > episode.mkv
+.EE
+.PP
+On Linux with a display attached but no desktop environment,
+.BR mpv (1)
+can draw straight to the console through the kernel modesetting driver, so
+playback needs neither X nor Wayland:
+.PP
+.EX
+plexdo read 3 12345 | mpv \-\-vo=drm \-
+.EE
+.PP
+Run that from a virtual terminal rather than a terminal emulator, and make
+sure your user can reach the DRM device, usually by being in the
+.B video
+group.
+.RE
+.
+.TP
+.BI find\-missing " [library] " [ \-\-include\-specials ]
+Walk every season of every show and report the episode numbers missing between
+the start of a season and its highest episode. A season that simply stops
+early is not reported, since an unaired episode cannot be told from a missing
+one. Season 0 is skipped unless
+.B \-\-include\-specials
+is given, because specials are numbered irregularly.
 .
 .SS Server management
 .TP

@@ -254,6 +254,22 @@ given before the subcommand - `plexdo --json list-users` would emit a table.
 With SUPPRESS the attribute only exists when the flag was actually passed, so
 whichever position it appears in wins and the other is left untouched.
 
+## THROTTLING
+
+`throttle.paced(items, args, what)` yields items, sleeping `--throttle`
+seconds between them once the count passes `THROTTLE_THRESHOLD` (50). The
+default is 0.25s; 0 disables it. The pause goes *between* elements, so n
+items wait n-1 times, and a short run is never paced because the delay would
+be latency for no benefit. Announce it once at info level with the expected
+duration and how to turn it off.
+
+Apply it wherever a loop makes one request per element and the count can
+realistically exceed 50: the seasons walk in `list-titles`, `find-missing`,
+applying watched state in `copy-watched`, `collect_photos` (one call per
+album), and the per-user loop in `copy-playlist-all-users`. Functions that
+need it take an optional `args`, since there is no global state to read it
+from.
+
 ## OUTPUT
 
 ### `output(data, args)`

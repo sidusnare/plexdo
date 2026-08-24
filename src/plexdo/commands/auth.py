@@ -3,7 +3,7 @@
 """Authentication and config bootstrap commands."""
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 import argparse
 import configparser
 import getpass

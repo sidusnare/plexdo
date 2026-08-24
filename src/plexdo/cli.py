@@ -27,6 +27,7 @@ from plexdo.accounts import UserAccessError, resolve_user_arguments
 from plexdo.sections import resolve_library_arguments
 from plexdo.commands import build_registry, register_all
 from plexdo.formats import OUTPUT_FORMATS
+from plexdo.throttle import DEFAULT_THROTTLE, THROTTLE_THRESHOLD
 from plexdo.config import cached_config, connect_plex
 from plexdo.logs import configure_logging
 from plexdo.security import scrub_password_argument
@@ -58,6 +59,15 @@ def _add_global_flags(
     parser.add_argument(
         "--json", dest="format", action="store_const", const="json",
         default=argparse.SUPPRESS, help="Shorthand for --format json.",
+    )
+    parser.add_argument(
+        "--throttle", type=float, metavar="SECONDS",
+        default=argparse.SUPPRESS if suppress else DEFAULT_THROTTLE,
+        help=(
+            "Seconds to wait between requests in operations that query once "
+            f"per item, when there are more than {THROTTLE_THRESHOLD} of them "
+            f"(default: {DEFAULT_THROTTLE}). Use 0 to disable."
+        ),
     )
     parser.add_argument(
         "-V", "--version", action="version",

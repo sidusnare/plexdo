@@ -3,7 +3,6 @@
 """Terminal output: JSON, box-drawn tables, and metadata records."""
 
 from typing import Any, Dict, List
-import argparse
 import sys
 import unicodedata
 

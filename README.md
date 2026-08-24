@@ -157,6 +157,26 @@ plexdo list-users -f clixml            # PowerShell Import-Clixml
 | `clixml` | PowerShell CLIXML with typed properties; pipe into `Import-Clixml`. |
 
 `-V/--version` prints the installed version, which also appears in `--help`.
+
+### Throttling
+
+Some operations query once per item: walking every season of a show library,
+applying watched state item by item, or reading each photo album. Past 50
+items those are paced at `--throttle` seconds apart, 0.25 by default, so a
+large run does not flood the server or trip its rate limiting. Smaller runs
+are never paced.
+
+```bash
+plexdo --throttle 0 find-missing      # as fast as the server will answer
+plexdo --throttle 1 find-missing      # gentler on a Raspberry Pi
+```
+
+When pacing kicks in it says so, with the expected duration:
+
+```
+Pacing 500 requests 0.25s apart to go easy on the server; about 2m04s,
+or --throttle 0 to disable.
+```
 Anywhere a **library** is required you may pass either the numeric library ID
 or its title, so `plexdo list-titles 3` and `plexdo list-titles "TV Shows"`
 are equivalent. The same applies to `--library-id` on `search` and `-l` on
@@ -175,13 +195,48 @@ identical rules apply to library IDs and titles.
 | Command | Purpose |
 | --- | --- |
 | `list-libraries` | Library IDs, types, and titles |
-| `list-titles <library_id> [--album A]` | Titles in a library |
+| `list-titles <library> [--album A]` | Titles in a library (alias: `list-library`) |
+| `find-missing [library] [--include-specials]` | Seasons with gaps in their episode numbering |
 | `list-show <rating_key> [--m3u P]` | Every episode of a show, specials skipped |
 | `list-users` | User IDs, account types, and titles |
 | `list-playlists <user_id>` | A user's playlists |
 | `list-playlist <user_id> <playlist\|ratingKey> [--m3u P]` | Items in one playlist |
 | `show-metadata <rating_key>` | Full metadata for one item |
 | `search <user_id> <query> [--media-type T] [--library-id N]` | Search as a given user |
+
+`list-titles` shows the rating key, title, release date, rating, and studio as
+a table. A machine-readable format carries **every field the server returned**
+for each item, and for a show library nests each show's episodes under a
+`seasons` object:
+
+```bash
+plexdo list-titles "TV Shows" -f json | jq '.[0].seasons | keys'
+```
+
+Those fields are the ones present in the library listing; `show-metadata` is
+the route to the full picture for a single item.
+
+### Finding gaps
+
+```bash
+plexdo find-missing                 # every show library
+plexdo find-missing "TV Shows"      # one library
+plexdo find-missing --include-specials
+```
+
+Reports the episode numbers missing between the start of a season and its
+highest episode. A season that simply stops early is not reported, since an
+unaired episode cannot be told from a missing one. Season 0 is skipped by
+default, because specials are numbered irregularly.
+
+```
+┌──────────────┬───────────┬────────┬─────────┬──────────────┬──────┬─────────┐
+│ show         │ ratingKey │ season │ missing │ missingCount │ have │ highest │
+├──────────────┼───────────┼────────┼─────────┼──────────────┼──────┼─────────┤
+│ Breaking Bad │ 1         │ 1      │ 5       │ 1            │ 6    │ 7       │
+│ The Wire     │ 2         │ 1      │ 1, 2    │ 2            │ 3    │ 5       │
+└──────────────┴───────────┴────────┴─────────┴──────────────┴──────┴─────────┘
+```
 
 ### Building playlists
 
@@ -292,6 +347,17 @@ to the photo gallery. Without it, exports keep the server's own paths.
 plexdo read 3 12345 | mpv -
 plexdo read 3 12345 > episode.mkv
 ```
+
+On Linux with a display attached but no desktop environment, mpv can draw
+straight to the console through the kernel modesetting driver, so playback
+needs neither X nor Wayland:
+
+```bash
+plexdo read 3 12345 | mpv --vo=drm -
+```
+
+Run that from a virtual terminal rather than a terminal emulator, and make sure
+your user can reach the DRM device (usually via the `video` group).
 
 ### Status
 

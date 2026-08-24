@@ -226,3 +226,22 @@ def test_write_cache_creates_the_configured_directory(tmp_path, monkeypatch):
 def test_the_template_documents_the_default_cache_dir():
     from plexdo.constants import CONFIG_EXAMPLE, DEFAULT_CACHE_DIR
     assert f"# cache_dir = {DEFAULT_CACHE_DIR}" in CONFIG_EXAMPLE
+
+
+# --- command alias -------------------------------------------------------
+
+def test_list_library_is_an_alias_for_list_titles(parser):
+    assert parser.parse_args(["list-library", "3"]).library_id == "3"
+    assert parser.parse_args(["list-library", "3"]).command == "list-library"
+
+
+def test_both_spellings_dispatch_to_the_same_handler():
+    """argparse reports the spelling typed, so the alias needs its own entry."""
+    handlers, needs_plex = build_registry()
+    assert handlers["list-library"] is handlers["list-titles"]
+    assert {"list-titles", "list-library"} <= needs_plex
+
+
+def test_the_alias_accepts_the_same_options(parser):
+    args = parser.parse_args(["list-library", "My Photos", "--album", "Trip"])
+    assert (args.library_id, args.album) == ("My Photos", "Trip")

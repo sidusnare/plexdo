@@ -9,6 +9,7 @@ from plexapi.photo import Photo
 
 from plexdo.console import clean_text
 from plexdo.constants import MediaItem
+from plexdo.throttle import paced
 from plexdo.titles import non_special_episodes
 
 
@@ -16,7 +17,7 @@ _LIBRARY_ITEM_TYPES = ("show", "movie", "photo")
 
 
 def collect_photos(
-    section: Any, album: Optional[str] = None
+    section: Any, album: Optional[str] = None, args: Any = None
 ) -> List[Photo]:
     """Return photos from a photo library section, optionally filtered by album.
 
@@ -28,7 +29,7 @@ def collect_photos(
     (case-insensitive title match).  Fails fast if the name is not found.
     """
     photos: List[Photo] = []
-    for palbum in section.all():
+    for palbum in paced(list(section.all()), args, "albums"):
         album_title = clean_text(getattr(palbum, "title", "") or "")
         if album is not None and album_title.lower() != album.lower():
             continue
@@ -43,7 +44,7 @@ def collect_photos(
 
 
 def collect_library_items(
-    section: Any, album: Optional[str] = None
+    section: Any, album: Optional[str] = None, args: Any = None
 ) -> List[MediaItem]:
     """Expand a library section into a flat list of playable items.
 
@@ -59,7 +60,7 @@ def collect_library_items(
     if section.type == "movie":
         return list(section.all())
     if section.type == "photo":
-        return collect_photos(section, album)  # type: ignore[return-value]
+        return collect_photos(section, album, args)  # type: ignore[return-value]
     sys.exit(
         f"Library type '{section.type}' is not supported. "
         f"Supported types: {', '.join(_LIBRARY_ITEM_TYPES)}."

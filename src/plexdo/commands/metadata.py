@@ -2,7 +2,7 @@
 
 """Per-item metadata display command."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict
 import argparse
 
 from plexapi.audio import Track

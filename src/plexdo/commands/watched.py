@@ -14,6 +14,7 @@ from plexdo.console import output, output_format
 from plexdo.constants import LOG
 from plexdo.convert import parse_date
 from plexdo.sections import resolve_sections
+from plexdo.throttle import paced
 from plexdo.titles import display_title, fetch_item
 
 
@@ -247,7 +248,7 @@ def cmd_copy_watched(plex: PlexServer, args: argparse.Namespace) -> None:
         LOG.info("--dry-run: no watch state was changed.")
         return
 
-    for change in plan:
+    for change in paced(plan, args, "updates"):
         _apply_action(change)
     LOG.info("Applied %d change(s).", len(plan))
 

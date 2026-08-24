@@ -2,7 +2,6 @@
 
 """User listing command."""
 
-from typing import List
 import argparse
 
 from plexapi.server import PlexServer

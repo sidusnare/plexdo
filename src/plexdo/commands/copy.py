@@ -14,6 +14,7 @@ from plexdo.accounts import UserAccessError, server_for_user
 from plexdo.console import clean_text, output, output_format, print_table
 from plexdo.constants import LOG, MediaItem
 from plexdo.playlists import copy_playlist_to, preview_rows, resolve_playlist
+from plexdo.throttle import paced
 
 
 def _copy_to_one_user(
@@ -72,7 +73,7 @@ def cmd_copy_playlist_all_users(plex: PlexServer, args: argparse.Namespace) -> N
         print()
 
     results: List[Dict[str, Any]] = []
-    for user in plex.myPlexAccount().users():
+    for user in paced(list(plex.myPlexAccount().users()), args, "users"):
         user_id = int(user.id)
         if user_id == args.source_user_id:
             record = {
