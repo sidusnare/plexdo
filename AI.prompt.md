@@ -287,7 +287,16 @@ Terminal display width, **not** `len()`. CJK glyphs (`east_asian_width` in
 table drifts out of alignment on any library holding non-Latin titles. Pair it
 with `_pad(text, width)` which replaces `ljust` everywhere.
 
-### `print_table(rows)` / `print_metadata(record)`
+Tables are fitted to the terminal. `table_limit(args)` returns the column
+budget: `None` when `-W/--wide` is given **or when stdout is not a tty**,
+since redirected output has no width to respect and truncating it would
+corrupt a pipeline. `_fit_widths` shrinks the widest column repeatedly,
+stopping at `MIN_COLUMN_WIDTH` and only then at the ellipsis itself, so a very
+narrow terminal degrades instead of overflowing. Truncation is display-width
+aware, and the columns narrowed are reported once at info level naming
+`--wide`.
+
+### `print_table(rows, limit=None)` / `print_metadata(record, limit=None)`
 UTF-8 box-drawn tables using `┌ ┬ ┐ ├ ┼ ┤ └ ┴ ┘ ─ │`, with a `_rule(widths, l, m, r)`
 helper, column widths computed from `display_width`, and one space of padding
 each side of every cell:

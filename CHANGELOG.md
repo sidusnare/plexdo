@@ -4,6 +4,25 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.12] - 2026-08-14
+
+### Added
+- `show-metadata` reports the server-side path of every file backing an item.
+  A table names a lone file `file` and numbers them when there are several; a
+  machine-readable format carries them as a `files` list.
+
+### Changed
+- The media traversal behind M3U export, photo galleries, and this new field
+  is now one shared `records.file_paths` rather than three copies.
+
+## [1.1.11] - 2026-08-14
+
+### Added
+- Table output is fitted to the terminal: the widest column is truncated with
+  an ellipsis so a row stays on one line, and the columns narrowed are
+  reported at INFO level. `-W/--wide` disables it, and redirected output is
+  never truncated.
+
 ## [1.1.10] - 2026-08-14
 
 ### Added
@@ -137,6 +156,8 @@ multi-user token handling, watched-state synchronisation, a status report,
 photo galleries, YAML/CSV/CLIXML output, shell completions for bash, zsh, and
 fish, a manual page, and packaging for PyPI. See the commit history.
 
+[1.1.12]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.12
+[1.1.11]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.11
 [1.1.10]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.10
 [1.1.9]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.9
 [1.1.8]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.8

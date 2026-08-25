@@ -87,3 +87,44 @@ def test_loaded_fields_reads_only_what_is_already_present():
         def __getattr__(self, name):     # only called for missing attributes
             raise AssertionError(f"reload triggered for {name}")
     assert loaded_fields(Exploding())["title"] == "A Title"
+
+
+# --- file paths ----------------------------------------------------------
+
+from plexdo.records import file_paths
+
+
+class Part:
+    def __init__(self, file):
+        self.file = file
+
+
+class Media:
+    def __init__(self, *files):
+        self.parts = [Part(f) for f in files]
+
+
+def test_a_single_file_is_reported():
+    assert file_paths(Item(media=[Media("/mnt/a.mkv")])) == ["/mnt/a.mkv"]
+
+
+def test_every_part_of_every_version_is_reported():
+    item = Item(media=[Media("/mnt/cd1.avi", "/mnt/cd2.avi"), Media("/mnt/hd.mkv")])
+    assert file_paths(item) == ["/mnt/cd1.avi", "/mnt/cd2.avi", "/mnt/hd.mkv"]
+
+
+def test_a_container_with_no_media_yields_nothing():
+    """A show's files belong to its episodes, not to the show."""
+    assert file_paths(Item(media=[])) == []
+    assert file_paths(Item()) == []
+
+
+def test_parts_without_a_path_are_skipped():
+    assert file_paths(Item(media=[Media(None, "/mnt/b.mkv")])) == ["/mnt/b.mkv"]
+
+
+def test_file_paths_does_not_trigger_a_reload():
+    class Exploding(Item):
+        def __getattr__(self, name):
+            raise AssertionError(f"reload triggered for {name}")
+    assert file_paths(Exploding()) == []

@@ -158,6 +158,21 @@ plexdo list-users -f clixml            # PowerShell Import-Clixml
 
 `-V/--version` prints the installed version, which also appears in `--help`.
 
+### Table width
+
+Table output is fitted to your terminal: the widest column is truncated with
+an ellipsis so a row stays on one line, and `--verbose` reports which columns
+were narrowed.
+
+```bash
+plexdo list-titles "TV Shows"           # fitted to the terminal
+plexdo -W list-titles "TV Shows"        # every character, however wide
+plexdo list-titles "TV Shows" > out.txt # redirected output is never truncated
+```
+
+Redirected output keeps every character, so piping to a file or to `grep` is
+unaffected.
+
 ### Throttling
 
 Some operations query once per item: walking every season of a show library,
@@ -201,7 +216,7 @@ identical rules apply to library IDs and titles.
 | `list-users` | User IDs, account types, and titles |
 | `list-playlists <user_id>` | A user's playlists |
 | `list-playlist <user_id> <playlist\|ratingKey> [--m3u P]` | Items in one playlist |
-| `show-metadata <rating_key>` | Full metadata for one item |
+| `show-metadata <rating_key>` | Full metadata for one item, including its file paths |
 | `search <user_id> <query> [--media-type T] [--library-id N]` | Search as a given user |
 
 `list-titles` shows the rating key, title, release date, rating, and studio as

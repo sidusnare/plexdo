@@ -213,6 +213,7 @@ _plexdo_global_opts=(
   '--verbose[Print high-level progress to stderr]'
   '--debug[Print detailed internal logs to stderr]'
   '--dry-run[Show what would happen without mutating Plex]'
+  '(-W --wide)'{-W,--wide}'[Do not shrink table columns to the terminal width]'
   '--throttle[Seconds between requests in per-item operations; 0 disables]:seconds:'
   '(-h --help)'{-h,--help}'[Show this help message and exit]'
 )

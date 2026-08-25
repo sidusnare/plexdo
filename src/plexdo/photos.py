@@ -9,6 +9,7 @@ from plexapi.photo import Photo
 
 from plexdo.console import clean_text
 from plexdo.constants import MediaItem
+from plexdo.records import file_paths
 from plexdo.throttle import paced
 from plexdo.titles import non_special_episodes
 
@@ -69,7 +70,5 @@ def collect_library_items(
 
 def photo_file_path(photo: Photo) -> Optional[str]:
     """Return the server filesystem path for a photo, or None if unavailable."""
-    try:
-        return photo.media[0].parts[0].file or None
-    except (IndexError, AttributeError):
-        return None
+    paths = file_paths(photo)
+    return paths[0] if paths else None

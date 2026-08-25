@@ -57,6 +57,7 @@ $script:PlexdoGlobalFlags = [ordered]@{
     '--verbose' = 'Print high-level progress to stderr'
     '--debug'   = 'Print detailed internal logs to stderr'
     '--dry-run' = 'Show what would happen without mutating Plex'
+    '--wide'    = 'Do not shrink table columns to the terminal width'
     '--throttle' = 'Seconds between requests in per-item operations; 0 disables'
     '--version' = 'Show the installed version and exit'
     '--help'    = 'Show help and exit'

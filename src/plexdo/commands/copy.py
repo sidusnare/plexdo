@@ -11,7 +11,7 @@ from plexapi.playlist import Playlist
 from plexapi.server import PlexServer
 
 from plexdo.accounts import UserAccessError, server_for_user
-from plexdo.console import clean_text, output, output_format, print_table
+from plexdo.console import clean_text, output, output_format, print_table, table_limit
 from plexdo.constants import LOG, MediaItem
 from plexdo.playlists import copy_playlist_to, preview_rows, resolve_playlist
 from plexdo.throttle import paced
@@ -69,7 +69,7 @@ def cmd_copy_playlist_all_users(plex: PlexServer, args: argparse.Namespace) -> N
     table_mode = output_format(args) == "table"
     if table_mode:
         print(f"{src.title} ({len(src_items)} items)")
-        print_table(preview_rows(src_items))
+        print_table(preview_rows(src_items), table_limit(args))
         print()
 
     results: List[Dict[str, Any]] = []

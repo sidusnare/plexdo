@@ -48,6 +48,21 @@ def loaded_fields(item: Any) -> Dict[str, Any]:
     }
 
 
+def file_paths(item: Any) -> List[str]:
+    """Server-side paths of every file backing an item.
+
+    An item can have several media versions and each several parts, so this
+    is a list. Shows and seasons have no media of their own and yield none.
+    """
+    paths: List[str] = []
+    for media in vars(item).get("media") or []:
+        for part in getattr(media, "parts", None) or []:
+            path = getattr(part, "file", None)
+            if path:
+                paths.append(path)
+    return paths
+
+
 def release_date(item: Any) -> str:
     """The item's release date, falling back to the year alone."""
     stamp = parse_date(vars(item).get("originallyAvailableAt"))

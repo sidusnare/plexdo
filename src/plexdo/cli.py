@@ -61,6 +61,14 @@ def _add_global_flags(
         default=argparse.SUPPRESS, help="Shorthand for --format json.",
     )
     parser.add_argument(
+        "-W", "--wide", action="store_true", default=default,
+        help=(
+            "Do not shrink table columns to the terminal width. By default "
+            "the widest column is truncated so a row fits on one line; "
+            "redirected output is never truncated."
+        ),
+    )
+    parser.add_argument(
         "--throttle", type=float, metavar="SECONDS",
         default=argparse.SUPPRESS if suppress else DEFAULT_THROTTLE,
         help=(

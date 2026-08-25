@@ -272,7 +272,7 @@ append-playlist export-titles copy-watched login write-config-example"
 }
 
 _plexdo_global_flags() {
-    echo "-f --format --json -v --verbose --debug --dry-run --throttle -V --version -h --help"
+    echo "-f --format --json -v --verbose --debug --dry-run -W --wide --throttle -V --version -h --help"
 }
 
 _plexdo_output_formats() {

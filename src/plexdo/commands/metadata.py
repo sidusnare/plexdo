@@ -2,15 +2,16 @@
 
 """Per-item metadata display command."""
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 import argparse
 
 from plexapi.audio import Track
 from plexapi.server import PlexServer
 from plexapi.video import Episode, Movie, Show
 
-from plexdo.console import clean_text, output
+from plexdo.console import clean_text, output, output_format
 from plexdo.convert import format_duration
+from plexdo.records import file_paths
 from plexdo.titles import display_title, fetch_item
 
 
@@ -90,11 +91,26 @@ _METADATA_BUILDERS = {
 }
 
 
+def _file_fields(paths: List[str]) -> Dict[str, str]:
+    """One row per file, numbered only when there is more than one."""
+    if len(paths) == 1:
+        return {"file": paths[0]}
+    return {f"file {number}": path for number, path in enumerate(paths, 1)}
+
+
 def cmd_show_metadata(plex: PlexServer, args: argparse.Namespace) -> None:
     """Display metadata for a single item by ratingKey."""
     item = fetch_item(plex, args.rating_key)
     builder = _METADATA_BUILDERS.get(item.type, _base_metadata)
     record: Dict[str, Any] = builder(item)
+
+    # A list reads naturally in a structured format, but the key/value table
+    # wants one row per file.
+    paths = file_paths(item)
+    if output_format(args) == "table":
+        record.update(_file_fields(paths))
+    else:
+        record["files"] = paths
 
     output(record, args)
 

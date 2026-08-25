@@ -2,14 +2,14 @@
 
 """Consolidated server status: sessions, users, activity, and identity."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import argparse
 import sys
 
 from plexapi.server import PlexServer
 
 from plexdo.accounts import account_type
-from plexdo.console import clean_text, output, output_format, print_metadata, print_table
+from plexdo.console import clean_text, output, output_format, print_metadata, print_table, table_limit
 from plexdo.constants import LOG
 from plexdo.convert import format_duration, parse_date
 from plexdo.formats import render
@@ -185,15 +185,15 @@ def _collect(plex: PlexServer, names: List[str]) -> Dict[str, Any]:
     return gathered
 
 
-def _print_report(gathered: Dict[str, Any]) -> None:
+def _print_report(gathered: Dict[str, Any], limit: Optional[int]) -> None:
     """Print the full multi-section report for the table renderer."""
     for name, payload in gathered.items():
         heading, _ = _SECTIONS[name]
         print(f"\n{heading}")
         if isinstance(payload, dict):
-            print_metadata(payload)
+            print_metadata(payload, limit)
         elif payload:
-            print_table(payload)
+            print_table(payload, limit)
         else:
             print("  (none)")
 
@@ -217,7 +217,7 @@ def cmd_status(plex: PlexServer, args: argparse.Namespace) -> None:
         output(gathered[args.section], args)
         return
     if chosen == "table":
-        _print_report(gathered)
+        _print_report(gathered, table_limit(args))
         return
     print(render(gathered, chosen))
 

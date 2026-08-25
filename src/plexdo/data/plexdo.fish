@@ -248,6 +248,7 @@ for prog in plexdo
     complete -c $prog -s v -l verbose -d 'Print high-level progress to stderr'
     complete -c $prog -l debug -d 'Print detailed internal logs to stderr'
     complete -c $prog -l dry-run -d 'Show what would happen without mutating Plex'
+    complete -c $prog -s W -l wide -d 'Do not shrink table columns to the terminal width'
     complete -c $prog -x -l throttle -d 'Seconds between requests in per-item operations; 0 disables'
     complete -c $prog -s h -l help -d 'Show this help message and exit'
 
