@@ -1,7 +1,7 @@
 .\" Man page for plexdo (plexdo).
 .\" Regenerate or edit alongside AI.prompt.md; the .TH version must match
 .\" __version__ in src/plexdo/__init__.py.
-.TH PLEXDO 1 "2026-08-14" "plexdo 1.1.12" "User Commands"
+.TH PLEXDO 1 "2026-08-14" "plexdo 1.1.13" "User Commands"
 .
 .SH NAME
 plexdo \- command\-line interface for Plex Media Server
@@ -122,7 +122,15 @@ release date, rating, and studio; a machine\-readable format carries every
 field the server returned for each item, and for a show library nests each
 show\(aqs episodes under a
 .B seasons
-object keyed by season name. \fB\-\-album\fR restricts a photo library to one
+object keyed by season name. Nested objects such as media and their parts are
+expanded, so a file name is at
+.BR media[].parts[].file ,
+and the paths are repeated in a top\-level
+.B files
+list for convenience. Note that
+.B sourceURI
+is not a file name: it is the remote server URI of an item in someone else\(aqs
+playlist, and is null for anything on your own server. \fB\-\-album\fR restricts a photo library to one
 album and is ignored elsewhere.
 .TP
 .BI list\-show " ratingKey " [ \-\-m3u " PATH" ]

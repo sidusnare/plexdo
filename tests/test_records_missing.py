@@ -128,3 +128,52 @@ def test_file_paths_does_not_trigger_a_reload():
         def __getattr__(self, name):
             raise AssertionError(f"reload triggered for {name}")
     assert file_paths(Exploding()) == []
+
+
+# --- nested media in listing records -------------------------------------
+
+class PartFull:
+    def __init__(self, file):
+        self.file, self.size, self.container = file, 100, "mkv"
+        self._server = object()
+
+
+class MediaFull:
+    def __init__(self, *files):
+        self.parts = [PartFull(f) for f in files]
+        self.videoResolution = "1080"
+
+
+def test_media_is_expanded_rather_than_repr_d():
+    """A repr like '<Media object at 0x...>' carries nothing."""
+    fields = loaded_fields(Item(media=[MediaFull("/mnt/a.mkv")]))
+    assert fields["media"][0]["parts"][0]["file"] == "/mnt/a.mkv"
+    assert "object at 0x" not in str(fields["media"])
+
+
+def test_the_file_paths_are_also_surfaced_at_the_top_level():
+    fields = loaded_fields(Item(media=[MediaFull("/mnt/a.mkv")]))
+    assert fields["files"] == ["/mnt/a.mkv"]
+
+
+def test_no_files_key_when_the_item_has_no_media():
+    assert "files" not in loaded_fields(Item())
+
+
+def test_private_attributes_of_nested_objects_are_skipped():
+    fields = loaded_fields(Item(media=[MediaFull("/mnt/a.mkv")]))
+    assert "_server" not in fields["media"][0]["parts"][0]
+
+
+def test_a_self_referential_object_does_not_recurse_forever():
+    class Loop:
+        def __init__(self):
+            self.name = "x"
+            self.parent = self
+    loaded_fields(Item(loop=Loop()))          # must simply return
+
+
+def test_an_object_without_a_dict_falls_back_to_text():
+    class Slotted:
+        __slots__ = ()
+    assert isinstance(loaded_fields(Item(thing=Slotted()))["thing"], str)

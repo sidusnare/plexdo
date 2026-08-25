@@ -228,6 +228,17 @@ for each item, and for a show library nests each show's episodes under a
 plexdo list-titles "TV Shows" -f json | jq '.[0].seasons | keys'
 ```
 
+Nested objects such as media and their parts are expanded rather than printed
+as object references, so a file name is at `media[].parts[].file`, and the
+paths are repeated in a top-level `files` list:
+
+```bash
+plexdo list-titles Movies -f json | jq -r '.[].files[]'
+```
+
+Note that `sourceURI` is **not** a file name. It is the remote server URI of an
+item in someone else's playlist, and is null for anything on your own server.
+
 Those fields are the ones present in the library listing; `show-metadata` is
 the route to the full picture for a single item.
 

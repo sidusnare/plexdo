@@ -22,30 +22,58 @@ from plexdo.formats import _scalar
 SUMMARY_FIELDS = ("ratingKey", "title", "releaseDate", "rating", "studio")
 
 
-def _scalar(value: Any) -> Any:
-    """Reduce a plexapi attribute to something a serialiser can carry."""
+# How far to descend into nested plexapi objects. Media -> parts -> Part is
+# two levels, which is what carries the file paths.
+_MAX_DEPTH = 2
+
+
+def _scalar(value: Any, depth: int = 0) -> Any:
+    """Reduce a plexapi attribute to something a serialiser can carry.
+
+    Nested objects such as Media and Part are expanded rather than repr'd,
+    since that is where the file paths, sizes, and codecs live.
+    """
     if value is None or isinstance(value, (bool, int, float, str)):
         return value
     if isinstance(value, (datetime.datetime, datetime.date)):
         return value.isoformat(sep=" ") if isinstance(
             value, datetime.datetime) else value.isoformat()
     if isinstance(value, (list, tuple)):
-        return [_scalar(item) for item in value]
+        return [_scalar(item, depth) for item in value]
     # Genres, directors, collections and friends are tag objects.
     for attribute in ("tag", "title"):
         tagged = getattr(value, attribute, None)
         if isinstance(tagged, str):
             return tagged
+    if depth < _MAX_DEPTH:
+        try:
+            nested = {
+                name: _scalar(inner, depth + 1)
+                for name, inner in sorted(vars(value).items())
+                if not name.startswith("_") and not callable(inner)
+            }
+        except TypeError:
+            nested = {}          # no __dict__ to look into
+        if nested:
+            return nested
     return str(value)
 
 
 def loaded_fields(item: Any) -> Dict[str, Any]:
-    """Every attribute already present on the item, JSON-safe and sorted."""
-    return {
+    """Every attribute already present on the item, JSON-safe and sorted.
+
+    A "files" key is added alongside: the paths are nested several levels
+    down under media, and having them at the top is worth the repetition.
+    """
+    fields = {
         name: _scalar(value)
         for name, value in sorted(vars(item).items())
         if not name.startswith("_") and not callable(value)
     }
+    paths = file_paths(item)
+    if paths:
+        fields["files"] = paths
+    return fields
 
 
 def file_paths(item: Any) -> List[str]:

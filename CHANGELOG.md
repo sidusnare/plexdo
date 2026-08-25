@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.13] - 2026-08-14
+
+### Fixed
+- `list-titles` in a machine-readable format printed media as object
+  references (`<Media object at 0x...>`), so file names appeared nowhere.
+  Nested objects are now expanded, putting the name at
+  `media[].parts[].file`, and the paths are repeated in a top-level `files`
+  list. `sourceURI` was never a file name: it is the remote server URI of an
+  item in another user's playlist and is null for local content.
+
 ## [1.1.12] - 2026-08-14
 
 ### Added
@@ -156,6 +166,7 @@ multi-user token handling, watched-state synchronisation, a status report,
 photo galleries, YAML/CSV/CLIXML output, shell completions for bash, zsh, and
 fish, a manual page, and packaging for PyPI. See the commit history.
 
+[1.1.13]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.13
 [1.1.12]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.12
 [1.1.11]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.11
 [1.1.10]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.10
