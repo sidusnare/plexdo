@@ -286,8 +286,11 @@ _plexdo_subcommand() {
       ;;
     find-missing)
       _arguments $_plexdo_global_opts \
+        '(-l --library)'{-l,--library}'[Library to look in]:library:_plexdo_libraries' \
+        '(-A --all)'{-A,--all}'[Check every show]' \
+        '(-s --season)'{-s,--season}'[Season number, or several comma separated]:seasons:' \
         '--include-specials[Also check season 0]' \
-        '1:library id:_plexdo_libraries'
+        '1:show:_plexdo_rating_keys'
       ;;
     rescan)
       _arguments $_plexdo_global_opts \

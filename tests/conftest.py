@@ -18,7 +18,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
 class FakeItem:
     """Minimal stand-in for a playable item."""
 
-    def __init__(self, rating_key: int, title: str, **kw: Any) -> None:
+    def __init__(self, rating_key: int = 1, title: str = "A Title",
+                 **kw: Any) -> None:
         self.ratingKey = rating_key
         self.title = title
         self.type = kw.pop("type", "movie")
@@ -29,13 +30,21 @@ class FakeItem:
 
 
 class FakePart:
-    def __init__(self, file: str) -> None:
+    """One file backing a media version."""
+
+    def __init__(self, file: str | None, **kw: Any) -> None:
         self.file = file
+        self.size = kw.pop("size", 100)
+        self.container = kw.pop("container", "mkv")
+        self._server = object()          # private: must never be reported
 
 
 class FakeMedia:
-    def __init__(self, file: str) -> None:
-        self.parts = [FakePart(file)]
+    """One media version, which may span several parts."""
+
+    def __init__(self, *files: str | None, **kw: Any) -> None:
+        self.parts = [FakePart(f) for f in files]
+        self.videoResolution = kw.pop("videoResolution", "1080")
 
 
 class FakeSection:

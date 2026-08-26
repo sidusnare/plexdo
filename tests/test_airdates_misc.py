@@ -6,7 +6,6 @@ import datetime
 
 import pytest
 
-from conftest import FakeItem
 from plexdo.accounts import _is_restricted, account_type
 from plexdo.airdates import _collect_neighbors, _estimate_date, _median_interval
 from plexdo.convert import format_duration, parse_date

@@ -1,7 +1,7 @@
 .\" Man page for plexdo (plexdo).
 .\" Regenerate or edit alongside AI.prompt.md; the .TH version must match
 .\" __version__ in src/plexdo/__init__.py.
-.TH PLEXDO 1 "2026-08-14" "plexdo 1.1.13" "User Commands"
+.TH PLEXDO 1 "2026-08-14" "plexdo 1.1.16" "User Commands"
 .
 .SH NAME
 plexdo \- command\-line interface for Plex Media Server
@@ -282,13 +282,36 @@ group.
 .RE
 .
 .TP
-.BI find\-missing " [library] " [ \-\-include\-specials ]
-Walk every season of every show and report the episode numbers missing between
-the start of a season and its highest episode. A season that simply stops
-early is not reported, since an unaired episode cannot be told from a missing
-one. Season 0 is skipped unless
+.BI find\-missing " SHOW " [ \-l " LIBRARY" "] [" \-A "] [" \-s " SEASONS" "] [" \-\-include\-specials ]
+Report the episode numbers missing between the start of a season and its
+highest episode.
+.I SHOW
+is a show title or ratingKey.
+.RS
+.PP
+A season that simply stops early is not reported, since an unaired episode
+cannot be told from a missing one.
+.TP
+.BR \-l ", " \-\-library " \fILIBRARY\fR"
+Look only in this library, by ID or title. Narrows the search for
+.IR SHOW ,
+or the sweep for
+.BR \-A .
+.TP
+.BR \-A ", " \-\-all
+Check every show rather than one named show.
+.I SHOW
+must be omitted.
+.TP
+.BR \-s ", " \-\-season " \fISEASONS\fR"
+One season number, or several separated by commas, as in
+.BR 1,3,5 .
+Applies to a single show. Naming season 0 includes the specials.
+.TP
 .B \-\-include\-specials
-is given, because specials are numbered irregularly.
+Also check season 0 when no season is named. Specials are numbered
+irregularly, so this is off by default.
+.RE
 .
 .SS Server management
 .TP

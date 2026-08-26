@@ -6,22 +6,19 @@ import datetime
 
 import pytest
 
+from conftest import FakeItem, FakeMedia
 from plexdo.commands.missing import episode_gaps
-from plexdo.records import SUMMARY_FIELDS, loaded_fields, release_date, summary_row
+from plexdo.records import loaded_fields, release_date, summary_row
 
 
 class Tag:
+    """A plexapi tag object, as genres and directors are."""
+
     def __init__(self, tag):
         self.tag = tag
 
 
-class Item:
-    def __init__(self, **kw):
-        self.ratingKey = kw.pop("ratingKey", 1)
-        self.title = kw.pop("title", "A Title")
-        for key, value in kw.items():
-            setattr(self, key, value)
-        self._server = object()          # private, must not be reported
+Item = FakeItem
 
 
 @pytest.mark.parametrize("numbers,expected", [
@@ -50,8 +47,9 @@ def test_episode_zero_starts_the_run_at_zero():
 # --- records -------------------------------------------------------------
 
 def test_summary_row_has_exactly_the_documented_columns():
+    """These five are what the man page and README promise."""
     row = summary_row(Item(year=1999, rating=8.1, studio="A24"))
-    assert tuple(row) == SUMMARY_FIELDS
+    assert tuple(row) == ("ratingKey", "title", "releaseDate", "rating", "studio")
 
 
 def test_release_date_prefers_the_full_date_over_the_year():
@@ -94,22 +92,12 @@ def test_loaded_fields_reads_only_what_is_already_present():
 from plexdo.records import file_paths
 
 
-class Part:
-    def __init__(self, file):
-        self.file = file
-
-
-class Media:
-    def __init__(self, *files):
-        self.parts = [Part(f) for f in files]
-
-
 def test_a_single_file_is_reported():
-    assert file_paths(Item(media=[Media("/mnt/a.mkv")])) == ["/mnt/a.mkv"]
+    assert file_paths(Item(media=[FakeMedia("/mnt/a.mkv")])) == ["/mnt/a.mkv"]
 
 
 def test_every_part_of_every_version_is_reported():
-    item = Item(media=[Media("/mnt/cd1.avi", "/mnt/cd2.avi"), Media("/mnt/hd.mkv")])
+    item = Item(media=[FakeMedia("/mnt/cd1.avi", "/mnt/cd2.avi"), FakeMedia("/mnt/hd.mkv")])
     assert file_paths(item) == ["/mnt/cd1.avi", "/mnt/cd2.avi", "/mnt/hd.mkv"]
 
 
@@ -120,7 +108,7 @@ def test_a_container_with_no_media_yields_nothing():
 
 
 def test_parts_without_a_path_are_skipped():
-    assert file_paths(Item(media=[Media(None, "/mnt/b.mkv")])) == ["/mnt/b.mkv"]
+    assert file_paths(Item(media=[FakeMedia(None, "/mnt/b.mkv")])) == ["/mnt/b.mkv"]
 
 
 def test_file_paths_does_not_trigger_a_reload():
@@ -132,27 +120,23 @@ def test_file_paths_does_not_trigger_a_reload():
 
 # --- nested media in listing records -------------------------------------
 
-class PartFull:
-    def __init__(self, file):
-        self.file, self.size, self.container = file, 100, "mkv"
-        self._server = object()
-
-
-class MediaFull:
-    def __init__(self, *files):
-        self.parts = [PartFull(f) for f in files]
-        self.videoResolution = "1080"
-
-
 def test_media_is_expanded_rather_than_repr_d():
     """A repr like '<Media object at 0x...>' carries nothing."""
-    fields = loaded_fields(Item(media=[MediaFull("/mnt/a.mkv")]))
+    fields = loaded_fields(Item(media=[FakeMedia("/mnt/a.mkv")]))
     assert fields["media"][0]["parts"][0]["file"] == "/mnt/a.mkv"
     assert "object at 0x" not in str(fields["media"])
 
 
+def test_expansion_carries_the_surrounding_media_detail():
+    """The point of expanding is the codec and size data, not just the path."""
+    version = loaded_fields(Item(media=[FakeMedia("/mnt/a.mkv")]))["media"][0]
+    assert version["videoResolution"] == "1080"
+    assert version["parts"][0]["container"] == "mkv"
+    assert version["parts"][0]["size"] == 100
+
+
 def test_the_file_paths_are_also_surfaced_at_the_top_level():
-    fields = loaded_fields(Item(media=[MediaFull("/mnt/a.mkv")]))
+    fields = loaded_fields(Item(media=[FakeMedia("/mnt/a.mkv")]))
     assert fields["files"] == ["/mnt/a.mkv"]
 
 
@@ -161,7 +145,7 @@ def test_no_files_key_when_the_item_has_no_media():
 
 
 def test_private_attributes_of_nested_objects_are_skipped():
-    fields = loaded_fields(Item(media=[MediaFull("/mnt/a.mkv")]))
+    fields = loaded_fields(Item(media=[FakeMedia("/mnt/a.mkv")]))
     assert "_server" not in fields["media"][0]["parts"][0]
 
 
@@ -177,3 +161,41 @@ def test_an_object_without_a_dict_falls_back_to_text():
     class Slotted:
         __slots__ = ()
     assert isinstance(loaded_fields(Item(thing=Slotted()))["thing"], str)
+
+
+# --- find-missing arguments ----------------------------------------------
+
+from plexdo.commands.missing import _wanted, parse_seasons
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("1", {1}), ("1,3,5", {1, 3, 5}), (" 2 , 4 ", {2, 4}), ("0", {0}),
+])
+def test_season_lists_are_parsed(text, expected):
+    assert parse_seasons(text) == expected
+
+
+@pytest.mark.parametrize("text", ["x", "1,,x", "", "  "])
+def test_a_bad_season_list_is_refused(text):
+    with pytest.raises(SystemExit):
+        parse_seasons(text)
+
+
+def test_season_zero_is_skipped_by_default():
+    assert _wanted(0, None, False) is False
+    assert _wanted(1, None, False) is True
+
+
+def test_include_specials_brings_season_zero_back():
+    assert _wanted(0, None, True) is True
+
+
+def test_naming_a_season_overrides_the_specials_default():
+    """Asking for --season 0 can only mean the specials."""
+    assert _wanted(0, {0}, False) is True
+    assert _wanted(1, {0}, False) is False
+
+
+def test_a_named_season_list_selects_only_those():
+    assert _wanted(3, {1, 3}, False) is True
+    assert _wanted(2, {1, 3}, False) is False

@@ -74,7 +74,7 @@ WIDE_ROWS = [{
 }]
 
 
-def render(rows, limit):
+def render_table(rows, limit):
     buffer = io.StringIO()
     original, sys.stdout = sys.stdout, buffer
     try:
@@ -86,27 +86,27 @@ def render(rows, limit):
 
 @pytest.mark.parametrize("limit", [80, 60, 40, 30, 24, 20])
 def test_a_table_never_exceeds_the_column_budget(limit):
-    assert max(display_width(line) for line in render(WIDE_ROWS, limit)) <= limit
+    assert max(display_width(line) for line in render_table(WIDE_ROWS, limit)) <= limit
 
 
 def test_every_line_is_the_same_width_after_fitting():
-    assert len({display_width(line) for line in render(WIDE_ROWS, 60)}) == 1
+    assert len({display_width(line) for line in render_table(WIDE_ROWS, 60)}) == 1
 
 
 def test_nothing_is_truncated_when_the_table_already_fits():
-    lines = render([{"a": "x"}], 200)
+    lines = render_table([{"a": "x"}], 200)
     assert "..." not in "\n".join(lines)
 
 
 def test_the_widest_column_is_the_one_shrunk(caplog):
     import logging
     caplog.set_level(logging.INFO, logger="plexdo")
-    render(WIDE_ROWS, 60)
+    render_table(WIDE_ROWS, 60)
     assert "title" in caplog.text and "--wide" in caplog.text
 
 
 def test_no_limit_keeps_every_character():
-    joined = "\n".join(render(WIDE_ROWS, None))
+    joined = "\n".join(render_table(WIDE_ROWS, None))
     assert "Then He's in the Bag" in joined
 
 

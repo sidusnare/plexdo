@@ -14,12 +14,6 @@ import datetime
 
 from plexdo.console import clean_text
 from plexdo.convert import parse_date
-from plexdo.formats import _scalar
-
-
-# Columns shown by the plain table renderer. Machine-readable formats get
-# every field the listing carried.
-SUMMARY_FIELDS = ("ratingKey", "title", "releaseDate", "rating", "studio")
 
 
 # How far to descend into nested plexapi objects. Media -> parts -> Part is
@@ -27,7 +21,7 @@ SUMMARY_FIELDS = ("ratingKey", "title", "releaseDate", "rating", "studio")
 _MAX_DEPTH = 2
 
 
-def _scalar(value: Any, depth: int = 0) -> Any:
+def _jsonable(value: Any, depth: int = 0) -> Any:
     """Reduce a plexapi attribute to something a serialiser can carry.
 
     Nested objects such as Media and Part are expanded rather than repr'd,
@@ -39,7 +33,7 @@ def _scalar(value: Any, depth: int = 0) -> Any:
         return value.isoformat(sep=" ") if isinstance(
             value, datetime.datetime) else value.isoformat()
     if isinstance(value, (list, tuple)):
-        return [_scalar(item, depth) for item in value]
+        return [_jsonable(item, depth) for item in value]
     # Genres, directors, collections and friends are tag objects.
     for attribute in ("tag", "title"):
         tagged = getattr(value, attribute, None)
@@ -48,7 +42,7 @@ def _scalar(value: Any, depth: int = 0) -> Any:
     if depth < _MAX_DEPTH:
         try:
             nested = {
-                name: _scalar(inner, depth + 1)
+                name: _jsonable(inner, depth + 1)
                 for name, inner in sorted(vars(value).items())
                 if not name.startswith("_") and not callable(inner)
             }
@@ -66,7 +60,7 @@ def loaded_fields(item: Any) -> Dict[str, Any]:
     down under media, and having them at the top is worth the repetition.
     """
     fields = {
-        name: _scalar(value)
+        name: _jsonable(value)
         for name, value in sorted(vars(item).items())
         if not name.startswith("_") and not callable(value)
     }
@@ -101,7 +95,11 @@ def release_date(item: Any) -> str:
 
 
 def summary_row(item: Any) -> Dict[str, Any]:
-    """The compact record shown in table output."""
+    """The compact record shown in table output.
+
+    Machine-readable formats carry every field the listing returned; these
+    five are what fits usefully in a terminal.
+    """
     fields = vars(item)
     return {
         "ratingKey": int(item.ratingKey),

@@ -4,6 +4,42 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.16] - 2026-08-14
+
+### Changed
+- `AI.prompt.md` regenerated from the current code rather than edited in
+  place. The previous version had drifted: the `find-missing` section had been
+  deleted by an earlier edit and `list-titles` still described an interface
+  three revisions old. The new one is checked against the registry and the
+  module list, is a third shorter, and states each constraint with the reason
+  attached.
+
+## [1.1.15] - 2026-08-14
+
+### Changed
+- `find-missing` now names a show by default, by title or ratingKey, rather
+  than sweeping every library. `-A/--all` restores the sweep, `-l/--library`
+  narrows either, and `-s/--season` takes one season or a comma-separated
+  list for a single show. Naming season 0 with `-s 0` includes the specials
+  without needing `--include-specials`.
+- Show lookup uses the same precedence as every other identifier: a numeric
+  value is a ratingKey, titles match exactly before case-insensitively, and an
+  ambiguous title aborts rather than guessing.
+
+## [1.1.14] - 2026-08-14
+
+### Fixed
+- `records.py` carried a stray `from plexdo.formats import _scalar` that
+  shadowed its own function of the same name, so nested media were flattened
+  to text instead of expanded. Both are now named for what they do:
+  `formats._cell_value` flattens for CSV and CLIXML, `records._jsonable`
+  preserves structure.
+
+### Changed
+- Test fixtures consolidated: one `FakeItem` and one `FakeMedia` in
+  `conftest.py` replace four near-duplicate mock classes.
+- Removed `SUMMARY_FIELDS`, a constant referenced only by its own test.
+
 ## [1.1.13] - 2026-08-14
 
 ### Fixed
@@ -166,6 +202,9 @@ multi-user token handling, watched-state synchronisation, a status report,
 photo galleries, YAML/CSV/CLIXML output, shell completions for bash, zsh, and
 fish, a manual page, and packaging for PyPI. See the commit history.
 
+[1.1.16]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.16
+[1.1.15]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.15
+[1.1.14]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.14
 [1.1.13]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.13
 [1.1.12]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.12
 [1.1.11]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.11

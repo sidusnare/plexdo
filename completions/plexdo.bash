@@ -299,7 +299,7 @@ _plexdo_positional_count() {
     for (( i=1; i < cword; i++ )); do
         word="${words[$i]}"
         if (( skip_next )); then skip_next=0; continue; fi
-        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle) skip_next=1; continue ;; esac
+        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle|-s|--season|-l|--library) skip_next=1; continue ;; esac
         if [[ "$word" == -* ]]; then continue; fi
         if (( ! found_cmd )); then
             [[ "$word" == "$cmd" ]] && found_cmd=1
@@ -317,7 +317,7 @@ _plexdo_nth_positional() {
     for (( i=1; i < cword; i++ )); do
         word="${words[$i]}"
         if (( skip_next )); then skip_next=0; continue; fi
-        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle) skip_next=1; continue ;; esac
+        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle|-s|--season|-l|--library) skip_next=1; continue ;; esac
         if [[ "$word" == -* ]]; then continue; fi
         if (( ! found_cmd )); then
             [[ "$word" == "$cmd" ]] && found_cmd=1
@@ -421,13 +421,15 @@ _plexdo_complete() {
                 COMPREPLY=()
             fi ;;
 
-        # [library_id] [--include-specials]
+        # <show> [-l LIBRARY] [-A] [-s SEASONS] [--include-specials]
         find-missing)
-            if [[ "$cur" == -* ]]; then
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --include-specials" -- "$cur") )
+            if [[ "$prev" == "-l" || "$prev" == "--library" ]]; then
+                _plexdo_complete_library_id
+            elif [[ "$cur" == -* ]]; then
+                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --library -l --all -A --season -s --include-specials" -- "$cur") )
             else
                 case $pos in
-                    0) _plexdo_complete_library_id ;;
+                    0) _plexdo_complete_rating_key ;;
                     *) COMPREPLY=() ;;
                 esac
             fi ;;

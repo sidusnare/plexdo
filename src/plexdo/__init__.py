@@ -22,5 +22,5 @@ The public entry point is :func:`plexdo.cli.main`, exposed by the ``plexdo``
 console script.
 """
 
-__version__ = "1.1.13"
+__version__ = "1.1.16"
 __all__ = ["__version__"]

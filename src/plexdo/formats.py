@@ -30,8 +30,13 @@ def _as_records(data: Payload) -> List[Record]:
     return []
 
 
-def _scalar(value: Any) -> Any:
-    """Reduce a value to something the serialisers can represent."""
+def _cell_value(value: Any) -> Any:
+    """Flatten a value for a tabular format.
+
+    CSV and CLIXML carry one scalar per column, so anything structured is
+    rendered as text. This is deliberately unlike records._jsonable, which
+    preserves structure for the formats that can express it.
+    """
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     return str(value)
@@ -113,7 +118,7 @@ def to_csv(data: Payload) -> str:
     )
     writer.writeheader()
     for record in records:
-        writer.writerow({key: _scalar(val) for key, val in record.items()})
+        writer.writerow({key: _cell_value(val) for key, val in record.items()})
     return buffer.getvalue().rstrip("\n")
 
 
@@ -153,7 +158,7 @@ def to_clixml(data: Payload) -> str:
             lines.append('    <TNRef RefId="0" />')
         lines.append("    <MS>")
         for key, value in record.items():
-            lines.append("      " + _clixml_property(key, _scalar(value)))
+            lines.append("      " + _clixml_property(key, _cell_value(value)))
         lines.append("    </MS>")
         lines.append("  </Obj>")
     lines.append("</Objs>")

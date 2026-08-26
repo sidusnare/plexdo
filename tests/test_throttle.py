@@ -5,8 +5,6 @@
 import argparse
 import time
 
-import pytest
-
 from plexdo.throttle import (DEFAULT_THROTTLE, THROTTLE_THRESHOLD, paced,
                              throttle_delay)
 

@@ -5,8 +5,6 @@
 import argparse
 import json
 
-import pytest
-
 from conftest import FakePlex, FakeSection
 from plexdo.paths import identity, mapper_for
 from plexdo.tokens import ADMIN_KEY, admin_token, load_store, lookup, store_token

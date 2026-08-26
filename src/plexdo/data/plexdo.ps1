@@ -326,7 +326,7 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
                 '^search$'                          { $flags['--media-type'] = 'Restrict to one media type'; $flags['--library-id'] = 'Restrict to one library' }
                 '^rescan$'                          { $flags['--status'] = 'Print all active scan jobs'; $flags['--now'] = 'Cancel pending scans first' }
                 '^status$'                          { $flags['--section'] = 'Show only one section' }
-                '^find-missing$'                    { $flags['--include-specials'] = 'Also check season 0' }
+                '^find-missing$'                    { $flags['--library'] = 'Library to look in'; $flags['--all'] = 'Check every show'; $flags['--season'] = 'Season number, or several comma separated'; $flags['--include-specials'] = 'Also check season 0' }
                 '^copy-watched$'                    { $flags['--one-way'] = 'Only write to the second user'; $flags['--library'] = 'Restrict to one library'; $flags['--title'] = 'Restrict to one item'; $flags['--unwatch'] = 'Propagate the unwatched state instead' }
                 '^login$'                           { $flags['--username'] = 'Plex username or email'; $flags['--password'] = 'Plex password (INSECURE)'; $flags['--code'] = 'Two-factor code'; $flags['--two-factor'] = 'Prompt for a two-factor code' }
             }
@@ -337,7 +337,7 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
                 { $_ -in 'list-titles', 'list-library' } { if ($index -eq 0) { $results = Get-PlexdoLibraries } }
                 'export-titles'  { if ($index -eq 0) { $results = Get-PlexdoLibraries } }
                 'rescan'         { if ($index -eq 0) { $results = Get-PlexdoLibraries } }
-                'find-missing'   { if ($index -eq 0) { $results = Get-PlexdoLibraries } }
+                'find-missing'   { if ($index -eq 0) { $results = Get-PlexdoRatingKeys } }
                 'read'           { if ($index -eq 0) { $results = Get-PlexdoLibraries }
                                    elseif ($index -eq 1) { $results = Get-PlexdoRatingKeys } }
                 'list-show'      { if ($index -eq 0) { $results = Get-PlexdoRatingKeys } }

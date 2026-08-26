@@ -113,7 +113,7 @@ function __plexdo_positionals
             continue
         end
         switch $t
-            case --m3u --album --sort --media-type --library-id -l --library -t --title -u --username -p --password -c --code -f --format --section -p --prefix --throttle
+            case --m3u --album --sort --media-type --library-id -l --library -t --title -u --username -p --password -c --code -f --format --section -p --prefix --throttle -s --season
                 set skip 1
                 continue
             case '-*'

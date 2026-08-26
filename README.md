@@ -211,7 +211,7 @@ identical rules apply to library IDs and titles.
 | --- | --- |
 | `list-libraries` | Library IDs, types, and titles |
 | `list-titles <library> [--album A]` | Titles in a library (alias: `list-library`) |
-| `find-missing [library] [--include-specials]` | Seasons with gaps in their episode numbering |
+| `find-missing <show> [-l L] [-A] [-s N,N]` | Seasons with gaps in their episode numbering |
 | `list-show <rating_key> [--m3u P]` | Every episode of a show, specials skipped |
 | `list-users` | User IDs, account types, and titles |
 | `list-playlists <user_id>` | A user's playlists |
@@ -245,15 +245,19 @@ the route to the full picture for a single item.
 ### Finding gaps
 
 ```bash
-plexdo find-missing                 # every show library
-plexdo find-missing "TV Shows"      # one library
-plexdo find-missing --include-specials
+plexdo find-missing "Breaking Bad"          # one show, by title
+plexdo find-missing 1234                    # or by ratingKey
+plexdo find-missing "The Wire" -s 1,3       # only these seasons
+plexdo find-missing "The Wire" -l "TV Shows"
+plexdo find-missing -A                      # every show, every library
+plexdo find-missing -A -l "TV Shows"        # every show in one library
 ```
 
 Reports the episode numbers missing between the start of a season and its
 highest episode. A season that simply stops early is not reported, since an
 unaired episode cannot be told from a missing one. Season 0 is skipped by
-default, because specials are numbered irregularly.
+default because specials are numbered irregularly, though naming it with
+`-s 0` includes it.
 
 ```
 ┌──────────────┬───────────┬────────┬─────────┬──────────────┬──────┬─────────┐
