@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.18] - 2026-08-14
+
+### Changed
+- Release notes in `CONTRIBUTING.md` now record that the publish workflow
+  triggers on a published release rather than a pushed tag, and suggest
+  `git config tag.sort version:refname` so `v1.1.16` no longer sorts before
+  `v1.1.6`.
+
+## [1.1.17] - 2026-08-14
+
+### Added
+- `.github/workflows/publish.yml`: publishes to PyPI through Trusted
+  Publishing, so no API token is stored. It reruns `make check`, refuses to
+  publish when the release tag does not match the packaged version, and
+  offers a manual TestPyPI rehearsal.
+
 ## [1.1.16] - 2026-08-14
 
 ### Changed
@@ -202,6 +218,8 @@ multi-user token handling, watched-state synchronisation, a status report,
 photo galleries, YAML/CSV/CLIXML output, shell completions for bash, zsh, and
 fish, a manual page, and packaging for PyPI. See the commit history.
 
+[1.1.18]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.18
+[1.1.17]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.17
 [1.1.16]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.16
 [1.1.15]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.15
 [1.1.14]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.14

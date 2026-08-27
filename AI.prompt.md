@@ -637,6 +637,17 @@ still cleans up.
 CI runs `make check` on Python 3.11 through 3.14, plus jobs that parse all
 four completions and lint the man page.
 
+`publish.yml` uploads to PyPI through Trusted Publishing (OIDC), so no API
+token exists to leak. It builds and verifies in one job, then publishes from a
+second that raises only `id-token: write` and names a `pypi` environment,
+which is where a deployment protection rule can be attached. Publishing runs
+on a published GitHub release; `workflow_dispatch` offers TestPyPI for a
+rehearsal, with `skip-existing` so a repeated dry run does not fail.
+
+The release job must confirm the tag matches the packaged version. PyPI
+uploads are immutable, so publishing `v1.2.3` from a tree carrying some other
+version cannot be undone. Strip a leading `v` before comparing.
+
 ## DELIVERABLES
 
 1. The `plexdo` package under `src/`, laid out as above

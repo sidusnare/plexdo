@@ -537,6 +537,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). In short: `make develop`, then
 
 Security issues: see [SECURITY.md](SECURITY.md).
 
+## Releasing
+
+Tagging a `vX.Y.Z` release publishes to PyPI through Trusted Publishing; see
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Links
 
 - Homepage and source: <https://github.com/sidusnare/plexdo>

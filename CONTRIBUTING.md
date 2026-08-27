@@ -38,5 +38,34 @@ That runs, in order:
 - Bump the revision (the third version field) for each release, in all three
   places `check-version` inspects.
 
+## Releasing
+
+1. Bump the revision in `src/plexdo/__init__.py`, `pyproject.toml`, and the
+   `.TH` line of `man/plexdo.1`; `make check-version` verifies all three.
+2. Add a `CHANGELOG.md` entry.
+3. `make check`.
+4. Tag and publish a GitHub release as `vX.Y.Z`. The workflow triggers on the
+   release being published, not on the tag being pushed, so pushing a tag
+   alone does nothing.
+
+Set git to sort tags by version once per clone:
+
+```bash
+git config tag.sort version:refname
+```
+
+Without it `git tag` sorts lexically, so `v1.1.16` lands before `v1.1.6` and
+the newest tag is not the last one listed. That only gets worse as the
+revision passes 9.
+
+Publishing to PyPI is automatic from `.github/workflows/publish.yml`, through
+[Trusted Publishing](https://docs.pypi.org/trusted-publishers/), so no API
+token is stored anywhere. The workflow reruns `make check`, refuses to publish
+if the tag does not match the packaged version, and uploads from a `pypi`
+environment you can put a protection rule on.
+
+To rehearse against TestPyPI, run the workflow manually from the Actions tab
+and choose `testpypi`.
+
 `AI.prompt.md` is the authoritative specification. When behaviour changes,
 update it in the same commit.
