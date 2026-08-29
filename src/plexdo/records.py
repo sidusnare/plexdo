@@ -9,7 +9,7 @@ what the server already sent and costs no extra calls. `show-metadata` is the
 route to the complete picture for a single item.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, Iterator, List, Tuple
 import datetime
 
 from plexdo.console import clean_text
@@ -53,36 +53,115 @@ def _jsonable(value: Any, depth: int = 0) -> Any:
     return str(value)
 
 
-def loaded_fields(item: Any) -> Dict[str, Any]:
-    """Every attribute already present on the item, JSON-safe and sorted.
+def _readable_names(item: Any) -> List[str]:
+    """Every public field name an item exposes.
 
-    A "files" key is added alongside: the paths are nested several levels
-    down under media, and having them at the top is worth the repetition.
+    Instance attributes alone are not enough: plexapi moved genres,
+    directors, media and a dozen others to ``cached_data_property``, which
+    does not appear in ``vars()`` until first accessed. A Movie has 18 of
+    them, so reading only ``vars()`` reports a fraction of the metadata.
     """
-    fields = {
-        name: _jsonable(value)
-        for name, value in sorted(vars(item).items())
-        if not name.startswith("_") and not callable(value)
-    }
+    lazy = getattr(type(item), "_cached_data_properties", set())
+    names = set(vars(item)) | set(lazy)
+    return sorted(name for name in names if not name.startswith("_"))
+
+
+def loaded_fields(item: Any) -> Dict[str, Any]:
+    """Every field the item carries, JSON-safe and sorted.
+
+    Reads with plexapi's auto-reload disabled, so a field that happens to be
+    empty does not trigger an HTTP request; across a library that would be
+    one round trip per item. A "files" key is added alongside, since the
+    paths are otherwise several levels down.
+    """
+    fields: Dict[str, Any] = {}
+    restore = getattr(item, "_autoReload", None)
+    if restore is not None:
+        item._autoReload = False        # pylint: disable=protected-access
+    try:
+        for name in _readable_names(item):
+            try:
+                value = getattr(item, name)
+            except Exception:           # pylint: disable=broad-except
+                continue                # a property that cannot resolve offline
+            if callable(value):
+                continue
+            fields[name] = _jsonable(value)
+    finally:
+        if restore is not None:
+            item._autoReload = restore  # pylint: disable=protected-access
+
     paths = file_paths(item)
     if paths:
         fields["files"] = paths
     return fields
 
 
+def _media_versions(item: Any) -> Iterator[Tuple[bool, List[Tuple[bool, str]]]]:
+    """Yield (selected, parts) for each media version of an item.
+
+    Reads the XML plexapi already holds in ``_data`` rather than the ``media``
+    property. That property is a ``cached_data_property``, so it is absent
+    from ``vars()`` until something first touches it, and touching it on an
+    item that genuinely has no media satisfies plexapi's reload condition and
+    costs an HTTP request. The XML is already in memory and always accurate.
+
+    Falls back to the typed objects for anything without ``_data``.
+    """
+    data = getattr(item, "_data", None)
+    if data is not None:
+        for element in data.findall("Media"):
+            parts = [
+                (part.get("selected") == "1", part.get("file") or "")
+                for part in element.findall("Part")
+            ]
+            yield element.get("selected") == "1", parts
+        return
+    for media in getattr(item, "media", None) or []:
+        yield (
+            bool(getattr(media, "selected", False)),
+            [
+                (bool(getattr(part, "selected", False)),
+                 getattr(part, "file", None) or "")
+                for part in getattr(media, "parts", None) or []
+            ],
+        )
+
+
 def file_paths(item: Any) -> List[str]:
     """Server-side paths of every file backing an item.
 
-    An item can have several media versions and each several parts, so this
-    is a list. Shows and seasons have no media of their own and yield none.
+    An item can have several media versions and a version several parts, so
+    this is a list. Containers such as shows and seasons have no media of
+    their own and yield nothing; their files belong to their episodes.
     """
-    paths: List[str] = []
-    for media in vars(item).get("media") or []:
-        for part in getattr(media, "parts", None) or []:
-            path = getattr(part, "file", None)
+    return [
+        path
+        for _, parts in _media_versions(item)
+        for _, path in parts
+        if path
+    ]
+
+
+def _preferred(entries: List[Tuple[bool, Any]]) -> List[Any]:
+    """Entries Plex marked as selected, or all of them when none is marked.
+
+    A session marks the version and part actually being played, which is the
+    only way to tell them apart on a multi-version item. Nothing is marked
+    when there is just one, so an empty selection means "all of them".
+    """
+    chosen = [value for selected, value in entries if selected]
+    return chosen or [value for _, value in entries]
+
+
+def playing_file(item: Any) -> str:
+    """The single file a player has open, or empty if none is resolvable."""
+    versions = list(_media_versions(item))
+    for parts in _preferred(versions):
+        for path in _preferred(parts):
             if path:
-                paths.append(path)
-    return paths
+                return path
+    return ""
 
 
 def release_date(item: Any) -> str:

@@ -67,5 +67,16 @@ environment you can put a protection rule on.
 To rehearse against TestPyPI, run the workflow manually from the Actions tab
 and choose `testpypi`.
 
+Every workflow needs a `permissions:` block. `contents: read` at the top of
+the file covers building and testing; a job needing more raises it for itself.
+Omitting it hands jobs the repository default token and CodeQL reports it once
+per job.
+
+Actions are pinned to a major version and should be kept on the newest one.
+GitHub retires the Node runtime under them every couple of years, so an
+action left on an old major starts warning and eventually stops running;
+`actions/checkout@v7`, `setup-python@v7`, `upload-artifact@v7`, and
+`download-artifact@v8` are all on node24.
+
 `AI.prompt.md` is the authoritative specification. When behaviour changes,
 update it in the same commit.

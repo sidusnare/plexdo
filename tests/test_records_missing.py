@@ -79,12 +79,23 @@ def test_loaded_fields_renders_dates_as_text():
     assert fields["addedAt"] == "2024-03-05 12:30:00"
 
 
-def test_loaded_fields_reads_only_what_is_already_present():
-    """Attribute access on a partial plexapi object triggers a reload."""
+def test_loaded_fields_disables_reload_while_reading():
+    """Across a library, one reload per item would be one request per item."""
     class Exploding(Item):
-        def __getattr__(self, name):     # only called for missing attributes
+        """Public attribute access explodes, as a reload would.
+
+        plexapi returns underscore attributes without reloading, so those
+        stay readable here too.
+        """
+
+        def __getattr__(self, name):
+            if name.startswith("_"):
+                raise AttributeError(name)
             raise AssertionError(f"reload triggered for {name}")
-    assert loaded_fields(Exploding())["title"] == "A Title"
+    item = Exploding()
+    item._autoReload = True
+    assert loaded_fields(item)["title"] == "A Title"
+    assert item._autoReload is True          # restored afterwards
 
 
 # --- file paths ----------------------------------------------------------
@@ -113,7 +124,15 @@ def test_parts_without_a_path_are_skipped():
 
 def test_file_paths_does_not_trigger_a_reload():
     class Exploding(Item):
+        """Public attribute access explodes, as a reload would.
+
+        plexapi returns underscore attributes without reloading, so those
+        stay readable here too.
+        """
+
         def __getattr__(self, name):
+            if name.startswith("_"):
+                raise AttributeError(name)
             raise AssertionError(f"reload triggered for {name}")
     assert file_paths(Exploding()) == []
 
@@ -199,3 +218,107 @@ def test_naming_a_season_overrides_the_specials_default():
 def test_a_named_season_list_selects_only_those():
     assert _wanted(3, {1, 3}, False) is True
     assert _wanted(2, {1, 3}, False) is False
+
+
+# --- the file a player has open ------------------------------------------
+
+from plexdo.records import playing_file
+
+
+class SelPart:
+    def __init__(self, file, selected=False):
+        self.file, self.selected = file, selected
+
+
+class SelMedia:
+    def __init__(self, *parts, selected=False):
+        self.parts, self.selected = list(parts), selected
+
+
+def test_a_single_version_needs_no_selection():
+    item = Item(media=[SelMedia(SelPart("/mnt/a.mkv"))])
+    assert playing_file(item) == "/mnt/a.mkv"
+
+
+def test_the_selected_version_wins_over_the_first():
+    """A 4K and a 1080p copy: report the one actually being played."""
+    item = Item(media=[SelMedia(SelPart("/mnt/4k.mkv")),
+                       SelMedia(SelPart("/mnt/1080.mkv"), selected=True)])
+    assert playing_file(item) == "/mnt/1080.mkv"
+
+
+def test_the_selected_part_wins_within_a_version():
+    item = Item(media=[SelMedia(SelPart("/mnt/cd1.avi"),
+                                SelPart("/mnt/cd2.avi", selected=True))])
+    assert playing_file(item) == "/mnt/cd2.avi"
+
+
+def test_an_item_with_no_media_reports_nothing():
+    assert playing_file(Item(media=[])) == ""
+    assert playing_file(Item()) == ""
+
+
+def test_playing_file_does_not_trigger_a_reload():
+    class Exploding(Item):
+        """Public attribute access explodes, as a reload would.
+
+        plexapi returns underscore attributes without reloading, so those
+        stay readable here too.
+        """
+
+        def __getattr__(self, name):
+            if name.startswith("_"):
+                raise AttributeError(name)
+            raise AssertionError(f"reload triggered for {name}")
+    assert playing_file(Exploding()) == ""
+
+
+# --- reading real plexapi object shapes ----------------------------------
+
+import xml.etree.ElementTree as ET
+
+
+class Lazy:
+    """A plexapi-shaped object: XML in _data, media as a lazy property.
+
+    plexapi moved media, genres and a dozen others to cached_data_property,
+    which is absent from vars() until first accessed, so anything reading
+    only vars() sees nothing.
+    """
+
+    _cached_data_properties = {"media"}
+
+    def __init__(self, xml):
+        self._data = ET.fromstring(xml)
+        self._autoReload = True
+        self.ratingKey = 101
+        self.title = "Blade Runner 2049"
+
+    @property
+    def media(self):
+        raise AssertionError("read from _data, not the lazy property")
+
+
+TWO_VERSIONS = """<Video ratingKey="101" title="Blade Runner 2049">
+  <Media id="1" videoResolution="4k" selected="0">
+    <Part id="11" file="/mnt/4k.mkv" selected="0"/>
+  </Media>
+  <Media id="2" videoResolution="1080" selected="1">
+    <Part id="12" file="/mnt/1080.mkv" selected="1"/>
+  </Media>
+</Video>"""
+
+NO_MEDIA = '<Directory ratingKey="1" title="Breaking Bad" type="show"/>'
+
+
+def test_file_paths_reads_a_real_object_shape():
+    assert file_paths(Lazy(TWO_VERSIONS)) == ["/mnt/4k.mkv", "/mnt/1080.mkv"]
+
+
+def test_playing_file_reads_a_real_object_shape():
+    assert playing_file(Lazy(TWO_VERSIONS)) == "/mnt/1080.mkv"
+
+
+def test_a_container_with_no_media_element_yields_nothing():
+    assert file_paths(Lazy(NO_MEDIA)) == []
+    assert playing_file(Lazy(NO_MEDIA)) == ""

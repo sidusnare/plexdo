@@ -13,6 +13,7 @@ from plexdo.console import clean_text, output, output_format, print_metadata, pr
 from plexdo.constants import LOG
 from plexdo.convert import format_duration, parse_date
 from plexdo.formats import render
+from plexdo.records import playing_file
 from plexdo.titles import display_title
 
 
@@ -52,6 +53,8 @@ def _session_rows(plex: PlexServer) -> List[Dict[str, Any]]:
         usernames = getattr(item, "usernames", []) or []
         rows.append({
             "user": clean_text(usernames[0] if usernames else ""),
+            "library": int(vars(item).get("librarySectionID") or 0),
+            "ratingKey": int(item.ratingKey),
             "title": display_title(item),
             "state": clean_text(getattr(player, "state", "") or ""),
             "player": clean_text(getattr(player, "title", "") or ""),
@@ -60,6 +63,7 @@ def _session_rows(plex: PlexServer) -> List[Dict[str, Any]]:
             "progress": _format_offset(
                 getattr(item, "viewOffset", 0), getattr(item, "duration", 0)
             ),
+            "file": playing_file(item),
         })
     return rows
 

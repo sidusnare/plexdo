@@ -4,6 +4,43 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.22] - 2026-08-27
+
+### Fixed
+- File paths were reported as empty everywhere: the `status` sessions column,
+  `show-metadata`, the `files` key in machine-readable `list-titles`, M3U
+  export, and the photo gallery. plexapi exposes `media` as a
+  `cached_data_property`, which is absent from `vars()` until first accessed,
+  and the traversal read only `vars()`. It now reads the XML plexapi already
+  holds in `_data`, which is both accurate and free.
+- `list-titles` in a machine-readable format was reporting a fraction of the
+  metadata for the same reason: a Movie has 18 lazy properties, including
+  genres, directors, and collections. They are now read with plexapi's
+  auto-reload disabled, so a field that happens to be empty costs no HTTP
+  request.
+
+## [1.1.21] - 2026-08-27
+
+### Fixed
+- `ci.yml` declared no `permissions`, so its three jobs received the
+  repository default token; CodeQL reported one warning per job. It now grants
+  `contents: read`, which is all a build and test run needs.
+
+## [1.1.20] - 2026-08-27
+
+### Changed
+- Workflow actions moved to their current majors, off the deprecated node20
+  runtime: `actions/checkout@v7`, `actions/setup-python@v7`,
+  `actions/upload-artifact@v7`, `actions/download-artifact@v8`. The PyPI
+  publish action is a composite and has no Node runtime to deprecate.
+
+## [1.1.19] - 2026-08-27
+
+### Added
+- The `status` sessions table now carries the library ID, the ratingKey, and
+  the file the player actually has open. For an item with several versions or
+  parts, the one Plex marks as selected is reported rather than the first.
+
 ## [1.1.18] - 2026-08-14
 
 ### Changed
@@ -218,6 +255,10 @@ multi-user token handling, watched-state synchronisation, a status report,
 photo galleries, YAML/CSV/CLIXML output, shell completions for bash, zsh, and
 fish, a manual page, and packaging for PyPI. See the commit history.
 
+[1.1.22]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.22
+[1.1.21]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.21
+[1.1.20]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.20
+[1.1.19]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.19
 [1.1.18]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.18
 [1.1.17]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.17
 [1.1.16]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.16

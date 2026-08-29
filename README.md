@@ -399,7 +399,8 @@ plexdo status --section tasks -f csv
 ```
 
 Reports server identity (name, version, machine ID, platform, platform
-version, last updated), active sessions, shared users, system accounts,
+version, last updated), active sessions with the library, ratingKey, and the
+file each player has open, shared users, system accounts,
 reachable addresses, library scans in progress, other background activity, and
 scheduled maintenance tasks.
 

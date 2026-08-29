@@ -338,10 +338,24 @@ state in `copy-watched`, `collect_photos`, and the per-user loop in
 
 ## RECORDS
 
-`records.loaded_fields(item)` reads `vars(item)`, never attribute access.
-plexapi's `PlexPartialObject.__getattribute__` reloads whenever a value is
-`None` or `[]` and the object is partial, so building metadata by attribute
-access costs one HTTP request **per item** across a library.
+plexapi exposes `media`, `genres`, `directors`, `collections` and a dozen
+others as `cached_data_property`. Those are **absent from `vars()`** until
+something first accesses them, so reading only `vars()` reports a fraction of
+the metadata and no file paths at all. Take the union of `vars(item)` and
+`type(item)._cached_data_properties`.
+
+Reading them must not cost requests, though:
+`PlexPartialObject.__getattribute__` reloads whenever a value is `None` or
+`[]` and the object is partial, which across a library is one round trip per
+item. Set `item._autoReload = False` while reading and restore it afterwards;
+that flag short-circuits the reload. Note plexapi returns underscore
+attributes without reloading, so a test fake modelling this must explode only
+for public names.
+
+`records._media_versions` reads the XML plexapi already holds in `_data`
+rather than the `media` property: it is always accurate, needs no reload
+guard, and carries the `selected` flags that identify the version and part a
+session is actually playing.
 
 `_jsonable` expands nested plexapi objects to a depth of 2 rather than
 `str()`-ing them, or `media` serialises as `<Media object at 0x...>` and the
@@ -497,7 +511,12 @@ string and returns nothing for an empty one, so the library appears empty.
 - `rescan [LIBRARY] [-s] [-n]` - `plex.activities` is a **property**, not a
   method. `section.update()` scans for files; `refresh()` only re-fetches
   metadata.
-- `status [--section S]` - eight sections: `server`, `sessions`, `users`,
+- `status [--section S]` - the sessions table carries `user`, `library`,
+  `ratingKey`, `title`, `state`, `player`, `platform`, `address`, `progress`,
+  and `file`. `records.playing_file` reports the file in use: a session marks
+  the version and part being played with `selected`, which is the only way to
+  tell them apart on a multi-version item, and nothing is marked when there is
+  just one, so an empty selection means all of them. Eight sections: `server`, `sessions`, `users`,
   `accounts`, `connections`, `scans`, `activities`, `tasks`. Split
   `plex.activities` on whether the type mentions scan/refresh/library so scans
   and other background work are separate. Collect each section in its own
@@ -636,6 +655,19 @@ still cleans up.
 
 CI runs `make check` on Python 3.11 through 3.14, plus jobs that parse all
 four completions and lint the man page.
+
+**Every workflow declares `permissions`.** Without one, its jobs receive
+whatever the repository default grants, which CodeQL flags as
+`actions/missing-workflow-permissions` once per job. `contents: read` at the
+top of the file is enough for anything that only builds and tests; a job
+needing more raises it for itself, as the publish jobs do with
+`id-token: write`.
+
+Keep actions on their newest major: GitHub retires the Node runtime beneath
+them periodically, so an old major first warns and eventually stops running.
+Check `runs.using` in the action's own `action.yml` rather than trusting a
+version number, and confirm the inputs still exist before jumping several
+majors at once.
 
 `publish.yml` uploads to PyPI through Trusted Publishing (OIDC), so no API
 token exists to leak. It builds and verifies in one job, then publishes from a
