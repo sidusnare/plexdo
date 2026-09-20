@@ -204,7 +204,7 @@ end
 
 set -l plexdo_cmds list-libraries list-titles list-library list-show export-titles search status find-missing \
     list-users list-playlists list-playlist export-playlist remove-playlist \
-    append-playlist show-metadata read rescan status find-missing build-interleaved \
+    append-playlist clean-playlist show-metadata read rescan status find-missing build-interleaved \
     build-chronological build-randomize copy-playlist-all-users \
     copy-playlist-to-user copy-watched login write-config-example
 
@@ -227,6 +227,7 @@ for prog in plexdo
     complete -c $prog -n __plexdo_no_subcommand -a list-playlists -d 'List playlists for a user'
     complete -c $prog -n __plexdo_no_subcommand -a list-playlist -d 'List items in a specific playlist'
     complete -c $prog -n __plexdo_no_subcommand -a export-playlist -d 'Export a playlist to an M3U file'
+    complete -c $prog -n __plexdo_no_subcommand -a clean-playlist -d 'Remove watched items from a playlist'
     complete -c $prog -n __plexdo_no_subcommand -a remove-playlist -d 'Delete a playlist from a user'
     complete -c $prog -n __plexdo_no_subcommand -a append-playlist -d 'Append items to an existing playlist'
     complete -c $prog -n __plexdo_no_subcommand -a show-metadata -d 'Display metadata for a single item'
@@ -259,6 +260,8 @@ for prog in plexdo
         -a '(__plexdo_libraries)' -d 'library'
     complete -c $prog -l include-specials -n '__fish_seen_subcommand_from find-missing' \
         -d 'Also check season 0'
+    complete -c $prog -l include-partial -n '__fish_seen_subcommand_from clean-playlist' \
+        -d 'Also remove part-played items'
     complete -c $prog -n "__fish_seen_subcommand_from list-show show-metadata; and __plexdo_at 0" \
         -a '(__plexdo_rating_keys)' -d 'item'
     complete -c $prog -n "__fish_seen_subcommand_from read; and __plexdo_at 1" \
@@ -268,7 +271,7 @@ for prog in plexdo
     complete -c $prog -n "__fish_seen_subcommand_from build-interleaved build-chronological; and not __plexdo_at 0" \
         -a '(__plexdo_rating_keys)' -d 'item'
 
-    complete -c $prog -n "__fish_seen_subcommand_from search list-playlists list-playlist export-playlist remove-playlist append-playlist build-randomize copy-playlist-all-users copy-playlist-to-user copy-watched; and __plexdo_at 0" \
+    complete -c $prog -n "__fish_seen_subcommand_from search list-playlists list-playlist export-playlist remove-playlist append-playlist clean-playlist build-randomize copy-playlist-all-users copy-playlist-to-user copy-watched; and __plexdo_at 0" \
         -a '(__plexdo_users)' -d 'user'
     complete -c $prog -n "__fish_seen_subcommand_from copy-watched; and __plexdo_at 1" \
         -a '(__plexdo_users)' -d 'user'
@@ -277,7 +280,7 @@ for prog in plexdo
 
     complete -c $prog -n "__fish_seen_subcommand_from list-playlist; and __plexdo_at 1" \
         -a '(__plexdo_playlists_or_keys 0)' -d 'playlist'
-    complete -c $prog -n "__fish_seen_subcommand_from export-playlist remove-playlist append-playlist build-randomize copy-playlist-all-users copy-playlist-to-user; and __plexdo_at 1" \
+    complete -c $prog -n "__fish_seen_subcommand_from export-playlist remove-playlist append-playlist clean-playlist build-randomize copy-playlist-all-users copy-playlist-to-user; and __plexdo_at 1" \
         -a '(__plexdo_playlists_or_keys 0)' -d 'playlist'
 
     complete -c $prog -rF -n "__fish_seen_subcommand_from export-titles; and __plexdo_at 1"

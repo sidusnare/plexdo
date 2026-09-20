@@ -189,6 +189,7 @@ _plexdo_commands() {
     'list-playlists:List playlists for a user'
     'list-playlist:List items in a specific playlist'
     'export-playlist:Export an existing playlist to an M3U file'
+    'clean-playlist:Remove watched items from a playlist'
     'remove-playlist:Delete a playlist from a user'
     'append-playlist:Append items to an existing playlist'
     'show-metadata:Display metadata for a single item'
@@ -267,6 +268,12 @@ _plexdo_subcommand() {
         '1:user:_plexdo_users' \
         '2:playlist:{_plexdo_playlists_or_keys $(_plexdo_positional 0)}' \
         '3:output path:_files'
+      ;;
+    clean-playlist)
+      _arguments $_plexdo_global_opts \
+        '--include-partial[Also remove part-played items]' \
+        '1:user:_plexdo_users' \
+        '2:playlist:{_plexdo_playlists_or_keys $(_plexdo_positional 0)}'
       ;;
     remove-playlist)
       _arguments $_plexdo_global_opts \

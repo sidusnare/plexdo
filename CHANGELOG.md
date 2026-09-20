@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.23] - 2026-09-19
+
+### Added
+- `clean-playlist USER PLAYLIST [--include-partial]` removes the watched
+  entries from a playlist and leaves the rest in their existing order. The
+  removals are previewed first, numbered by each entry's place in the playlist
+  as it stands rather than renumbered around the gaps, and `--dry-run` stops
+  there. A part-played item is kept by default, being the one the user is in
+  the middle of; `--include-partial` drops those too. A smart playlist is
+  refused, its contents coming from a filter rather than from its entries.
+
+### Changed
+- The played-state and resume-point reads that `copy-watched` used privately
+  are now `titles.item_is_played` and `titles.item_view_offset`, shared with
+  `clean-playlist` rather than written twice.
+
 ## [1.1.22] - 2026-08-27
 
 ### Fixed
@@ -255,6 +271,7 @@ multi-user token handling, watched-state synchronisation, a status report,
 photo galleries, YAML/CSV/CLIXML output, shell completions for bash, zsh, and
 fish, a manual page, and packaging for PyPI. See the commit history.
 
+[1.1.23]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.23
 [1.1.22]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.22
 [1.1.18]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.18
 [1.1.16]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.16

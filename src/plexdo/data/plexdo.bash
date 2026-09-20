@@ -268,7 +268,7 @@ _plexdo_commands() {
     echo "list-libraries list-titles list-library list-users list-playlists list-playlist \
 list-show show-metadata search read rescan status find-missing build-interleaved build-chronological build-randomize \
 copy-playlist-all-users copy-playlist-to-user export-playlist remove-playlist \
-append-playlist export-titles copy-watched login write-config-example"
+append-playlist clean-playlist export-titles copy-watched login write-config-example"
 }
 
 _plexdo_global_flags() {
@@ -355,6 +355,8 @@ _plexdo_complete() {
                 COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --m3u --prefix -p" -- "$cur") ) ;;
             export-playlist|export-titles)
                 COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --prefix -p" -- "$cur") ) ;;
+            clean-playlist)
+                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --include-partial" -- "$cur") ) ;;
             *)
                 COMPREPLY=( $(compgen -W "$(_plexdo_global_flags)" -- "$cur") ) ;;
         esac
@@ -531,6 +533,15 @@ _plexdo_complete() {
 
         # <user_id> <playlist>
         remove-playlist)
+            case $pos in
+                0) _plexdo_complete_user_id ;;
+                1) uid="$(_plexdo_nth_positional "$cmd" 0)"
+                   _plexdo_complete_playlist_id_or_name "$uid" ;;
+                *) COMPREPLY=() ;;
+            esac ;;
+
+        # <user_id> <playlist> [--include-partial]
+        clean-playlist)
             case $pos in
                 0) _plexdo_complete_user_id ;;
                 1) uid="$(_plexdo_nth_positional "$cmd" 0)"

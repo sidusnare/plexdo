@@ -34,6 +34,7 @@ $script:PlexdoCommands = [ordered]@{
     'list-playlists'          = 'List playlists for a user'
     'list-playlist'           = 'List items in a specific playlist'
     'export-playlist'         = 'Export a playlist to an M3U file'
+    'clean-playlist'          = 'Remove watched items from a playlist'
     'remove-playlist'         = 'Delete a playlist from a user'
     'append-playlist'         = 'Append items to an existing playlist'
     'show-metadata'           = 'Display metadata for a single item'
@@ -327,6 +328,7 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
                 '^rescan$'                          { $flags['--status'] = 'Print all active scan jobs'; $flags['--now'] = 'Cancel pending scans first' }
                 '^status$'                          { $flags['--section'] = 'Show only one section' }
                 '^find-missing$'                    { $flags['--library'] = 'Library to look in'; $flags['--all'] = 'Check every show'; $flags['--season'] = 'Season number, or several comma separated'; $flags['--include-specials'] = 'Also check season 0' }
+                '^clean-playlist$'                  { $flags['--include-partial'] = 'Also remove part-played items' }
                 '^copy-watched$'                    { $flags['--one-way'] = 'Only write to the second user'; $flags['--library'] = 'Restrict to one library'; $flags['--title'] = 'Restrict to one item'; $flags['--unwatch'] = 'Propagate the unwatched state instead' }
                 '^login$'                           { $flags['--username'] = 'Plex username or email'; $flags['--password'] = 'Plex password (INSECURE)'; $flags['--code'] = 'Two-factor code'; $flags['--two-factor'] = 'Prompt for a two-factor code' }
             }
@@ -349,6 +351,8 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
                 'export-playlist'   { if ($index -eq 0) { $results = Get-PlexdoUsers }
                                       elseif ($index -eq 1) { $results = Get-PlexdoPlaylists $user } }
                 'remove-playlist'   { if ($index -eq 0) { $results = Get-PlexdoUsers }
+                                      elseif ($index -eq 1) { $results = Get-PlexdoPlaylists $user } }
+                'clean-playlist'    { if ($index -eq 0) { $results = Get-PlexdoUsers }
                                       elseif ($index -eq 1) { $results = Get-PlexdoPlaylists $user } }
                 'append-playlist'   { if ($index -eq 0) { $results = Get-PlexdoUsers }
                                       elseif ($index -eq 1) { $results = Get-PlexdoPlaylists $user }

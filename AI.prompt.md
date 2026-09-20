@@ -112,7 +112,8 @@ src/plexdo/
     sections.py     resolve_section, resolve_sections,
                     resolve_library_arguments
     titles.py       display_title, fetch_item, fetch_show,
-                    non_special_episodes, shuffle_list
+                    non_special_episodes, shuffle_list, item_is_played,
+                    item_view_offset
     playlists.py    resolve_playlist, finalize_playlist, copy_playlist_to,
                     existing_playlist, preview_rows
     photos.py       collect_photos, collect_library_items, photo_file_path
@@ -333,8 +334,8 @@ turn it off.
 
 Apply wherever a loop makes one request per element and the count can exceed
 50: the seasons walk in `list-titles`, `find-missing -A`, applying watched
-state in `copy-watched`, `collect_photos`, and the per-user loop in
-`copy-playlist-all-users`. Functions needing it take an optional `args`.
+state in `copy-watched`, removing entries in `clean-playlist`,
+`collect_photos`, and the per-user loop in `copy-playlist-all-users`. Functions needing it take an optional `args`.
 
 ## RECORDS
 
@@ -403,7 +404,7 @@ touched.
 - `list-libraries` - columns `id`, `type`, `title`; writes the libraries cache.
 - `list-titles LIBRARY [--album A]` - registered with
   `aliases=["list-library"]`. argparse reports whichever spelling was typed,
-  so `COMMANDS` needs an entry for both, giving 25 registry entries for 24
+  so `COMMANDS` needs an entry for both, giving 26 registry entries for 25
   commands; the smoke test floor must allow for it. Table columns are
   `ratingKey`, `title`, `releaseDate`, `rating`, `studio`; a machine-readable
   format carries every listed field and, for a show library, nests each show's
@@ -448,6 +449,18 @@ touched.
   every skip on stderr.
 - `copy-playlist-to-user USER PLAYLIST USER DEST`.
 - `append-playlist USER PLAYLIST RATINGKEY...`, `remove-playlist USER PLAYLIST`.
+- `clean-playlist USER PLAYLIST [--include-partial]` - removes the watched
+  entries and leaves the rest in their existing order. Preview first, then one
+  `removeItems` call per entry so the loop is paced like any other per-item
+  loop; the playlist item IDs come from the listing plexapi already holds, so
+  the repeated calls cost nothing beyond the one DELETE each. Number the
+  preview by each entry's place in the playlist **as it stands**, not within
+  the removal list, so it lines up with what Plex shows. A part-played item is
+  **kept** by default - it is the one being watched right now, not a watched
+  one - and `--include-partial` drops it, labelled `partial` rather than
+  `played`. Refuse a smart playlist: its contents come from a filter, and Plex
+  answers a delete on one of its entries with a 400. Warn when every entry is
+  going, since Plex drops a playlist that loses its last item.
 
 ### Watched state
 
@@ -468,7 +481,11 @@ changes. Two fully played states need no sync at all.
 
 plexapi renamed these methods, so call through a helper trying both spellings
 (`markPlayed`/`markWatched`, `markUnplayed`/`markUnwatched`) and read played
-state from `isPlayed`, then `isWatched`, then `viewCount`.
+state from `isPlayed`, then `isWatched`, then `viewCount`. That read and the
+resume-point read are `titles.item_is_played` and `titles.item_view_offset`,
+because `clean-playlist` needs the same two and the rules must not be written
+twice. All three attributes default to a bool or a number rather than None, so
+reading them does not satisfy plexapi's reload condition.
 
 Watch state lives on leaf items: map `movie`->`movie`, `show`->`episode`,
 `artist`->`track`, and skip photo libraries. Use `section.all(libtype=...)`,
@@ -544,7 +561,8 @@ string and returns nothing for an empty one, so the library appears empty.
 
 `sys.exit` with a clear message for: missing config or token, unknown
 ratingKey, wrong media type, playlist or user or library not found,
-unsupported library type, album not found, a refused name collision. No bare
+unsupported library type, album not found, a refused name collision, a smart
+playlist asked to give up an entry. No bare
 `except`; the broad ones are in `_cancel_all_scans`, the per-user copy loop,
 and per-section collection, each with a `# pylint: disable=broad-except`.
 
@@ -619,7 +637,9 @@ serialisers round-tripping through real parsers; table alignment under
 double-width characters, the ASCII fallback, and fitting to a budget;
 identifier resolution including the ID-versus-title collision; the overwrite
 guard performing **no** server calls when it refuses; watched-state selection
-in both directions and that an undated state never wins; path rewriting
+in both directions and that an undated state never wins; which playlist entries
+`clean-playlist` drops, and that it numbers them by their place in the
+playlist rather than within the removal list; path rewriting
 picking the longest matching root; the token store reading a legacy bare-token
 file; that `loaded_fields` and `file_paths` never trigger a reload; and that
 global flags survive being given before the subcommand.

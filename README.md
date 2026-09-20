@@ -295,8 +295,29 @@ impossible.
 plexdo copy-playlist-to-user 0 "Mix" 7 "Mix" -o
 plexdo copy-playlist-all-users 0 "Mix"          # skips the source user
 plexdo append-playlist 0 "Mix" 55 56 57
+plexdo clean-playlist 0 "Mix"                   # drop what has been watched
 plexdo remove-playlist 0 "Mix"
 ```
+
+`clean-playlist` removes the watched entries and leaves the rest in their
+existing order. It previews what it will drop, numbered by each entry's place
+in the playlist as it stands, so the list lines up with what Plex shows rather
+than renumbering around the gaps:
+
+```
+┌───────┬───────────┬─────────────────────────────┬─────────┐
+│ index │ ratingKey │ title                       │ state   │
+├───────┼───────────┼─────────────────────────────┼─────────┤
+│ 1     │ 55        │ The Wire - The Target       │ played  │
+│ 4     │ 58        │ The Wire - Old Cases        │ played  │
+└───────┴───────────┴─────────────────────────────┴─────────┘
+```
+
+A part-played item is kept, since it is the one you are in the middle of;
+`--include-partial` drops those too, reported as `partial`. Watched state is
+per-user, so the USER argument decides whose viewing history is consulted.
+A smart playlist is refused - its contents come from a filter, not from its
+entries - and `--dry-run` stops after the preview.
 
 A user with no libraries shared to them cannot be acted on, even by the server
 admin - Plex scopes each token to what that user can see. Commands targeting

@@ -15,7 +15,8 @@ from plexdo.constants import LOG
 from plexdo.convert import parse_date
 from plexdo.sections import resolve_sections
 from plexdo.throttle import paced
-from plexdo.titles import display_title, fetch_item
+from plexdo.titles import (display_title, fetch_item, item_is_played,
+                           item_view_offset)
 
 
 # Library type -> the leaf libtype that actually carries watch state.
@@ -63,20 +64,11 @@ def _call_first_method(item: Any, names: Sequence[str], *args: Any) -> bool:
     return False
 
 
-def _item_is_played(item: Any) -> bool:
-    """Return True if the item is marked fully played for this user."""
-    for attr in ("isPlayed", "isWatched"):
-        value = getattr(item, attr, None)
-        if isinstance(value, bool):
-            return value
-    return bool(getattr(item, "viewCount", 0))
-
-
 def _watch_state(item: Any) -> WatchState:
     """Capture the watch state of a single item."""
     return WatchState(
-        played=_item_is_played(item),
-        offset=int(getattr(item, "viewOffset", 0) or 0),
+        played=item_is_played(item),
+        offset=item_view_offset(item),
         last_viewed=parse_date(getattr(item, "lastViewedAt", None)),
         item=item,
     )

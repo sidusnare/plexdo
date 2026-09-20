@@ -1,7 +1,7 @@
 .\" Man page for plexdo (plexdo).
 .\" Regenerate or edit alongside AI.prompt.md; the .TH version must match
 .\" __version__ in src/plexdo/__init__.py.
-.TH PLEXDO 1 "2026-08-14" "plexdo 1.1.22" "User Commands"
+.TH PLEXDO 1 "2026-09-19" "plexdo 1.1.23" "User Commands"
 .
 .SH NAME
 plexdo \- command\-line interface for Plex Media Server
@@ -200,6 +200,15 @@ Copy a playlist to one user.
 .TP
 .BI append\-playlist " user playlist ratingKey ..."
 Append items to an existing playlist.
+.TP
+.BI clean\-playlist " user playlist " [ \-\-include\-partial ]
+Remove the watched items from a playlist, leaving the rest in their existing
+order. The entries to be dropped are previewed first, numbered by their place
+in the playlist as it stands.
+.BI \-\-include\-partial
+also drops items that are only part\-played; by default a resume point is left
+alone, since it is what you are in the middle of watching. A smart playlist is
+refused, its contents being defined by a filter rather than by its entries.
 .TP
 .BI remove\-playlist " user playlist"
 Delete a playlist.

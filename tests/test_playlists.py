@@ -5,6 +5,7 @@
 import pytest
 
 from conftest import FakeItem, FakePlaylist, FakePlex
+from plexdo.commands.playlists import _watched_entries
 from plexdo.playlists import _resolve_dest_name, finalize_playlist
 
 ITEMS = [FakeItem(1, "A"), FakeItem(2, "B")]
@@ -70,3 +71,44 @@ def test_overwrite_targets_the_plain_name_and_reports_a_replacement():
 
 def test_overwrite_on_an_empty_destination_is_not_a_replacement():
     assert _resolve_dest_name(plex_with(), "Mix", True) == ("Mix", False)
+
+
+# --- clean-playlist: which entries count as watched ----------------------
+
+def labelled(items, include_partial=False):
+    """(position, title, label) for the entries a clean run would remove."""
+    return [(pos, item.title, label)
+            for pos, item, label in _watched_entries(items, include_partial)]
+
+
+def test_played_entries_are_removed_and_the_rest_kept():
+    items = [FakeItem(1, "A", viewCount=1), FakeItem(2, "B"),
+             FakeItem(3, "C", viewCount=2)]
+    assert labelled(items) == [(1, "A", "played"), (3, "C", "played")]
+
+
+def test_positions_are_the_playlists_own_numbering():
+    """The preview must point at what Plex shows, not renumber the gaps."""
+    items = [FakeItem(1, "A"), FakeItem(2, "B"), FakeItem(3, "C", viewCount=1)]
+    assert labelled(items) == [(3, "C", "played")]
+
+
+def test_a_resume_point_is_kept_by_default():
+    """Part-played is what the user is in the middle of, not watched."""
+    assert labelled([FakeItem(1, "A", viewOffset=90_000)]) == []
+
+
+def test_include_partial_removes_a_resume_point():
+    items = [FakeItem(1, "A", viewOffset=90_000), FakeItem(2, "B")]
+    assert labelled(items, True) == [(1, "A", "partial")]
+
+
+def test_is_played_beats_a_stale_view_count():
+    """plexapi's isPlayed is authoritative; viewCount is only the fallback."""
+    items = [FakeItem(1, "A", isPlayed=False, viewCount=3),
+             FakeItem(2, "B", isWatched=True, viewCount=0)]
+    assert labelled(items) == [(2, "B", "played")]
+
+
+def test_an_untouched_playlist_yields_nothing_to_remove():
+    assert labelled([FakeItem(1, "A"), FakeItem(2, "B")]) == []

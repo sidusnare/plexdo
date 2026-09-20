@@ -18,6 +18,25 @@ def display_title(item: Any) -> str:
     return item.title
 
 
+def item_is_played(item: Any) -> bool:
+    """Return True if the item is marked fully played for this user.
+
+    plexapi renamed ``isWatched`` to ``isPlayed``, so both spellings are
+    tried before falling back to the raw view count. All three default to a
+    number or a bool rather than None, so reading them costs no reload.
+    """
+    for attr in ("isPlayed", "isWatched"):
+        value = getattr(item, attr, None)
+        if isinstance(value, bool):
+            return value
+    return bool(getattr(item, "viewCount", 0))
+
+
+def item_view_offset(item: Any) -> int:
+    """Return the item's resume point in milliseconds, 0 when unplayed."""
+    return int(getattr(item, "viewOffset", 0) or 0)
+
+
 def fetch_show(plex: PlexServer, rating_key: int) -> Show:
     """Fetch a Show by ratingKey, failing fast on wrong type."""
     item = plex.fetchItem(rating_key)
