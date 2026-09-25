@@ -223,6 +223,11 @@ _plexdo_global_opts=(
 _plexdo_subcommand() {
   local m3u='--m3u[Also export an M3U file using Plex server paths]:m3u path:_files'
   local pfx='(-p --prefix)'{-p,--prefix}'[Rewrite exported paths onto this prefix]:prefix:'
+  local -a target
+  target=(
+    '(-u --user -a --all-users)'{-u,--user}'[Create it for this user instead]:user:_plexdo_users'
+    '(-u --user -a --all-users)'{-a,--all-users}'[Create it for every user on the server]'
+  )
   case ${words[1]} in
     list-titles|list-library)
       _arguments $_plexdo_global_opts \
@@ -307,20 +312,20 @@ _plexdo_subcommand() {
         '1:library id:_plexdo_libraries'
       ;;
     build-interleaved|build-chronological)
-      _arguments $_plexdo_global_opts $pfx $m3u \
+      _arguments $_plexdo_global_opts $pfx $m3u $target \
         '(-o --overwrite)'{-o,--overwrite}'[Replace an existing playlist of the same name]' \
         '1:playlist name:' \
         '*:rating key:_plexdo_rating_keys'
       ;;
     build-randomize)
-      _arguments $_plexdo_global_opts $pfx $m3u \
+      _arguments $_plexdo_global_opts $pfx $m3u $target \
         '(-o --overwrite)'{-o,--overwrite}'[Replace an existing playlist of the same name]' \
         '1:user:_plexdo_users' \
         '2:source playlist:{_plexdo_playlists_or_keys $(_plexdo_positional 0)}' \
         '3:destination playlist:'
       ;;
     build-concatenated)
-      _arguments $_plexdo_global_opts $pfx $m3u \
+      _arguments $_plexdo_global_opts $pfx $m3u $target \
         '(-o --overwrite)'{-o,--overwrite}'[Replace an existing playlist of the same name]' \
         '--unique[Skip an item an earlier playlist already contributed]' \
         '1:user:_plexdo_users' \

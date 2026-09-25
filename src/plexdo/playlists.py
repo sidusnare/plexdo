@@ -58,6 +58,58 @@ def existing_playlist(plex: PlexServer, name: str) -> Optional[Playlist]:
     return None
 
 
+def require_items(items: List[MediaItem]) -> None:
+    """Refuse an empty playlist.
+
+    Asked once by whichever caller assembled the list, which is the same
+    list for every user a fan-out then creates it for.
+    """
+    if not items:
+        sys.exit("Playlist is empty - aborting.")
+
+
+def _refuses_replacement(
+    duplicate: Optional[Playlist], args: argparse.Namespace
+) -> bool:
+    """True when the name is taken and --overwrite was not given.
+
+    The fatal path and the per-user path both ask here, so the rule that
+    decides whether a name may be reused lives in exactly one place. When it
+    returns True the caller has a duplicate to report on.
+    """
+    return duplicate is not None and not getattr(args, "overwrite", False)
+
+
+def _write_playlist(
+    plex: PlexServer,
+    name: str,
+    items: List[MediaItem],
+    duplicate: Optional[Playlist],
+    args: argparse.Namespace,
+) -> str:
+    """Replace or create the playlist, honouring --dry-run.
+
+    Returns "created" or "replaced". The caller has already established that
+    *duplicate* may be replaced, so no further check happens here.
+    """
+    LOG.info("Playlist '%s': %d items", name, len(items))
+    outcome = "replaced" if duplicate is not None else "created"
+
+    if args.dry_run:
+        if duplicate is not None:
+            LOG.info("--dry-run: would replace the existing '%s'", name)
+        LOG.info("--dry-run: skipping playlist creation.")
+        return outcome
+
+    if duplicate is not None:
+        duplicate.delete()
+        LOG.info("Removed the existing playlist '%s'", name)
+
+    plex.createPlaylist(name, items=items)
+    LOG.info("Playlist '%s' created with %d items.", name, len(items))
+    return outcome
+
+
 def finalize_playlist(
     plex: PlexServer,
     name: str,
@@ -76,11 +128,10 @@ def finalize_playlist(
     --overwrite is given, and checks that before printing the preview so a
     doomed run fails immediately rather than after a screen of output.
     """
-    if not items:
-        sys.exit("Playlist is empty - aborting.")
+    require_items(items)
 
     duplicate = existing_playlist(plex, name)
-    if duplicate is not None and not getattr(args, "overwrite", False):
+    if _refuses_replacement(duplicate, args):
         sys.exit(
             f"A playlist named {name!r} already exists (ratingKey "
             f"{int(duplicate.ratingKey)}). Nothing has been "
@@ -88,26 +139,32 @@ def finalize_playlist(
             "Re-run with --overwrite to replace it, or choose another name."
         )
 
-    LOG.info("Playlist '%s': %d items", name, len(items))
-
     if preview:
         output(preview_rows(items), args)
 
-    outcome = "replaced" if duplicate is not None else "created"
+    return _write_playlist(plex, name, items, duplicate, args)
 
-    if args.dry_run:
-        if duplicate is not None:
-            LOG.info("--dry-run: would replace the existing '%s'", name)
-        LOG.info("--dry-run: skipping playlist creation.")
-        return outcome
 
-    if duplicate is not None:
-        duplicate.delete()
-        LOG.info("Removed the existing playlist '%s'", name)
+def create_for_user(
+    user_plex: PlexServer,
+    name: str,
+    items: List[MediaItem],
+    args: argparse.Namespace,
+) -> Tuple[str, str]:
+    """Create the playlist for one user, reporting instead of exiting.
 
-    plex.createPlaylist(name, items=items)
-    LOG.info("Playlist '%s' created with %d items.", name, len(items))
-    return outcome
+    Returns (status, detail); status is "created", "replaced", or "skipped".
+    A refused name collision comes back as a skip rather than a sys.exit,
+    because SystemExit would tear down a run that still has other users to
+    serve - the same reason UserAccessError is an ordinary exception.
+    """
+    duplicate = existing_playlist(user_plex, name)
+    if _refuses_replacement(duplicate, args):
+        return "skipped", (
+            f"{name!r} already exists (ratingKey "
+            f"{int(duplicate.ratingKey)}); --overwrite would replace it"
+        )
+    return _write_playlist(user_plex, name, items, duplicate, args), ""
 
 
 def _resolve_dest_name(

@@ -2,30 +2,29 @@
 
 """Playlist copying commands."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 import argparse
 import sys
 
-from plexapi.myplex import MyPlexUser
 from plexapi.playlist import Playlist
 from plexapi.server import PlexServer
 
 from plexdo.accounts import UserAccessError, server_for_user
-from plexdo.console import clean_text, output, output_format, print_table, table_limit
+from plexdo.console import clean_text, output, output_format
 from plexdo.constants import LOG, MediaItem
-from plexdo.playlists import copy_playlist_to, preview_rows, resolve_playlist
-from plexdo.throttle import paced
+from plexdo.fanout import report_line, run_per_user
+from plexdo.playlists import copy_playlist_to, resolve_playlist
 
 
 def _copy_to_one_user(
     plex: PlexServer,
-    user: MyPlexUser,
+    target: Tuple[int, str],
     src_items: List[MediaItem],
     args: argparse.Namespace,
 ) -> Dict[str, Any]:
     """Copy to a single user, converting any failure into a result record."""
-    user_id = int(user.id)
-    label = f"user {user.title!r} (id={user_id})"
+    user_id, title = target
+    label = f"user {title!r} (id={user_id})"
     try:
         user_plex = server_for_user(plex, user_id)
         status, final_name, detail = copy_playlist_to(
@@ -39,21 +38,12 @@ def _copy_to_one_user(
         LOG.debug("Copy failed for %s: %s", label, exc)
         status, final_name, detail = "failed", "", str(exc)
     return {
-        "user": clean_text(user.title or ""),
+        "user": title,
         "id": user_id,
         "status": status,
         "playlist": final_name,
         "detail": detail,
     }
-
-
-def _report_line(record: Dict[str, Any]) -> str:
-    """Format one per-user outcome as a single line."""
-    line = f"  {record['status']:<8} {record['user']}"
-    extra = record["detail"] or (
-        record["playlist"] if record["playlist"] else ""
-    )
-    return f"{line}  ({extra})" if extra else line
 
 
 def cmd_copy_playlist_all_users(plex: PlexServer, args: argparse.Namespace) -> None:
@@ -64,31 +54,22 @@ def cmd_copy_playlist_all_users(plex: PlexServer, args: argparse.Namespace) -> N
     if not src_items:
         sys.exit(f"Source playlist {src.title!r} is empty - nothing to copy.")
 
-    # The item list is identical for every user, so it is shown once here and
-    # suppressed per user; each user then costs a single line of output.
-    table_mode = output_format(args) == "table"
-    if table_mode:
-        print(f"{src.title} ({len(src_items)} items)")
-        print_table(preview_rows(src_items), table_limit(args))
-        print()
-
-    results: List[Dict[str, Any]] = []
-    for user in paced(list(plex.myPlexAccount().users()), args, "users"):
-        user_id = int(user.id)
-        if user_id == args.source_user_id:
-            record = {
-                "user": clean_text(user.title or ""), "id": user_id,
+    def copy_to(target: Tuple[int, str]) -> Dict[str, Any]:
+        """One user's outcome, source user included so it reports its skip."""
+        if target[0] == args.source_user_id:
+            return {
+                "user": target[1], "id": target[0],
                 "status": "skipped", "playlist": "", "detail": "source user",
             }
-        else:
-            record = _copy_to_one_user(plex, user, src_items, args)
-        results.append(record)
-        if table_mode:
-            # Printed as each user completes, so a long run shows progress.
-            print(_report_line(record))
+        return _copy_to_one_user(plex, target, src_items, args)
 
-    if not table_mode:
-        output(results, args)
+    # The shared users, not the roster: this command has always addressed the
+    # accounts a playlist is shared with rather than the admin's own.
+    targets = [
+        (int(user.id), clean_text(user.title or ""))
+        for user in plex.myPlexAccount().users()
+    ]
+    run_per_user(targets, (src.title, src_items), args, copy_to)
 
 
 def cmd_copy_playlist_to_user(plex: PlexServer, args: argparse.Namespace) -> None:
@@ -107,7 +88,7 @@ def cmd_copy_playlist_to_user(plex: PlexServer, args: argparse.Namespace) -> Non
         "status": status, "playlist": final_name, "detail": detail,
     }
     if output_format(args) == "table":
-        print(_report_line(record))
+        print(report_line(record))
     else:
         output(record, args)
 

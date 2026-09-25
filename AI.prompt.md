@@ -108,14 +108,17 @@ src/plexdo/
                     cache_row, season_records
     identify.py     resolve_identifier
     accounts.py     server_for_user, account_type, resolve_user_arguments,
-                    UserAccessError
+                    user_roster, UserAccessError
     sections.py     resolve_section, resolve_sections,
                     resolve_library_arguments
     titles.py       display_title, fetch_item, fetch_show,
                     non_special_episodes, shuffle_list, item_is_played,
                     item_view_offset
     playlists.py    resolve_playlist, finalize_playlist, copy_playlist_to,
-                    existing_playlist, preview_rows
+                    existing_playlist, preview_rows, require_items,
+                    create_for_user
+    fanout.py       add_user_target_arguments, deliver_playlist, run_per_user,
+                    report_line
     photos.py       collect_photos, collect_library_items, photo_file_path
     sorting.py      apply_sort
     m3u.py          write_m3u
@@ -251,7 +254,7 @@ arguments are plain strings with `metavar="USER"` or `"LIBRARY"` - never
 `type=int`. `accounts.resolve_user_arguments` and
 `sections.resolve_library_arguments` run from `cli.main` after connecting and
 before dispatch, rewriting `user_id`, `user_a`, `user_b`, `source_user_id`,
-and `library_id` in place, so handlers always receive an int. Build each
+`dest_user_id`, and `library_id` in place, so handlers always receive an int. Build each
 roster once per invocation, and skip the fetch when no such argument is
 present.
 
@@ -336,7 +339,8 @@ Apply wherever a loop makes one request per element and the count can exceed
 50: the seasons walk in `list-titles`, `find-missing -A`, applying watched
 state in `copy-watched`, removing entries in `clean-playlist`, reading each
 source in `build-concatenated`, `collect_photos`, and the per-user loop in
-`copy-playlist-all-users`. Functions needing it take an optional `args`.
+`fanout.run_per_user`, which serves `copy-playlist-all-users` and every build
+command given `-a`. Functions needing it take an optional `args`.
 
 ## RECORDS
 
@@ -385,6 +389,15 @@ Every build command constructs the list fully in memory, validates it is
 non-empty, prints a numbered preview, and makes exactly one `createPlaylist`
 call. `finalize_playlist` enforces this and returns `"created"` or
 `"replaced"`.
+
+There are two ways in: `finalize_playlist`, which **exits** on a refused name
+collision, and `create_for_user`, which **reports** one as
+`("skipped", detail)`. Both ask `_refuses_replacement` and both write through
+`_write_playlist`, so the rule and the write each exist once. The second must
+not `sys.exit`: it runs once per user, and SystemExit would tear down a run
+that still had other users to serve - the same reason `UserAccessError` is an
+ordinary exception. `require_items` holds the empty check, asked once by
+whichever caller assembled the list rather than once per user.
 
 Every creating command takes `-o/--overwrite`. A name collision without it
 exits reporting the existing ratingKey and making clear nothing was created or
@@ -472,6 +485,31 @@ touched.
   `played`. Refuse a smart playlist: its contents come from a filter, and Plex
   answers a delete on one of its entries with a 400. Warn when every entry is
   going, since Plex drops a playlist that loses its last item.
+
+#### Who a built playlist is for
+
+All four build commands take `-u/--user` and `-a/--all-users`, registered
+through `fanout.add_user_target_arguments` as a mutually exclusive group -
+writing the pair out on each parser is what trips `duplicate-code`. Without
+either, the playlist goes where it always did: the account the items came
+from, which is the admin server for the two that take rating keys and the
+source user's server for the two that take playlists. `deliver_playlist` takes
+both servers for exactly that reason. `-a` targets `accounts.user_roster`,
+which **includes the admin** at id 0, because the admin is a user of the
+server too.
+
+`fanout.run_per_user` holds the loop: print the item list once, then run a
+per-user action and print its one-line outcome as it completes, so a long run
+shows progress; in a machine-readable format emit one record per user instead,
+since one document cannot carry both. `copy-playlist-all-users` uses the same
+loop with its own action and its own target list - the accounts a playlist is
+shared with rather than the roster - so the loop is not written twice.
+
+The action must turn every failure into a record rather than raising:
+`UserAccessError` becomes a `skipped` carrying its one-line `summary`, a
+refused name becomes a `skipped`, and anything else becomes a `failed` with a
+`# pylint: disable=broad-except`. One bad user must never end a run that has
+others left.
 
 ### Watched state
 
@@ -651,7 +689,10 @@ guard performing **no** server calls when it refuses; watched-state selection
 in both directions and that an undated state never wins; which playlist entries
 `clean-playlist` drops, and that it numbers them by their place in the
 playlist rather than within the removal list; that concatenation preserves the
-order given and that `--unique` matches on ratingKey; path rewriting
+order given and that `--unique` matches on ratingKey; that a per-user create
+reports a taken name instead of exiting and performs no call when it does, and
+that a fan-out records an unreachable user and an unexpected failure and keeps
+going; path rewriting
 picking the longest matching root; the token store reading a legacy bare-token
 file; that `loaded_fields` and `file_paths` never trigger a reload; and that
 global flags survive being given before the subcommand.

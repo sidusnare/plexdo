@@ -4,6 +4,30 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.25] - 2026-09-24
+
+### Added
+- All four build commands (`build-interleaved`, `build-chronological`,
+  `build-randomize`, `build-concatenated`) take `-u/--user` to create the
+  playlist for one named user and `-a/--all-users` to create it for every user
+  on the server, the admin account included. Without either the playlist lands
+  where it always has, on the account the items came from. With either, the
+  item list is printed once and each user then reports a single line as it
+  completes: `created`, `replaced`, `skipped`, or `failed`. Nothing that goes
+  wrong for one user ends the run - a name already taken and a user the server
+  will not act for are both skips - and a machine-readable format returns one
+  record per user.
+
+### Changed
+- `finalize_playlist` now shares its write step with a new non-fatal
+  `create_for_user`, which reports a refused name collision instead of calling
+  `sys.exit`; a SystemExit would have torn down a run that still had other
+  users to serve, for the same reason `UserAccessError` is an ordinary
+  exception.
+- The per-user loop that prints the item list once and then one line per user
+  moved to the new `fanout` module, so the build commands and
+  `copy-playlist-all-users` share it rather than each keeping a copy.
+
 ## [1.1.24] - 2026-09-24
 
 ### Added
@@ -284,6 +308,7 @@ multi-user token handling, watched-state synchronisation, a status report,
 photo galleries, YAML/CSV/CLIXML output, shell completions for bash, zsh, and
 fish, a manual page, and packaging for PyPI. See the commit history.
 
+[1.1.25]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.25
 [1.1.24]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.24
 [1.1.23]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.23
 [1.1.22]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.22

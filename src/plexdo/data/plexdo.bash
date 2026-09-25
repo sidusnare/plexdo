@@ -300,7 +300,7 @@ _plexdo_positional_count() {
     for (( i=1; i < cword; i++ )); do
         word="${words[$i]}"
         if (( skip_next )); then skip_next=0; continue; fi
-        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle|-s|--season|-l|--library) skip_next=1; continue ;; esac
+        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle|-s|--season|-l|--library|-u|--user) skip_next=1; continue ;; esac
         if [[ "$word" == -* ]]; then continue; fi
         if (( ! found_cmd )); then
             [[ "$word" == "$cmd" ]] && found_cmd=1
@@ -318,7 +318,7 @@ _plexdo_nth_positional() {
     for (( i=1; i < cword; i++ )); do
         word="${words[$i]}"
         if (( skip_next )); then skip_next=0; continue; fi
-        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle|-s|--season|-l|--library) skip_next=1; continue ;; esac
+        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle|-s|--season|-l|--library|-u|--user) skip_next=1; continue ;; esac
         if [[ "$word" == -* ]]; then continue; fi
         if (( ! found_cmd )); then
             [[ "$word" == "$cmd" ]] && found_cmd=1
@@ -349,13 +349,22 @@ _plexdo_complete() {
         return
     fi
 
+    # -u USER on the build commands -> a user id or title
+    if [[ "$prev" == "-u" || "$prev" == "--user" ]]; then
+        case "$cmd" in
+            build-*) _plexdo_complete_user_id; return ;;
+        esac
+    fi
+
     # Flag completion
     if [[ "$cur" == --* ]]; then
         case "$cmd" in
-            list-playlist|list-show|build-interleaved|build-chronological|build-randomize)
+            list-playlist|list-show)
                 COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --m3u --prefix -p" -- "$cur") ) ;;
+            build-interleaved|build-chronological|build-randomize)
+                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --m3u --prefix -p -o --overwrite --user -u --all-users -a" -- "$cur") ) ;;
             build-concatenated)
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --m3u --prefix -p -o --overwrite --unique" -- "$cur") ) ;;
+                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --m3u --prefix -p -o --overwrite --unique --user -u --all-users -a" -- "$cur") ) ;;
             export-playlist|export-titles)
                 COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --prefix -p" -- "$cur") ) ;;
             clean-playlist)
@@ -481,10 +490,10 @@ _plexdo_complete() {
                 *) COMPREPLY=() ;;
             esac ;;
 
-        # <name> <ratingKey...> [--m3u] [-o]
+        # <name> <ratingKey...> [--m3u] [-o] [-u USER | -a]
         build-interleaved|build-chronological)
             if [[ "$cur" == -* ]]; then
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --m3u --overwrite -o --prefix -p" -- "$cur") )
+                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --m3u --overwrite -o --prefix -p --user -u --all-users -a" -- "$cur") )
                 return
             fi
             case $pos in
@@ -492,10 +501,10 @@ _plexdo_complete() {
                 *) _plexdo_complete_rating_key ;;
             esac ;;
 
-        # <user_id> <source> <dest> [--m3u] [-o]
+        # <user_id> <source> <dest> [--m3u] [-o] [-u USER | -a]
         build-randomize)
             if [[ "$cur" == -* ]]; then
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --m3u --overwrite -o --prefix -p" -- "$cur") )
+                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --m3u --overwrite -o --prefix -p --user -u --all-users -a" -- "$cur") )
                 return
             fi
             case $pos in
@@ -505,10 +514,10 @@ _plexdo_complete() {
                 *) COMPREPLY=() ;;
             esac ;;
 
-        # <user_id> <name> <playlist...> [--unique] [--m3u] [-o]
+        # <user_id> <name> <playlist...> [--unique] [--m3u] [-o] [-u USER | -a]
         build-concatenated)
             if [[ "$cur" == -* ]]; then
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --unique --m3u --overwrite -o --prefix -p" -- "$cur") )
+                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --unique --m3u --overwrite -o --prefix -p --user -u --all-users -a" -- "$cur") )
                 return
             fi
             case $pos in

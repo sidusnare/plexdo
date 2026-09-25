@@ -14,10 +14,11 @@ from plexapi.video import Episode, Movie, Show
 from plexdo.accounts import server_for_user
 from plexdo.airdates import episodes_in_same_season, prompt_for_date, resolve_episode_date
 from plexdo.constants import LOG, MediaItem
+from plexdo.fanout import add_user_target_arguments, deliver_playlist
 from plexdo.convert import parse_date
 from plexdo.m3u import write_m3u
 from plexdo.paths import add_prefix_argument, mapper_for
-from plexdo.playlists import finalize_playlist, resolve_playlist
+from plexdo.playlists import resolve_playlist
 from plexdo.throttle import paced
 from plexdo.titles import fetch_show, non_special_episodes, shuffle_list
 
@@ -48,7 +49,7 @@ def cmd_build_interleaved(plex: PlexServer, args: argparse.Namespace) -> None:
         episode_lists.append(eps)
 
     items: List[MediaItem] = list(_round_robin(episode_lists))
-    finalize_playlist(plex, args.name, items, args)
+    deliver_playlist(plex, plex, args.name, items, args)
 
     if args.m3u:
         write_m3u(items, args.m3u, mapper_for(plex, args))
@@ -104,7 +105,7 @@ def cmd_build_chronological(plex: PlexServer, args: argparse.Namespace) -> None:
     dated_items.sort(key=_chronological_sort_key)
     items: List[MediaItem] = [item for item, _ in dated_items]
 
-    finalize_playlist(plex, args.name, items, args)
+    deliver_playlist(plex, plex, args.name, items, args)
 
     if args.m3u:
         write_m3u(items, args.m3u, mapper_for(plex, args))
@@ -119,7 +120,7 @@ def cmd_build_randomize(plex: PlexServer, args: argparse.Namespace) -> None:
     randomized: List[MediaItem] = shuffle_list(all_items)
 
     LOG.info("Randomized %d items", len(randomized))
-    finalize_playlist(user_plex, args.dest, randomized, args)
+    deliver_playlist(plex, user_plex, args.dest, randomized, args)
 
     if args.m3u:
         write_m3u(randomized, args.m3u, mapper_for(user_plex, args))
@@ -185,7 +186,7 @@ def cmd_build_concatenated(plex: PlexServer, args: argparse.Namespace) -> None:
         LOG.info("--unique: skipped %d repeated item(s).", total - len(items))
     LOG.info("Concatenated %d playlist(s) into %d item(s)", len(sources), len(items))
 
-    finalize_playlist(user_plex, args.name, items, args)
+    deliver_playlist(plex, user_plex, args.name, items, args)
 
     if args.m3u:
         write_m3u(items, args.m3u, mapper_for(user_plex, args))
@@ -214,6 +215,7 @@ def register(
         help="Also export an M3U file at PATH using Plex server filesystem paths.",
     )
     add_prefix_argument(p_bi)
+    add_user_target_arguments(p_bi)
 
     p_bc = sub.add_parser(
         "build-chronological", parents=parents,
@@ -233,6 +235,7 @@ def register(
         help="Also export an M3U file at PATH using Plex server filesystem paths.",
     )
     add_prefix_argument(p_bc)
+    add_user_target_arguments(p_bc)
 
     p_br = sub.add_parser(
         "build-randomize", parents=parents,
@@ -250,6 +253,7 @@ def register(
         help="Also export an M3U file at PATH using Plex server filesystem paths.",
     )
     add_prefix_argument(p_br)
+    add_user_target_arguments(p_br)
 
     p_bn = sub.add_parser(
         "build-concatenated", parents=parents,
@@ -281,6 +285,7 @@ def register(
         help="Also export an M3U file at PATH using Plex server filesystem paths.",
     )
     add_prefix_argument(p_bn)
+    add_user_target_arguments(p_bn)
 
 
 COMMANDS = {

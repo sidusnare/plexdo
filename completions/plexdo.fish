@@ -113,7 +113,7 @@ function __plexdo_positionals
             continue
         end
         switch $t
-            case --m3u --album --sort --media-type --library-id -l --library -t --title -u --username -p --password -c --code -f --format --section -p --prefix --throttle -s --season
+            case --m3u --album --sort --media-type --library-id -l --library -t --title -u --user --username -p --password -c --code -f --format --section -p --prefix --throttle -s --season
                 set skip 1
                 continue
             case '-*'
@@ -312,6 +312,10 @@ for prog in plexdo
         -d 'Replace an existing playlist of the same name'
     complete -c $prog -l unique -n '__fish_seen_subcommand_from build-concatenated' \
         -d 'Skip an item an earlier playlist already contributed'
+    complete -c $prog -x -s u -l user -n '__fish_seen_subcommand_from build-interleaved build-chronological build-randomize build-concatenated' \
+        -a '(__plexdo_users)' -d 'Create the playlist for this user instead'
+    complete -c $prog -s a -l all-users -n '__fish_seen_subcommand_from build-interleaved build-chronological build-randomize build-concatenated' \
+        -d 'Create the playlist for every user on the server'
     complete -c $prog -l one-way -n '__fish_seen_subcommand_from copy-watched' -d 'Only write to the second user'
     complete -c $prog -x -s l -l library -n '__fish_seen_subcommand_from copy-watched' \
         -a '(__plexdo_libraries)' -d 'Restrict to one library'

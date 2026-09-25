@@ -305,6 +305,43 @@ empty source is reported and contributes nothing - a typo that resolved to the
 wrong playlist otherwise looks exactly like a playlist that happens to be
 empty.
 
+#### Who the playlist is built for
+
+All four build commands take `-u/--user` and `-a/--all-users`. Without either,
+the playlist lands where it always has: on the account the items came from.
+
+```bash
+plexdo build-interleaved "Mixed Run" 101 202 -u 7    # just for user 7
+plexdo build-interleaved "Mixed Run" 101 202 -u Bob  # a title works too
+plexdo build-interleaved "Mixed Run" 101 202 -a      # for everyone
+```
+
+With either flag the item list is printed once, and then one line per user as
+that user completes, so a long run shows progress:
+
+```
+Mixed Run (42 items)
+┌───────┬───────────┬───────────────────────────┐
+│ index │ ratingKey │ title                     │
+└───────┴───────────┴───────────────────────────┘
+
+  created  admin  (Mixed Run)
+  created  Alice  (Mixed Run)
+  skipped  Bob  ('Mixed Run' already exists (ratingKey 4120); --overwrite would replace it)
+  skipped  Cara  (access denied (401) - no libraries are shared with 'Cara')
+  failed   Dan  (500 Internal Server Error)
+```
+
+Nothing that goes wrong for one user ends the run. A name already taken is a
+`skipped`, a user the server will not act for is a `skipped`, and anything
+else is a `failed`; the remaining users are served either way. `-o/--overwrite`
+turns the name collisions into `replaced`, and `--dry-run` reports what each
+user would get without writing anything. In a machine-readable format the
+outcomes come back as one record per user instead of the item list.
+
+`-a` includes the admin account, since it is a user of the server too. `-u`
+and `-a` are mutually exclusive.
+
 ### Copying and modifying
 
 ```bash

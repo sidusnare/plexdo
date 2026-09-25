@@ -19,7 +19,8 @@ $script:PlexdoCacheDir = $null
 # Options that consume the following token, so it is not counted as positional.
 $script:PlexdoValueOptions = @(
     '--m3u', '--album', '--sort', '--media-type', '--library-id', '--section',
-    '--prefix', '--throttle', '-p', '-l', '--library', '-t', '--title', '-u', '--username',
+    '--prefix', '--throttle', '-p', '-l', '--library', '-t', '--title', '-u', '--user',
+    '--username',
     '-c', '--code', '-f', '--format'
 )
 
@@ -283,6 +284,9 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
 
     # A value expected by the option just typed.
     switch ($previous) {
+        { $_ -in '-u', '--user' } {
+            if ($command -like 'build-*') { $results = Get-PlexdoUsers }
+        }
         { $_ -in '-f', '--format' } {
             $results = @('table', 'json', 'yaml', 'csv', 'clixml') |
                 ForEach-Object { New-PlexdoResult $_ 'output format' }
@@ -323,6 +327,7 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
                 '^(list-playlist|list-show|build-)' { $flags['--m3u'] = 'Also export an M3U file'; $flags['--prefix'] = 'Rewrite exported paths onto this prefix' }
                 '^(export-playlist|export-titles)$' { $flags['--prefix'] = 'Rewrite exported paths onto this prefix' }
                 '^(build-|copy-playlist-)'          { $flags['--overwrite'] = 'Replace an existing playlist of the same name' }
+                '^build-'                           { $flags['--user'] = 'Create the playlist for this user instead'; $flags['--all-users'] = 'Create the playlist for every user on the server' }
                 '^build-concatenated$'              { $flags['--unique'] = 'Skip an item an earlier playlist already contributed' }
                 '^(list-titles|list-library|export-titles)$' { $flags['--album'] = 'Restrict to a single photo album' }
                 '^export-titles$'                   { $flags['--sort'] = 'Sort order' }

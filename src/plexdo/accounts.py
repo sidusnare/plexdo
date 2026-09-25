@@ -218,10 +218,12 @@ def account_type(user: MyPlexUser) -> str:
 
 # Namespace attributes that hold a user identifier, resolved centrally in
 # cli.main() so every command handler receives a plain numeric user ID.
-USER_ID_ARGUMENTS = ("user_id", "user_a", "user_b", "source_user_id")
+USER_ID_ARGUMENTS = (
+    "user_id", "user_a", "user_b", "source_user_id", "dest_user_id",
+)
 
 
-def _user_roster(plex: PlexServer) -> List[Tuple[int, str]]:
+def user_roster(plex: PlexServer) -> List[Tuple[int, str]]:
     """Return (id, title) for the admin account and every shared user."""
     account = plex.myPlexAccount()
     roster = [(0, clean_text(getattr(account, "title", "") or "admin"))]
@@ -241,13 +243,14 @@ def resolve_user_arguments(plex: PlexServer, args: "argparse.Namespace") -> None
     """Replace user ID/title arguments with numeric user IDs, in place.
 
     The roster is fetched once per invocation, so a command taking two user
-    arguments costs a single extra API call rather than two.
+    arguments costs a single extra API call rather than two, and a command
+    given none of them costs nothing.
     """
     present = [
         name for name in USER_ID_ARGUMENTS if getattr(args, name, None) is not None
     ]
     if not present:
         return
-    roster = _user_roster(plex)
+    roster = user_roster(plex)
     for name in present:
         setattr(args, name, resolve_user_identifier(roster, getattr(args, name)))
