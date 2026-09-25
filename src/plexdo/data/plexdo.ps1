@@ -45,6 +45,7 @@ $script:PlexdoCommands = [ordered]@{
     'build-interleaved'       = 'Round-robin playlist from shows'
     'build-chronological'     = 'Date-sorted playlist from shows and movies'
     'build-randomize'         = 'Randomize a playlist into a new one'
+    'build-concatenated'      = 'Join several playlists end to end into one'
     'copy-playlist-all-users' = 'Copy a playlist to all managed users'
     'copy-playlist-to-user'   = 'Copy a playlist to a specific user'
     'copy-watched'            = 'Synchronise watched state between two users'
@@ -322,6 +323,7 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
                 '^(list-playlist|list-show|build-)' { $flags['--m3u'] = 'Also export an M3U file'; $flags['--prefix'] = 'Rewrite exported paths onto this prefix' }
                 '^(export-playlist|export-titles)$' { $flags['--prefix'] = 'Rewrite exported paths onto this prefix' }
                 '^(build-|copy-playlist-)'          { $flags['--overwrite'] = 'Replace an existing playlist of the same name' }
+                '^build-concatenated$'              { $flags['--unique'] = 'Skip an item an earlier playlist already contributed' }
                 '^(list-titles|list-library|export-titles)$' { $flags['--album'] = 'Restrict to a single photo album' }
                 '^export-titles$'                   { $flags['--sort'] = 'Sort order' }
                 '^search$'                          { $flags['--media-type'] = 'Restrict to one media type'; $flags['--library-id'] = 'Restrict to one library' }
@@ -359,6 +361,8 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
                                       else { $results = Get-PlexdoRatingKeys } }
                 'build-randomize'   { if ($index -eq 0) { $results = Get-PlexdoUsers }
                                       elseif ($index -eq 1) { $results = Get-PlexdoPlaylists $user } }
+                'build-concatenated' { if ($index -eq 0) { $results = Get-PlexdoUsers }
+                                       elseif ($index -ge 2) { $results = Get-PlexdoPlaylists $user -IncludeKeys } }
                 'copy-playlist-all-users' { if ($index -eq 0) { $results = Get-PlexdoUsers }
                                             elseif ($index -eq 1) { $results = Get-PlexdoPlaylists $user } }
                 'copy-playlist-to-user'   { if ($index -eq 0) { $results = Get-PlexdoUsers }

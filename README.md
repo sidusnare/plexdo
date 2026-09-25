@@ -274,6 +274,7 @@ default because specials are numbered irregularly, though naming it with
 plexdo build-interleaved "Mixed Run" 101 202       # round-robin across shows
 plexdo build-chronological "By Air Date" 101 202   # date-sorted, shows and movies
 plexdo build-randomize 0 "Source" "Shuffled"       # secrets-backed shuffle
+plexdo build-concatenated 0 "All" "Part 1" "Part 2"  # joined end to end
 ```
 
 Playlists are always built fully in memory, validated, previewed, and then
@@ -288,6 +289,21 @@ is removed and replaced.
 `build-chronological` estimates missing air dates from the median interval
 between neighbouring episodes in the same season, and prompts only when that is
 impossible.
+
+`build-concatenated` joins playlists end to end, keeping the order within each
+and the order they were named in. Every source is read before anything is
+written, so a source may also be the destination:
+
+```bash
+plexdo build-concatenated 0 "Mix" "Mix" "New Finds" -o   # append one to another
+```
+
+Duplicates are kept by default, since a plain concatenation is faithful and
+Plex permits a repeat; `--unique` keeps only an item's first appearance,
+matching on ratingKey rather than title, and reports how many it skipped. An
+empty source is reported and contributes nothing - a typo that resolved to the
+wrong playlist otherwise looks exactly like a playlist that happens to be
+empty.
 
 ### Copying and modifying
 

@@ -334,8 +334,9 @@ turn it off.
 
 Apply wherever a loop makes one request per element and the count can exceed
 50: the seasons walk in `list-titles`, `find-missing -A`, applying watched
-state in `copy-watched`, removing entries in `clean-playlist`,
-`collect_photos`, and the per-user loop in `copy-playlist-all-users`. Functions needing it take an optional `args`.
+state in `copy-watched`, removing entries in `clean-playlist`, reading each
+source in `build-concatenated`, `collect_photos`, and the per-user loop in
+`copy-playlist-all-users`. Functions needing it take an optional `args`.
 
 ## RECORDS
 
@@ -404,7 +405,7 @@ touched.
 - `list-libraries` - columns `id`, `type`, `title`; writes the libraries cache.
 - `list-titles LIBRARY [--album A]` - registered with
   `aliases=["list-library"]`. argparse reports whichever spelling was typed,
-  so `COMMANDS` needs an entry for both, giving 26 registry entries for 25
+  so `COMMANDS` needs an entry for both, giving 27 registry entries for 26
   commands; the smoke test floor must allow for it. Table columns are
   `ratingKey`, `title`, `releaseDate`, `rating`, `studio`; a machine-readable
   format carries every listed field and, for a show library, nests each show's
@@ -441,6 +442,16 @@ touched.
   `-median`, averaging when both exist, and prompt only when that is
   impossible.
 - `build-randomize USER SOURCE DEST` - Fisher-Yates via `secrets.randbelow`.
+- `build-concatenated USER NAME PLAYLIST... [--unique]` - joins the sources
+  end to end, keeping the order within each and the order they were named in.
+  Read **every** source before writing anything, so naming a source as the
+  destination works under `--overwrite`: the items are already in memory when
+  the old playlist goes. Duplicates are kept by default - a concatenation is
+  faithful, and Plex permits a repeat - while `--unique` keeps only an item's
+  first appearance, matched on ratingKey rather than title, and reports how
+  many it skipped. Warn about an empty source rather than passing over it: a
+  typo that resolved to the wrong playlist looks exactly like a playlist that
+  happens to be empty.
 - `copy-playlist-all-users USER PLAYLIST` - skips the source user, prints the
   item list **once** before the loop and passes `preview=False` thereafter,
   then one line per user (`created`, `replaced`, `skipped`, `failed`) printed
@@ -499,7 +510,7 @@ Watch state lives on leaf items: map `movie`->`movie`, `show`->`episode`,
   `duration`/1000 with `-1` fallback, and skips items with no path.
 - Photo libraries export a self-contained Spotlight.js gallery. **No Plex HTTP
   URLs anywhere in it**: both `href` and `src` are server filesystem paths.
-- `-p/--prefix` on all seven export commands, registered through
+- `-p/--prefix` on all eight export commands, registered through
   `paths.add_prefix_argument` - repeating the help text inline trips
   `duplicate-code`. `mapper_for(plex, args)` returns `identity` without a
   prefix, so the default costs no extra call. The prefix replaces the
@@ -639,7 +650,8 @@ identifier resolution including the ID-versus-title collision; the overwrite
 guard performing **no** server calls when it refuses; watched-state selection
 in both directions and that an undated state never wins; which playlist entries
 `clean-playlist` drops, and that it numbers them by their place in the
-playlist rather than within the removal list; path rewriting
+playlist rather than within the removal list; that concatenation preserves the
+order given and that `--unique` matches on ratingKey; path rewriting
 picking the longest matching root; the token store reading a legacy bare-token
 file; that `loaded_fields` and `file_paths` never trigger a reload; and that
 global flags survive being given before the subcommand.

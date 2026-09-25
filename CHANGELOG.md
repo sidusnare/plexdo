@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.24] - 2026-09-24
+
+### Added
+- `build-concatenated USER NAME PLAYLIST... [--unique]` joins several
+  playlists end to end into one new playlist, keeping the order within each
+  and the order they were named in. Every source is read before anything is
+  written, so a source may also be the destination under `-o/--overwrite`.
+  Duplicates are kept by default, a plain concatenation being faithful and
+  Plex permitting a repeat; `--unique` keeps only an item's first appearance,
+  matched on ratingKey, and reports how many it skipped. An empty source is
+  reported rather than passed over, since a typo that resolved to the wrong
+  playlist otherwise looks exactly like a playlist that happens to be empty.
+
 ## [1.1.23] - 2026-09-19
 
 ### Added
@@ -271,6 +284,7 @@ multi-user token handling, watched-state synchronisation, a status report,
 photo galleries, YAML/CSV/CLIXML output, shell completions for bash, zsh, and
 fish, a manual page, and packaging for PyPI. See the commit history.
 
+[1.1.24]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.24
 [1.1.23]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.23
 [1.1.22]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.22
 [1.1.18]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.18

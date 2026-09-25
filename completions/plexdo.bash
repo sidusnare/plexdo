@@ -267,6 +267,7 @@ PYEOF
 _plexdo_commands() {
     echo "list-libraries list-titles list-library list-users list-playlists list-playlist \
 list-show show-metadata search read rescan status find-missing build-interleaved build-chronological build-randomize \
+build-concatenated \
 copy-playlist-all-users copy-playlist-to-user export-playlist remove-playlist \
 append-playlist clean-playlist export-titles copy-watched login write-config-example"
 }
@@ -353,6 +354,8 @@ _plexdo_complete() {
         case "$cmd" in
             list-playlist|list-show|build-interleaved|build-chronological|build-randomize)
                 COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --m3u --prefix -p" -- "$cur") ) ;;
+            build-concatenated)
+                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --m3u --prefix -p -o --overwrite --unique" -- "$cur") ) ;;
             export-playlist|export-titles)
                 COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --prefix -p" -- "$cur") ) ;;
             clean-playlist)
@@ -500,6 +503,19 @@ _plexdo_complete() {
                 1) uid="$(_plexdo_nth_positional "$cmd" 0)"
                    _plexdo_complete_playlist_id_or_name "$uid" ;;
                 *) COMPREPLY=() ;;
+            esac ;;
+
+        # <user_id> <name> <playlist...> [--unique] [--m3u] [-o]
+        build-concatenated)
+            if [[ "$cur" == -* ]]; then
+                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --unique --m3u --overwrite -o --prefix -p" -- "$cur") )
+                return
+            fi
+            case $pos in
+                0) _plexdo_complete_user_id ;;
+                1) COMPREPLY=() ;;
+                *) uid="$(_plexdo_nth_positional "$cmd" 0)"
+                   _plexdo_complete_playlist_id_or_name "$uid" ;;
             esac ;;
 
         # <source_user_id> <source_playlist> [-o]

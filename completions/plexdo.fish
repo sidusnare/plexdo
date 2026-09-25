@@ -205,7 +205,7 @@ end
 set -l plexdo_cmds list-libraries list-titles list-library list-show export-titles search status find-missing \
     list-users list-playlists list-playlist export-playlist remove-playlist \
     append-playlist clean-playlist show-metadata read rescan status find-missing build-interleaved \
-    build-chronological build-randomize copy-playlist-all-users \
+    build-chronological build-randomize build-concatenated copy-playlist-all-users \
     copy-playlist-to-user copy-watched login write-config-example
 
 # No bare filename completion anywhere; each rule opts in explicitly.
@@ -238,6 +238,7 @@ for prog in plexdo
     complete -c $prog -n __plexdo_no_subcommand -a build-interleaved -d 'Round-robin playlist from shows'
     complete -c $prog -n __plexdo_no_subcommand -a build-chronological -d 'Date-sorted playlist from shows and movies'
     complete -c $prog -n __plexdo_no_subcommand -a build-randomize -d 'Randomize a playlist into a new one'
+    complete -c $prog -n __plexdo_no_subcommand -a build-concatenated -d 'Join several playlists end to end into one'
     complete -c $prog -n __plexdo_no_subcommand -a copy-playlist-all-users -d 'Copy a playlist to all managed users'
     complete -c $prog -n __plexdo_no_subcommand -a copy-playlist-to-user -d 'Copy a playlist to a specific user'
     complete -c $prog -n __plexdo_no_subcommand -a copy-watched -d 'Synchronise watched state between two users'
@@ -271,7 +272,7 @@ for prog in plexdo
     complete -c $prog -n "__fish_seen_subcommand_from build-interleaved build-chronological; and not __plexdo_at 0" \
         -a '(__plexdo_rating_keys)' -d 'item'
 
-    complete -c $prog -n "__fish_seen_subcommand_from search list-playlists list-playlist export-playlist remove-playlist append-playlist clean-playlist build-randomize copy-playlist-all-users copy-playlist-to-user copy-watched; and __plexdo_at 0" \
+    complete -c $prog -n "__fish_seen_subcommand_from search list-playlists list-playlist export-playlist remove-playlist append-playlist clean-playlist build-randomize build-concatenated copy-playlist-all-users copy-playlist-to-user copy-watched; and __plexdo_at 0" \
         -a '(__plexdo_users)' -d 'user'
     complete -c $prog -n "__fish_seen_subcommand_from copy-watched; and __plexdo_at 1" \
         -a '(__plexdo_users)' -d 'user'
@@ -282,16 +283,18 @@ for prog in plexdo
         -a '(__plexdo_playlists_or_keys 0)' -d 'playlist'
     complete -c $prog -n "__fish_seen_subcommand_from export-playlist remove-playlist append-playlist clean-playlist build-randomize copy-playlist-all-users copy-playlist-to-user; and __plexdo_at 1" \
         -a '(__plexdo_playlists_or_keys 0)' -d 'playlist'
+    complete -c $prog -n "__fish_seen_subcommand_from build-concatenated; and not __plexdo_at 0; and not __plexdo_at 1" \
+        -a '(__plexdo_playlists_or_keys 0)' -d 'playlist'
 
     complete -c $prog -rF -n "__fish_seen_subcommand_from export-titles; and __plexdo_at 1"
     complete -c $prog -rF -n "__fish_seen_subcommand_from export-playlist; and __plexdo_at 2"
 
     # -- per-command options -------------------------------------------------
     complete -c $prog -x -s p -l prefix \
-        -n '__fish_seen_subcommand_from list-playlist list-show export-playlist export-titles build-interleaved build-chronological build-randomize' \
+        -n '__fish_seen_subcommand_from list-playlist list-show export-playlist export-titles build-interleaved build-chronological build-randomize build-concatenated' \
         -d 'Rewrite exported paths onto this prefix'
     complete -c $prog -rF -l m3u \
-        -n '__fish_seen_subcommand_from list-playlist list-show build-interleaved build-chronological build-randomize' \
+        -n '__fish_seen_subcommand_from list-playlist list-show build-interleaved build-chronological build-randomize build-concatenated' \
         -d 'Also export an M3U file using Plex server paths'
     complete -c $prog -x -l album -n '__fish_seen_subcommand_from list-titles list-library export-titles' \
         -a '(__plexdo_albums 0)' -d 'Restrict to a single photo album'
@@ -305,8 +308,10 @@ for prog in plexdo
     complete -c $prog -s s -l status -n '__fish_seen_subcommand_from rescan' -d 'Print all active scan jobs'
     complete -c $prog -s n -l now -n '__fish_seen_subcommand_from rescan' -d 'Cancel pending scans first'
     complete -c $prog -s o -l overwrite \
-        -n '__fish_seen_subcommand_from copy-playlist-all-users copy-playlist-to-user build-interleaved build-chronological build-randomize' \
+        -n '__fish_seen_subcommand_from copy-playlist-all-users copy-playlist-to-user build-interleaved build-chronological build-randomize build-concatenated' \
         -d 'Replace an existing playlist of the same name'
+    complete -c $prog -l unique -n '__fish_seen_subcommand_from build-concatenated' \
+        -d 'Skip an item an earlier playlist already contributed'
     complete -c $prog -l one-way -n '__fish_seen_subcommand_from copy-watched' -d 'Only write to the second user'
     complete -c $prog -x -s l -l library -n '__fish_seen_subcommand_from copy-watched' \
         -a '(__plexdo_libraries)' -d 'Restrict to one library'

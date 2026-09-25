@@ -200,6 +200,7 @@ _plexdo_commands() {
     'build-interleaved:Round-robin interleaved playlist from shows'
     'build-chronological:Date-sorted playlist from shows and movies'
     'build-randomize:Randomize a playlist into a new one'
+    'build-concatenated:Join several playlists end to end into one'
     'copy-playlist-all-users:Copy a playlist to all managed users'
     'copy-playlist-to-user:Copy a playlist to a specific user'
     'copy-watched:Synchronise watched state between two users'
@@ -317,6 +318,14 @@ _plexdo_subcommand() {
         '1:user:_plexdo_users' \
         '2:source playlist:{_plexdo_playlists_or_keys $(_plexdo_positional 0)}' \
         '3:destination playlist:'
+      ;;
+    build-concatenated)
+      _arguments $_plexdo_global_opts $pfx $m3u \
+        '(-o --overwrite)'{-o,--overwrite}'[Replace an existing playlist of the same name]' \
+        '--unique[Skip an item an earlier playlist already contributed]' \
+        '1:user:_plexdo_users' \
+        '2:new playlist name:' \
+        '*:source playlist:{_plexdo_playlists_or_keys $(_plexdo_positional 0)}'
       ;;
     copy-playlist-all-users)
       _arguments $_plexdo_global_opts \

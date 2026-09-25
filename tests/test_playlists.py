@@ -5,6 +5,7 @@
 import pytest
 
 from conftest import FakeItem, FakePlaylist, FakePlex
+from plexdo.commands.build import _concatenate
 from plexdo.commands.playlists import _watched_entries
 from plexdo.playlists import _resolve_dest_name, finalize_playlist
 
@@ -112,3 +113,41 @@ def test_is_played_beats_a_stale_view_count():
 
 def test_an_untouched_playlist_yields_nothing_to_remove():
     assert labelled([FakeItem(1, "A"), FakeItem(2, "B")]) == []
+
+
+# --- build-concatenated: joining sources end to end ----------------------
+
+def joined(sources, unique=False):
+    """Titles of the concatenation, in order."""
+    return [item.title for item in _concatenate(sources, unique)]
+
+
+A, B, C = FakeItem(1, "A"), FakeItem(2, "B"), FakeItem(3, "C")
+
+
+def test_sources_are_joined_in_the_order_given():
+    assert joined([("one", [A, B]), ("two", [C])]) == ["A", "B", "C"]
+    assert joined([("two", [C]), ("one", [A, B])]) == ["C", "A", "B"]
+
+
+def test_duplicates_are_kept_by_default():
+    """Plex allows a repeat, and a plain concatenation is faithful."""
+    assert joined([("one", [A, B]), ("two", [B, C])]) == ["A", "B", "B", "C"]
+
+
+def test_unique_keeps_the_first_appearance_only():
+    assert joined([("one", [A, B]), ("two", [B, C])], True) == ["A", "B", "C"]
+
+
+def test_unique_also_collapses_a_repeat_inside_one_source():
+    assert joined([("one", [A, B, A])], True) == ["A", "B"]
+
+
+def test_an_item_is_identified_by_rating_key_not_title():
+    """Two playlists hold separate objects for the same item."""
+    same = [("one", [FakeItem(1, "A")]), ("two", [FakeItem(1, "A again")])]
+    assert joined(same, True) == ["A"]
+
+
+def test_empty_sources_contribute_nothing():
+    assert joined([("one", []), ("two", [A]), ("three", [])]) == ["A"]

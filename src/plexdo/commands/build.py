@@ -2,7 +2,7 @@
 
 """Playlist building commands."""
 
-from typing import Iterator, List, Optional, Tuple
+from typing import Iterator, List, Optional, Sequence, Set, Tuple
 import argparse
 import datetime
 import sys
@@ -18,6 +18,7 @@ from plexdo.convert import parse_date
 from plexdo.m3u import write_m3u
 from plexdo.paths import add_prefix_argument, mapper_for
 from plexdo.playlists import finalize_playlist, resolve_playlist
+from plexdo.throttle import paced
 from plexdo.titles import fetch_show, non_special_episodes, shuffle_list
 
 
@@ -124,6 +125,72 @@ def cmd_build_randomize(plex: PlexServer, args: argparse.Namespace) -> None:
         write_m3u(randomized, args.m3u, mapper_for(user_plex, args))
 
 
+def _collect_sources(
+    user_plex: PlexServer,
+    names: Sequence[str],
+    args: argparse.Namespace,
+) -> List[Tuple[str, List[MediaItem]]]:
+    """Resolve each named playlist and read its items, in the order given.
+
+    One listing request per playlist, so the walk is paced like any other
+    per-element loop. An empty source is reported rather than passed over in
+    silence: a typo that resolved to the wrong playlist looks exactly like a
+    playlist that happens to be empty.
+    """
+    sources: List[Tuple[str, List[MediaItem]]] = []
+    for name in paced(names, args, "playlists"):
+        part: List[MediaItem] = list(resolve_playlist(user_plex, name).items())
+        if part:
+            LOG.info("Playlist '%s': %d item(s)", name, len(part))
+        else:
+            LOG.warning("Playlist '%s' is empty; it contributes nothing.", name)
+        sources.append((name, part))
+    return sources
+
+
+def _concatenate(
+    sources: Sequence[Tuple[str, List[MediaItem]]], unique: bool
+) -> List[MediaItem]:
+    """Join the sources end to end, preserving the order within each.
+
+    With *unique*, an item already added is skipped rather than repeated; a
+    ratingKey identifies the item, so the same episode reached through two
+    playlists becomes one entry. Without it the result is a faithful
+    concatenation, duplicates and all, which is what Plex itself allows.
+    """
+    items: List[MediaItem] = []
+    seen: Set[int] = set()
+    for _, part in sources:
+        for item in part:
+            key = int(item.ratingKey)
+            if unique and key in seen:
+                continue
+            seen.add(key)
+            items.append(item)
+    return items
+
+
+def cmd_build_concatenated(plex: PlexServer, args: argparse.Namespace) -> None:
+    """Build one playlist from several others, joined end to end."""
+    user_plex = server_for_user(plex, args.user_id)
+
+    # Every source is read before anything is written, so naming a source as
+    # the destination and passing --overwrite still works: the items are
+    # already in memory by the time the old playlist is removed.
+    sources = _collect_sources(user_plex, args.playlists, args)
+    items = _concatenate(sources, args.unique)
+
+    total = sum(len(part) for _, part in sources)
+    if args.unique and len(items) < total:
+        LOG.info("--unique: skipped %d repeated item(s).", total - len(items))
+    LOG.info("Concatenated %d playlist(s) into %d item(s)", len(sources), len(items))
+
+    finalize_playlist(user_plex, args.name, items, args)
+
+    if args.m3u:
+        write_m3u(items, args.m3u, mapper_for(user_plex, args))
+
+
 def register(
     sub: "argparse._SubParsersAction",
     parents: "List[argparse.ArgumentParser]",
@@ -184,11 +251,43 @@ def register(
     )
     add_prefix_argument(p_br)
 
+    p_bn = sub.add_parser(
+        "build-concatenated", parents=parents,
+        help="Join several playlists end to end into one new playlist.",
+    )
+    p_bn.add_argument("user_id", metavar="USER", help="User ID (int) or user title (str); use 0 for the admin account. Obtain both with list-users.")
+    p_bn.add_argument("name", help="Name for the new playlist (str).")
+    p_bn.add_argument(
+        "playlists", nargs="+", metavar="PLAYLIST",
+        help=(
+            "The playlists to join, in the order they should appear. "
+            "Playlist name (str) or ratingKey (int). Obtain either with "
+            "list-playlists."
+        ),
+    )
+    p_bn.add_argument(
+        "--unique", action="store_true", default=False,
+        help=(
+            "Skip an item an earlier playlist already contributed, so a "
+            "title appearing in two of them is listed once."
+        ),
+    )
+    p_bn.add_argument(
+        "-o", "--overwrite", action="store_true", default=False,
+        help="Replace an existing playlist of the same name instead of failing.",
+    )
+    p_bn.add_argument(
+        "--m3u", metavar="PATH",
+        help="Also export an M3U file at PATH using Plex server filesystem paths.",
+    )
+    add_prefix_argument(p_bn)
+
 
 COMMANDS = {
     "build-interleaved": cmd_build_interleaved,
     "build-chronological": cmd_build_chronological,
     "build-randomize": cmd_build_randomize,
+    "build-concatenated": cmd_build_concatenated,
 }
 
 REQUIRES_PLEX = frozenset(COMMANDS)
