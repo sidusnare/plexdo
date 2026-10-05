@@ -37,6 +37,31 @@ def output(data: Any, args: "argparse.Namespace") -> None:
         print(data)
 
 
+# Formats that can be emitted a record at a time. CLIXML is missing because
+# Import-Clixml reads exactly one document, so a stream of them is useless.
+STREAMABLE_FORMATS = ("table", "json", "yaml", "csv")
+
+
+def stream_record(
+    record: Dict[str, Any], args: "argparse.Namespace", first: bool
+) -> None:
+    """Emit one record of a stream in the selected machine-readable format.
+
+    For a command that reports as it goes rather than once at the end. JSON
+    becomes JSON Lines, one object per line; YAML a stream of documents; CSV
+    a header before the *first* record only. Each record is flushed, or a
+    pipe would see nothing until the buffer happened to fill.
+    """
+    chosen = output_format(args)
+    rendered = render(record, chosen)
+    if chosen == "yaml":
+        rendered = "---\n" + rendered
+    elif chosen == "csv" and not first:
+        # A header never contains a newline, so the first one ends it.
+        rendered = rendered.split("\n", 1)[1]
+    print(rendered, flush=True)
+
+
 def clean_text(value: Any) -> str:
     """Convert a table cell value to a clean string, stripping control characters."""
     return str(value).strip()

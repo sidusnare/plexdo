@@ -52,6 +52,8 @@ def _session_rows(plex: PlexServer) -> List[Dict[str, Any]]:
         player = players[0] if players else None
         usernames = getattr(item, "usernames", []) or []
         rows.append({
+            # What `wait --session` takes, so a session can be picked by it.
+            "sessionKey": getattr(item, "sessionKey", None),
             "user": clean_text(usernames[0] if usernames else ""),
             "library": int(vars(item).get("librarySectionID") or 0),
             "ratingKey": int(item.ratingKey),

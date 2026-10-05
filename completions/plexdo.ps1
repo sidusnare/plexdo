@@ -42,6 +42,7 @@ $script:PlexdoCommands = [ordered]@{
     'read'                    = 'Stream a media file to stdout'
     'rescan'                  = 'Trigger a library rescan or show scan status'
     'status'                  = 'Show server identity, sessions, users, and tasks'
+    'wait'                    = 'Sleep until a session''s current play is over'
     'find-missing'            = 'Find gaps in episode numbering across every show'
     'build-interleaved'       = 'Round-robin playlist from shows'
     'build-chronological'     = 'Date-sorted playlist from shows and movies'
@@ -287,6 +288,9 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
         { $_ -in '-u', '--user' } {
             if ($command -like 'build-*') { $results = Get-PlexdoUsers }
         }
+        { $_ -in '-r', '--rating-key' } {
+            if ($command -eq 'wait') { $results = Get-PlexdoRatingKeys }
+        }
         { $_ -in '-f', '--format' } {
             $results = @('table', 'json', 'yaml', 'csv', 'clixml') |
                 ForEach-Object { New-PlexdoResult $_ 'output format' }
@@ -334,6 +338,7 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
                 '^search$'                          { $flags['--media-type'] = 'Restrict to one media type'; $flags['--library-id'] = 'Restrict to one library' }
                 '^rescan$'                          { $flags['--status'] = 'Print all active scan jobs'; $flags['--now'] = 'Cancel pending scans first' }
                 '^status$'                          { $flags['--section'] = 'Show only one section' }
+                '^wait$'                            { $flags['--session'] = 'Follow the session with this sessionKey'; $flags['--rating-key'] = 'Wait for this video'; $flags['--interval'] = 'Seconds between polls'; $flags['--fast-interval'] = 'Seconds between polls near the end point'; $flags['--no-credits'] = 'Ignore the credits marker and wait for the end'; $flags['--offset'] = 'Signed seconds: negative ends early, positive sleeps after'; $flags['--all'] = 'Wait for every play by every user'; $flags['--paused'] = 'Count a play as over once paused this many seconds'; $flags['--now'] = 'With -r: exit at once if the video is not playing' }
                 '^find-missing$'                    { $flags['--library'] = 'Library to look in'; $flags['--all'] = 'Check every show'; $flags['--season'] = 'Season number, or several comma separated'; $flags['--include-specials'] = 'Also check season 0' }
                 '^clean-playlist$'                  { $flags['--include-partial'] = 'Also remove part-played items' }
                 '^copy-watched$'                    { $flags['--one-way'] = 'Only write to the second user'; $flags['--library'] = 'Restrict to one library'; $flags['--title'] = 'Restrict to one item'; $flags['--unwatch'] = 'Propagate the unwatched state instead' }

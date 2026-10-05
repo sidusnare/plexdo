@@ -4,6 +4,32 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.26] - 2026-10-05
+
+### Added
+- `wait` sleeps until a session's current play is over, then exits 0, so
+  `plexdo wait && ...` runs once the viewer is done. It follows the first
+  session listed by default, or `-s/--session`, and waits for what that
+  session is playing, or `-r/--rating-key`. The play is over at the start of
+  the end credits when Plex has a credits marker - the final one, after any
+  mid-credits scene - and at the end otherwise; `--no-credits` ignores the
+  marker. It is also over the moment the video stops playing. A negative
+  `--offset` ends the wait that many seconds early; a positive one sleeps that
+  long afterwards. Polls come every 10 seconds (`-i/--interval`), then every
+  second (`--fast-interval`) from 30 seconds before the end point, each
+  varied by up to 20%, and every poll reports the user, what is playing, the
+  video waited for, the position, the time waited, and the time left. A video
+  not yet playing is waited for until it starts, or with `--now` not at all.
+  `--paused SECONDS` counts a play as over once it has sat paused that long.
+  `-a/--all` waits for every play by every user, and ends only when two polls
+  an interval apart find nothing left, so a play started meanwhile - autoplay
+  included - is waited for too.
+  Machine-readable formats stream one record per poll; CLIXML, which cannot
+  be streamed, is refused. Failed polls are retried, and an interrupt exits
+  130.
+- The `status` sessions table carries each session's `sessionKey`, which
+  `wait --session` takes.
+
 ## [1.1.25] - 2026-09-24
 
 ### Added
@@ -308,6 +334,7 @@ multi-user token handling, watched-state synchronisation, a status report,
 photo galleries, YAML/CSV/CLIXML output, shell completions for bash, zsh, and
 fish, a manual page, and packaging for PyPI. See the commit history.
 
+[1.1.26]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.26
 [1.1.25]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.25
 [1.1.24]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.24
 [1.1.23]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.23

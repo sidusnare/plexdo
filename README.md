@@ -473,8 +473,8 @@ plexdo status --section tasks -f csv
 ```
 
 Reports server identity (name, version, machine ID, platform, platform
-version, last updated), active sessions with the library, ratingKey, and the
-file each player has open, shared users, system accounts,
+version, last updated), active sessions with the sessionKey, library,
+ratingKey, and the file each player has open, shared users, system accounts,
 reachable addresses, library scans in progress, other background activity, and
 scheduled maintenance tasks.
 
@@ -482,6 +482,71 @@ A section that cannot be read - reachable addresses need a plex.tv round trip,
 for instance - is reported as a warning and left empty rather than losing the
 whole report. `--format csv` and `--format clixml` are flat by nature and need
 `--section`, since the eight sections have different shapes.
+
+### Waiting for a play to end
+
+```bash
+plexdo wait && sudo systemctl restart plexmediaserver   # after the credits start
+plexdo wait --no-credits                 # through the credits to the very end
+plexdo wait --offset -120                # two minutes before the credits
+plexdo wait --offset 60                  # a minute after the wait is over
+plexdo wait -s 42                        # a particular session
+plexdo wait -r 12345                     # until that video, once started, is over
+plexdo wait -r 12345 --now               # ...or not at all, if it is not playing
+plexdo wait --paused 600                 # a 10-minute pause counts as done
+plexdo wait --all && sudo reboot         # everyone, including what starts meanwhile
+```
+
+`wait` sleeps until a session's current play is over and then exits 0, so
+whatever follows `&&` runs once the viewer is done. By default it follows the
+first session listed and waits for whatever that session is playing.
+
+The play is over when playback reaches the start of the end credits, if Plex
+has a credits marker for the video, or its end otherwise; `--no-credits`
+ignores the marker. Where a film has two credits markers around a mid-credits
+scene, the final one is used so the scene is not cut off. The wait also ends
+the moment the video stops playing - the viewer quit, or autoplay moved on to
+the next episode - wherever playback had got to.
+
+It polls every 10 seconds (`-i`), then every second (`--fast-interval`) from
+30 seconds before the end point on, so the end is caught within about a
+second. Each delay varies by up to 20% either way. Every poll prints a line:
+
+```
+Waiting for "The Wire - The Target" (Alice) to reach the credits at 55:40.
+Alice | playing: The Wire - The Target | waiting for: The Wire - The Target | 55:00 / 58:12 | waited 0:00 | ~0:40 left
+Alice | playing: The Wire - The Target | waiting for: The Wire - The Target | 55:15 / 58:12 | waited 0:10 | ~0:25 left
+Alice | playing: The Wire - The Target | waiting for: The Wire - The Target | 55:30 / 58:12 paused | waited 0:11 | ~0:10 left
+Alice | playing: The Wire - The Target | waiting for: The Wire - The Target | 55:41 / 58:12 reached | waited 0:12 | done
+"The Wire - The Target" reached its end point.
+```
+
+With `-r`, a video that is not playing yet is waited for until it starts, and
+each line says what the user is watching instead; `--now` exits 0 at once
+rather than waiting. Without `-s`, `-r` follows whichever session plays the
+video. `status --section sessions` lists the sessionKey `-s` takes.
+
+In a machine-readable format every poll is one record - a line of JSON, a
+YAML document, or a CSV row under a single header - flushed as it is written,
+so a pipe sees each one immediately. CLIXML cannot be streamed and is refused;
+from PowerShell, read the JSON a line at a time with `ConvertFrom-Json`.
+
+`--paused SECONDS` counts a play as over once its player has sat paused that
+long - someone fell asleep, or walked away. Plex does not say when a pause
+began, so the count starts at the first poll that sees it; resuming starts it
+again, and `0` ends the play at the first sight of a pause. While paused, the
+estimate is the time the pause has left.
+
+`--all` waits for every play by every user, each judged by the same rules:
+its own credits or end, `--offset`, `--no-credits`, and `--paused`. Each poll
+prints a line per session, and a session that disappears is reported once as
+`stopped`. It ends only when two polls an interval apart both find nothing
+left, so a play started in the meantime - an autoplayed next episode, or
+someone new - is one more to wait for. Nothing playing at all still takes that
+second look before exiting. `--all` takes neither `-s` nor `-r`.
+
+A poll that fails is retried; five failures in a row end the wait with an
+error. Interrupting it exits 130, so a command chained with `&&` does not run.
 
 ### Server management
 

@@ -196,6 +196,7 @@ _plexdo_commands() {
     'read:Stream a media file to stdout'
     'rescan:Trigger a library rescan or show scan status'
     'status:Show server identity, sessions, users, scans, and tasks'
+    'wait:Sleep until a session'\''s current play is over'
     'find-missing:Find gaps in episode numbering across every show'
     'build-interleaved:Round-robin interleaved playlist from shows'
     'build-chronological:Date-sorted playlist from shows and movies'
@@ -274,6 +275,18 @@ _plexdo_subcommand() {
         '1:user:_plexdo_users' \
         '2:playlist:{_plexdo_playlists_or_keys $(_plexdo_positional 0)}' \
         '3:output path:_files'
+      ;;
+    wait)
+      _arguments $_plexdo_global_opts \
+        '(-s --session -a --all)'{-s,--session}'[Follow the session with this sessionKey]:session key:' \
+        '(-r --rating-key -a --all)'{-r,--rating-key}'[Wait for this video]:rating key:_plexdo_rating_keys' \
+        '(-a --all -s --session -r --rating-key)'{-a,--all}'[Wait for every play by every user]' \
+        '(-i --interval)'{-i,--interval}'[Seconds between polls]:seconds:' \
+        '--fast-interval[Seconds between polls near the end point]:seconds:' \
+        '--no-credits[Ignore the credits marker and wait for the end]' \
+        '--offset[Signed seconds: negative ends early, positive sleeps after]:seconds:' \
+        '--paused[Count a play as over once paused this many seconds]:seconds:' \
+        '--now[With -r: exit at once if the video is not playing]'
       ;;
     clean-playlist)
       _arguments $_plexdo_global_opts \

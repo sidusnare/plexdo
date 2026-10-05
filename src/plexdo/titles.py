@@ -63,10 +63,25 @@ def shuffle_list(lst: List[Any]) -> List[Any]:
     return result
 
 
-def fetch_item(plex: PlexServer, rating_key: Any) -> Any:
-    """Fetch a single item by ratingKey, failing fast if it does not exist."""
+def find_item(plex: PlexServer, rating_key: Any, markers: bool = False) -> Any:
+    """Fetch a single item by ratingKey, or None if the server has none.
+
+    With *markers*, the intro and credits markers come back in the same
+    request. A plain fetch leaves them out, and reading the markers property
+    afterwards would quietly cost a second request to reload the item.
+    """
     key = int(rating_key)
     try:
+        if markers:
+            return plex.fetchItem(f"/library/metadata/{key}?includeMarkers=1")
         return plex.fetchItem(key)
     except NotFound:
-        sys.exit(f"ratingKey not found: {key}")
+        return None
+
+
+def fetch_item(plex: PlexServer, rating_key: Any, markers: bool = False) -> Any:
+    """Fetch a single item by ratingKey, failing fast if it does not exist."""
+    item = find_item(plex, rating_key, markers)
+    if item is None:
+        sys.exit(f"ratingKey not found: {int(rating_key)}")
+    return item

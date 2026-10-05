@@ -22,7 +22,7 @@ from typing import Any, Callable, Dict, FrozenSet, List, Tuple
 
 from plexdo.commands import (auth, build, copy, libraries, metadata, missing,
                              playlists, rescan, search, status, stream, users,
-                             watched)
+                             wait, watched)
 
 # Order determines the order subcommands appear in --help.
 MODULES = (
@@ -35,6 +35,7 @@ MODULES = (
     stream,
     rescan,
     status,
+    wait,
     build,
     copy,
     watched,

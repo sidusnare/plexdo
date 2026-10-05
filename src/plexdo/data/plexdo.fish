@@ -204,7 +204,7 @@ end
 
 set -l plexdo_cmds list-libraries list-titles list-library list-show export-titles search status find-missing \
     list-users list-playlists list-playlist export-playlist remove-playlist \
-    append-playlist clean-playlist show-metadata read rescan status find-missing build-interleaved \
+    append-playlist clean-playlist show-metadata read rescan status wait find-missing build-interleaved \
     build-chronological build-randomize build-concatenated copy-playlist-all-users \
     copy-playlist-to-user copy-watched login write-config-example
 
@@ -235,6 +235,7 @@ for prog in plexdo
     complete -c $prog -n __plexdo_no_subcommand -a rescan -d 'Trigger a library rescan or show scan status'
     complete -c $prog -n __plexdo_no_subcommand -a status -d 'Show server identity, sessions, users, scans, and tasks'
     complete -c $prog -n __plexdo_no_subcommand -a find-missing -d 'Find gaps in episode numbering across every show'
+    complete -c $prog -n __plexdo_no_subcommand -a wait -d 'Sleep until a session\'s current play is over'
     complete -c $prog -n __plexdo_no_subcommand -a build-interleaved -d 'Round-robin playlist from shows'
     complete -c $prog -n __plexdo_no_subcommand -a build-chronological -d 'Date-sorted playlist from shows and movies'
     complete -c $prog -n __plexdo_no_subcommand -a build-randomize -d 'Randomize a playlist into a new one'
@@ -316,6 +317,16 @@ for prog in plexdo
         -a '(__plexdo_users)' -d 'Create the playlist for this user instead'
     complete -c $prog -s a -l all-users -n '__fish_seen_subcommand_from build-interleaved build-chronological build-randomize build-concatenated' \
         -d 'Create the playlist for every user on the server'
+    complete -c $prog -x -s s -l session -n '__fish_seen_subcommand_from wait' -d 'Follow the session with this sessionKey'
+    complete -c $prog -x -s r -l rating-key -n '__fish_seen_subcommand_from wait' \
+        -a '(__plexdo_rating_keys)' -d 'Wait for this video'
+    complete -c $prog -x -s i -l interval -n '__fish_seen_subcommand_from wait' -d 'Seconds between polls'
+    complete -c $prog -x -l fast-interval -n '__fish_seen_subcommand_from wait' -d 'Seconds between polls near the end point'
+    complete -c $prog -l no-credits -n '__fish_seen_subcommand_from wait' -d 'Ignore the credits marker and wait for the end'
+    complete -c $prog -x -l offset -n '__fish_seen_subcommand_from wait' -d 'Signed seconds: negative ends early, positive sleeps after'
+    complete -c $prog -l now -n '__fish_seen_subcommand_from wait' -d 'With -r: exit at once if the video is not playing'
+    complete -c $prog -s a -l all -n '__fish_seen_subcommand_from wait' -d 'Wait for every play by every user'
+    complete -c $prog -x -l paused -n '__fish_seen_subcommand_from wait' -d 'Count a play as over once paused this many seconds'
     complete -c $prog -l one-way -n '__fish_seen_subcommand_from copy-watched' -d 'Only write to the second user'
     complete -c $prog -x -s l -l library -n '__fish_seen_subcommand_from copy-watched' \
         -a '(__plexdo_libraries)' -d 'Restrict to one library'

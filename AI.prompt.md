@@ -102,7 +102,8 @@ src/plexdo/
     cache.py        cache_dir, write_cache
     convert.py      parse_date, format_duration
     console.py      output, output_format, clean_text, table_limit,
-                    print_table, print_metadata
+                    print_table, print_metadata, stream_record,
+                    STREAMABLE_FORMATS
     formats.py      to_json, to_yaml, to_csv, to_clixml, render
     records.py      loaded_fields, file_paths, release_date, summary_row,
                     cache_row, season_records
@@ -111,7 +112,7 @@ src/plexdo/
                     user_roster, UserAccessError
     sections.py     resolve_section, resolve_sections,
                     resolve_library_arguments
-    titles.py       display_title, fetch_item, fetch_show,
+    titles.py       display_title, find_item, fetch_item, fetch_show,
                     non_special_episodes, shuffle_list, item_is_played,
                     item_view_offset
     playlists.py    resolve_playlist, finalize_playlist, copy_playlist_to,
@@ -302,6 +303,12 @@ No command reaches for `json.dumps` directly.
   which is what `Import-Clixml` expects.
 - `formats._cell_value` flattens for CSV and CLIXML; `records._jsonable`
   preserves structure for the formats that can express it.
+- A command that reports as it goes emits through `console.stream_record`
+  instead of `output`: JSON becomes JSON Lines, YAML a `---` separated stream,
+  CSV a header before the first record only. **Flush every record**, or a pipe
+  sees nothing until the buffer fills. CLIXML cannot stream - `Import-Clixml`
+  reads exactly one document - so `STREAMABLE_FORMATS` leaves it out and such
+  a command refuses it, pointing PowerShell users at `ConvertFrom-Json`.
 
 ### Tables
 
@@ -418,7 +425,7 @@ touched.
 - `list-libraries` - columns `id`, `type`, `title`; writes the libraries cache.
 - `list-titles LIBRARY [--album A]` - registered with
   `aliases=["list-library"]`. argparse reports whichever spelling was typed,
-  so `COMMANDS` needs an entry for both, giving 27 registry entries for 26
+  so `COMMANDS` needs an entry for both, giving 28 registry entries for 27
   commands; the smoke test floor must allow for it. Table columns are
   `ratingKey`, `title`, `releaseDate`, `rating`, `studio`; a machine-readable
   format carries every listed field and, for a show library, nests each show's
@@ -577,9 +584,9 @@ string and returns nothing for an empty one, so the library appears empty.
 - `rescan [LIBRARY] [-s] [-n]` - `plex.activities` is a **property**, not a
   method. `section.update()` scans for files; `refresh()` only re-fetches
   metadata.
-- `status [--section S]` - the sessions table carries `user`, `library`,
-  `ratingKey`, `title`, `state`, `player`, `platform`, `address`, `progress`,
-  and `file`. `records.playing_file` reports the file in use: a session marks
+- `status [--section S]` - the sessions table carries `sessionKey`, `user`,
+  `library`, `ratingKey`, `title`, `state`, `player`, `platform`, `address`,
+  `progress`, and `file`; `sessionKey` is what `wait --session` takes. `records.playing_file` reports the file in use: a session marks
   the version and part being played with `selected`, which is the only way to
   tell them apart on a multi-version item, and nothing is marked when there is
   just one, so an empty selection means all of them. Eight sections: `server`, `sessions`, `users`,
@@ -588,6 +595,66 @@ string and returns nothing for an empty one, so the library appears empty.
   and other background work are separate. Collect each section in its own
   try/except: `connections` needs a plex.tv round trip an offline server
   cannot make. CSV and CLIXML are flat and require `--section`.
+
+- `wait [-s KEY] [-r KEY] [-a] [-i S] [--fast-interval S] [--no-credits]
+  [--offset S] [--paused S] [--now]` - sleeps until a play is over, then
+  exits 0, so
+  `plexdo wait && ...` runs afterwards. Follows the first session listed, or
+  `-s`, and waits for what it is playing, or `-r`.
+  - **The end point** is the start of the end credits when there is a credits
+    marker and the video's end otherwise; `--no-credits` always uses the end.
+    Take the marker Plex flags `final`, else the last: a film with a
+    mid-credits scene has two, and the final one follows the scene. Read the
+    markers from `_data`, as `records` reads media, after fetching with
+    `fetch_item(..., markers=True)` - a plain fetch omits them, and touching
+    `markers` afterwards costs a reload.
+  - **The wait also ends** the moment the video stops playing, wherever it had
+    got to: the session is gone, or has moved to another ratingKey because
+    autoplay went on to the next episode.
+  - **`--paused S`** counts a play as over once its player has sat paused S
+    seconds. Plex gives no pause timestamp, so the count starts at the first
+    poll that sees the pause, keyed by play - (sessionKey, ratingKey) - and
+    any other state clears it. Compare rounded to the millisecond: a sleep
+    timed to land on the deadline must count as reaching it despite float
+    error. While paused, the estimate is the pause's time left.
+  - **One judge:** `_assess` decides every play's state - reached, left
+    paused, or the player's own - for both a single wait and `--all`, so the
+    two cannot drift apart.
+  - **`--all`** judges every session on its own video each poll, one line or
+    record per session, reporting a play that has vanished once as
+    `stopped`. Nothing pending must be seen **twice, a slow interval apart**,
+    before it exits - the second poll is what catches a play started in
+    between, autoplay's next episode included - and that holds even when
+    nothing was playing to begin with. Fetch each video's markers once per
+    ratingKey with `find_item`, which returns None rather than exiting:
+    an item the server will not return falls back to the session's own
+    duration and XML instead of ending a wait over everyone. Refuses `-s`
+    and `-r`.
+  - **Offset:** negative moves the end point that many seconds earlier,
+    clamped at 0; positive is a sleep taken *after* the wait, not a position,
+    since there is no playback left to watch past the end.
+  - **Cadence:** `-i` (10s) until any unfinished play is within 30s of its
+    end point or past it, then `--fast-interval` (1s); every delay jittered
+    by up to 20% either way. A slow delay is cut short at the soonest moment
+    any play next needs a look - its fast window, or its pause running out -
+    so a long `-i` cannot sleep straight through either. Not `paced`: this is a
+    timed poll, not a loop over elements.
+  - **Following:** bind to the user of the session being followed, preferring
+    its original sessionKey but accepting any of that user's sessions on the
+    video, since stopping and restarting gives the same play a new key. `-r`
+    without `-s` binds nobody until someone is seen playing the video; until
+    then a poll describes the first session listed.
+  - **Every poll** reports the user, what is playing, the video waited for,
+    position, time waited, and estimated time left - one line for a table,
+    one streamed record otherwise, each record carrying every key so CSV
+    columns stay fixed. A video not yet playing says so and is waited for;
+    `--now`, valid only with `-r`, exits 0 instead.
+  - **Failure:** a failed poll is a warning and a retry, since a wait can last
+    hours; five in a row is a `sys.exit`. Nothing playing at all is exit 0.
+    An unknown `-s` exits 1 listing the active sessionKeys - a typo must not
+    let `&&` run. Ctrl-C exits 130 for the same reason.
+  - Time, sleep and jitter come in as one `Clock`, so the loop is tested
+    without waiting.
 
 ### Setup
 
@@ -611,7 +678,8 @@ string and returns nothing for an empty one, so the library appears empty.
 `sys.exit` with a clear message for: missing config or token, unknown
 ratingKey, wrong media type, playlist or user or library not found,
 unsupported library type, album not found, a refused name collision, a smart
-playlist asked to give up an entry. No bare
+playlist asked to give up an entry, an unknown sessionKey. An interrupted
+`wait` exits 130. No bare
 `except`; the broad ones are in `_cancel_all_scans`, the per-user copy loop,
 and per-section collection, each with a `# pylint: disable=broad-except`.
 
@@ -692,7 +760,13 @@ playlist rather than within the removal list; that concatenation preserves the
 order given and that `--unique` matches on ratingKey; that a per-user create
 reports a taken name instead of exiting and performs no call when it does, and
 that a fan-out records an unreachable user and an unexpected failure and keeps
-going; path rewriting
+going; where `wait` puts its end point for every combination of marker,
+`--no-credits` and offset, that it switches to fast polls 30s out and never
+sleeps through that window, that it ends on a stop or on autoplay moving on,
+that a failed poll is retried; that `--paused` ends a play on its deadline and
+a resume restarts the count; and that `--all` waits for a play started during
+its confirming poll, takes that second look even when nothing played, and
+judges an unfetchable video by its session; path rewriting
 picking the longest matching root; the token store reading a legacy bare-token
 file; that `loaded_fields` and `file_paths` never trigger a reload; and that
 global flags survive being given before the subcommand.

@@ -1,7 +1,7 @@
 .\" Man page for plexdo (plexdo).
 .\" Regenerate or edit alongside AI.prompt.md; the .TH version must match
 .\" __version__ in src/plexdo/__init__.py.
-.TH PLEXDO 1 "2026-09-24" "plexdo 1.1.25" "User Commands"
+.TH PLEXDO 1 "2026-10-05" "plexdo 1.1.26" "User Commands"
 .
 .SH NAME
 plexdo \- command\-line interface for Plex Media Server
@@ -362,12 +362,77 @@ lists active scan jobs instead and needs no library.
 cancels pending scans on every library first.
 .TP
 .BI status " " [ \-\-section " SECTION" ]
-Report server identity, active sessions (with the library, ratingKey, and the
-file the player has open), shared users, system accounts,
+Report server identity, active sessions (with the sessionKey, library,
+ratingKey, and the file the player has open), shared users, system accounts,
 reachable addresses, scans in progress, other background activity, and
 scheduled tasks. A section that cannot be read is warned about and left empty
 rather than losing the whole report. \fB\-\-format csv\fR and
 \fB\-\-format clixml\fR are flat and require \fB\-\-section\fR.
+.TP
+.BI wait " " [ \-s " KEY" "] [" \-r " KEY" "] [" \-a "] [" \-i " SECONDS" "] [" \-\-fast\-interval " SECONDS" "] [" \-\-no\-credits "] [" \-\-offset " SECONDS" "] [" \-\-paused " SECONDS" "] [" \-\-now ]
+Sleep until a session\(aqs current play is over, then exit 0. By default the
+first session listed is followed and the wait is for whatever it is playing.
+.RS
+.PP
+The wait is over when playback reaches the start of the end credits, if the
+video has a credits marker, or its end otherwise. Where a film carries two
+credits markers around a mid\-credits scene, the final one is used, so the
+scene is not cut off. The wait is also over the moment the video stops
+playing: the viewer quit, or autoplay moved on to the next one.
+.PP
+It polls every 10 seconds, then every second from 30 seconds before the end
+point on; each delay varies by up to 20% either way. Every poll prints the
+session\(aqs user, what it is playing, the video waited for, the playback
+position, the time waited so far, and the estimated time left. In a
+machine\-readable format each poll is one record instead: a line of JSON, a
+YAML document, or a CSV row under a single header. CLIXML cannot be streamed
+and is refused.
+.TP
+.BR \-s ", " \-\-session " \fIKEY\fR"
+Follow the session with this sessionKey, from
+.BR "status \-\-section sessions" .
+.TP
+.BR \-r ", " \-\-rating\-key " \fIKEY\fR"
+Wait for this video. Without
+.BR \-\-session ,
+whichever session plays it is followed. If it is not playing, every poll says
+so and the wait lasts until it starts.
+.TP
+.BR \-a ", " \-\-all
+Wait for every play by every user, each judged by the same rules, with one line
+or record per session each poll and a session that disappears reported once
+as stopped. The wait is over only when two polls an interval apart both find
+nothing left, so a play started in the meantime, an autoplayed next episode
+included, is waited for too. Takes neither
+.B \-s
+nor
+.BR \-r .
+.TP
+.BR \-i ", " \-\-interval " \fISECONDS\fR"
+Seconds between polls. Default 10.
+.TP
+.BI \-\-fast\-interval " SECONDS"
+Seconds between polls near the end point. Default 1.
+.TP
+.B \-\-no\-credits
+Ignore the credits marker and wait for the video itself to end.
+.TP
+.BI \-\-offset " SECONDS"
+Negative: end the wait that many seconds before the end point. Positive: sleep
+that many seconds once the wait is over.
+.TP
+.BI \-\-paused " SECONDS"
+Count a play as over once its player has sat paused this long. Plex does not
+say when a pause began, so the count starts at the first poll that sees it,
+and resuming starts it again.
+.B 0
+ends the play at the first sight of a pause.
+.TP
+.B \-\-now
+With
+.BR \-r :
+if the video is not playing, exit 0 at once rather than waiting for it.
+.RE
 .
 .SS Setup
 .TP
@@ -479,6 +544,12 @@ Success.
 .B 1
 Failure: missing configuration or token, an unknown ID, an inaccessible user,
 a name collision refused without \fB\-\-overwrite\fR, or an invalid argument.
+.TP
+.B 130
+.B wait
+was interrupted before the play was over, so a command chained after it with
+.B &&
+does not run.
 .
 .SH ENVIRONMENT
 .TP
@@ -564,6 +635,12 @@ Stream an episode into a player:
 .PP
 .EX
 plexdo read 3 12345 | mpv \-
+.EE
+.PP
+Restart the server once the current episode reaches its credits:
+.PP
+.EX
+plexdo wait && sudo systemctl restart plexmediaserver
 .EE
 .PP
 Machine\-readable output:

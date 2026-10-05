@@ -266,7 +266,7 @@ PYEOF
 
 _plexdo_commands() {
     echo "list-libraries list-titles list-library list-users list-playlists list-playlist \
-list-show show-metadata search read rescan status find-missing build-interleaved build-chronological build-randomize \
+list-show show-metadata search read rescan status wait find-missing build-interleaved build-chronological build-randomize \
 build-concatenated \
 copy-playlist-all-users copy-playlist-to-user export-playlist remove-playlist \
 append-playlist clean-playlist export-titles copy-watched login write-config-example"
@@ -369,6 +369,8 @@ _plexdo_complete() {
                 COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --prefix -p" -- "$cur") ) ;;
             clean-playlist)
                 COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --include-partial" -- "$cur") ) ;;
+            wait)
+                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) -s --session -r --rating-key -a --all -i --interval --fast-interval --no-credits --offset --paused --now" -- "$cur") ) ;;
             *)
                 COMPREPLY=( $(compgen -W "$(_plexdo_global_flags)" -- "$cur") ) ;;
         esac
@@ -563,6 +565,14 @@ _plexdo_complete() {
                 1) uid="$(_plexdo_nth_positional "$cmd" 0)"
                    _plexdo_complete_playlist_id_or_name "$uid" ;;
                 *) COMPREPLY=() ;;
+            esac ;;
+
+        # [-s KEY] [-r KEY] [-a] [-i SECONDS] [--fast-interval SECONDS] [--no-credits] [--offset SECONDS] [--paused SECONDS] [--now]
+        wait)
+            case "$prev" in
+                -r|--rating-key) _plexdo_complete_rating_key ;;
+                -s|--session|-i|--interval|--fast-interval|--offset|--paused) COMPREPLY=() ;;
+                *) COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) -s --session -r --rating-key -a --all -i --interval --fast-interval --no-credits --offset --paused --now" -- "$cur") ) ;;
             esac ;;
 
         # <user_id> <playlist> [--include-partial]
