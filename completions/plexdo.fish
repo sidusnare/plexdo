@@ -311,6 +311,8 @@ for prog in plexdo
     complete -c $prog -s o -l overwrite \
         -n '__fish_seen_subcommand_from copy-playlist-all-users copy-playlist-to-user build-interleaved build-chronological build-randomize build-concatenated' \
         -d 'Replace an existing playlist of the same name'
+    complete -c $prog -s o -l overwrite -n '__fish_seen_subcommand_from write-config-example' \
+        -d 'Replace an existing config file'
     complete -c $prog -l unique -n '__fish_seen_subcommand_from build-concatenated' \
         -d 'Skip an item an earlier playlist already contributed'
     complete -c $prog -x -s u -l user -n '__fish_seen_subcommand_from build-interleaved build-chronological build-randomize build-concatenated' \

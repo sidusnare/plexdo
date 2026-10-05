@@ -79,15 +79,19 @@ def cmd_copy_playlist_to_user(plex: PlexServer, args: argparse.Namespace) -> Non
 
     src_items: List[MediaItem] = list(src.items())
     user_plex = server_for_user(plex, args.user_id)
+    # A machine-readable format gets the outcome record alone: printing the
+    # item list too would make two documents on one stream, which nothing
+    # parsing it expects. copy-playlist-all-users does the same.
+    table_mode = output_format(args) == "table"
     status, final_name, detail = copy_playlist_to(
         src_items, user_plex, args.dest, args,
-        target_label=f"user id={args.user_id}",
+        target_label=f"user id={args.user_id}", preview=table_mode,
     )
     record = {
         "user": str(args.user_id), "id": args.user_id,
         "status": status, "playlist": final_name, "detail": detail,
     }
-    if output_format(args) == "table":
+    if table_mode:
         print(report_line(record))
     else:
         output(record, args)

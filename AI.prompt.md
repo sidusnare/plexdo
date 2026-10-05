@@ -84,8 +84,8 @@ characters where they reproduce program output or draw a `tree`-style listing.
 ```
 pyproject.toml  Makefile  README.md  LICENSE  MANIFEST.in  requirements.txt
 CHANGELOG.md  CONTRIBUTING.md  SECURITY.md  AI.prompt.md  .gitignore
-.gitattributes  .github/workflows/ci.yml
-man/plexdo.1
+.gitattributes  .github/workflows/{ci,publish,wiki}.yml  tools/wiki-pages.sh
+man/plexdo.1  man/plexdo-conventions.7.scd  man/plexdo-COMMAND.1.scd
 completions/{plexdo.bash,_plexdo,plexdo.fish,plexdo.ps1}
 tests/conftest.py + test_*.py
 src/plexdo/
@@ -390,7 +390,10 @@ content.
 
 Every argument naming an **existing** playlist accepts a title or a ratingKey
 through `resolve_playlist`; no command may call `plex.playlist(name)`
-directly.
+directly. A numeric value that is no item at all is a clean `sys.exit`, not
+plexapi's `NotFound` escaping as a traceback: look it up with
+`titles.find_item`, which returns None, and `fetch_item` wraps that for every
+other fatal lookup, `fetch_show` included. Nothing calls `fetchItem` bare.
 
 Every build command constructs the list fully in memory, validates it is
 non-empty, prints a numbered preview, and makes exactly one `createPlaylist`
@@ -450,7 +453,9 @@ touched.
   present. A season that simply **stops early is not a gap**: an unaired
   episode cannot be told from a missing one. Season 0 is skipped by default
   because specials are numbered irregularly, but `-s 0` overrides that, since
-  asking for season 0 can only mean the specials.
+  asking for season 0 can only mean the specials. With nothing missing a
+  table prints `No gaps found.`, but a machine-readable format prints an
+  empty list: prose on stdout breaks whatever parses it.
 
 ### Building and copying
 
@@ -460,7 +465,12 @@ touched.
   side, require at least 3 known dates (so at least 2 intervals), take the
   median interval, estimate from latest-previous `+median` and earliest-next
   `-median`, averaging when both exist, and prompt only when that is
-  impossible.
+  impossible. A film with no date has no neighbours, so it is prompted for
+  directly. `prompt_for_date` takes **any** item: name an episode by show,
+  season, and episode, with `??` for a number Plex lacks rather than `00`,
+  which would read as a real episode 0, and anything else by title and year.
+  It once read episode-only attributes and crashed on every undated film.
+  Running out of input is a `sys.exit` naming the item, not an `EOFError`.
 - `build-randomize USER SOURCE DEST` - Fisher-Yates via `secrets.randbelow`.
 - `build-concatenated USER NAME PLAYLIST... [--unique]` - joins the sources
   end to end, keeping the order within each and the order they were named in.
@@ -478,7 +488,10 @@ touched.
   as it completes. Because the caller surfaces the skip reason, the message
   inside `copy_playlist_to` is `LOG.info`, not a warning that would duplicate
   every skip on stderr.
-- `copy-playlist-to-user USER PLAYLIST USER DEST`.
+- `copy-playlist-to-user USER PLAYLIST USER DEST` - a table shows the item
+  list then the outcome line; a machine-readable format shows the outcome
+  record **alone**, as `copy-playlist-all-users` does, because two documents
+  on one stream parse as neither.
 - `append-playlist USER PLAYLIST RATINGKEY...`, `remove-playlist USER PLAYLIST`.
 - `clean-playlist USER PLAYLIST [--include-partial]` - removes the watched
   entries and leaves the rest in their existing order. Preview first, then one
@@ -668,18 +681,26 @@ string and returns nothing for an empty one, so the library appears empty.
   from `sys.argv`, with a warning that is blunt about what cannot be fixed:
   the value is already in shell history and was visible during interpreter
   startup. On Windows the rewrite has no equivalent.
-- `write-config-example` - writes `CONFIG_EXAMPLE`, mode 0600. Its `--help`
+- `write-config-example [-o]` - writes `CONFIG_EXAMPLE`, mode 0600. An
+  existing config is refused without `-o/--overwrite`, and that check comes
+  before `--dry-run`, so a rehearsal fails where the real run would; a
+  dry run then writes nothing and says where it would write. Its `--help`
   prints the exact template, which needs `RawDescriptionHelpFormatter` for the
   epilog's newlines; that same formatter stops argparse wrapping the
   description, so pre-wrap it with `textwrap.fill(..., width=78)`.
+  `CONFIG_EXAMPLE` is one implicitly concatenated string: a line written
+  without its opening quote becomes a Python comment and silently drops
+  out of the template, as the per-user heading once did.
 
 ## ERROR HANDLING
 
 `sys.exit` with a clear message for: missing config or token, unknown
 ratingKey, wrong media type, playlist or user or library not found,
 unsupported library type, album not found, a refused name collision, a smart
-playlist asked to give up an entry, an unknown sessionKey. An interrupted
-`wait` exits 130. No bare
+playlist asked to give up an entry, an unknown sessionKey, an existing config
+file without `--overwrite`, an air date with no input to answer for it. A
+command line argparse cannot parse exits 2, its own convention. An
+interrupted `wait` exits 130. No bare
 `except`; the broad ones are in `_cancel_all_scans`, the per-user copy loop,
 and per-section collection, each with a `# pylint: disable=broad-except`.
 
@@ -771,6 +792,12 @@ picking the longest matching root; the token store reading a legacy bare-token
 file; that `loaded_fields` and `file_paths` never trigger a reload; and that
 global flags survive being given before the subcommand.
 
+Each bug that shipped gets a regression test in `tests/test_fixes.py` that
+**fails against the code before the fix**; check that it does, or it proves
+nothing. Build real plexapi `Movie` and `Episode` objects from XML for these
+where the bug was about their attributes - they construct offline - rather
+than stand-ins that would have hidden it.
+
 Two behaviours easy to get backwards: two fully played states need no sync, so
 a "latest wins" test must use states that actually differ; and
 `format_duration(None)` is empty while `format_duration(0)` is `"0:00"`,
@@ -827,16 +854,83 @@ The release job must confirm the tag matches the packaged version. PyPI
 uploads are immutable, so publishing `v1.2.3` from a tree carrying some other
 version cannot be undone. Strip a leading `v` before comparing.
 
+## COMMAND PAGES
+
+Beside the roff overview, every command has a detailed page in scdoc source
+format: `man/plexdo-COMMAND.1.scd`, one per command, with `list-library`
+documented in the `list-titles` page as the alias it is, and
+`man/plexdo-conventions.7.scd` for what every command shares - the global
+options, how users, libraries, playlists, items, and sessions are named,
+output formats, path rewriting, pacing, exit status, files, and
+environment. Nothing installs them; `MANIFEST.in` ships them in the sdist,
+and they sit under `man/`, so `check-assets` holds them to plain ASCII.
+
+They are also the project wiki, one page each. `tools/wiki-pages.sh`
+converts them scdoc -> roff -> `pandoc --from man --to gfm`, and `make wiki`
+runs it into `build/wiki/`. mandoc cannot do this step: its Markdown output
+takes mdoc(7) only, and scdoc writes man(7). The script:
+- names the page for the file less its section, so `plexdo-wait.1.scd` is
+  the page `plexdo-wait`, and fails if two sources would share a name;
+- writes each stage to a file of its own rather than a pipe, since a plain
+  POSIX pipe hides a failure upstream and yields a truncated page;
+- rewrites `**plexdo-X**(N)` into a link to page `plexdo-X`, and fails when
+  a link names a page that was not generated: a dangling reference is a
+  build error, not a broken link on the wiki;
+- opens each page with a hidden `<!-- Generated from ... -->` comment.
+
+`.github/workflows/wiki.yml` builds the pages in a `contents: read` job, on
+every push and pull request touching them, and uploads them as an artifact.
+A second job, only for `main` and never for a pull request, raises
+`contents: write` - the permission under which `GITHUB_TOKEN` pushes to the
+wiki - checks out `REPO.wiki`, and syncs: it deletes a page only when its
+**first line** is the generated mark and its source is gone, so a page
+written on the wiki by hand is never deleted, then copies the rest in and
+commits only when something changed. Check that the wiki repository exists
+first with `git ls-remote`: GitHub creates it only once a first page has
+been made by hand, and checkout's bare "repository not found" does not say
+so. The workflow is in a `wiki` concurrency group, queued rather than
+cancelled, since two pushes to the wiki at once would race.
+
+Each command page has, in order: NAME, SYNOPSIS, DESCRIPTION, ARGUMENTS,
+OPTIONS, GLOBAL OPTIONS, OPTION INTERACTIONS, OUTPUT, EXIT STATUS, EXAMPLES,
+and SEE ALSO. GLOBAL OPTIONS says what **each** global flag does for that
+particular command - "no effect" is an answer, and `--dry-run` writing a
+file anyway is worth saying. OPTION INTERACTIONS covers every conflict and
+dependency, whether argparse enforces it (`-u`/`-a`) or the handler does
+(`find-missing -A` with SHOW, `wait --now` without `-r`). Document what the
+code does, checked against it, not what a help string implies. Sample tables
+are real output from `print_table` with an ASCII console, never hand-drawn.
+
+scdoc accepts several mistakes silently, so follow these rules:
+- **Write every flag in prose bold**, `*--flag*`. A line starting with a
+  bare `-` is a scdoc error, and wrapping puts flags at line starts.
+- **No spaced ` - ` dash in prose.** Wrapped to a line start it silently
+  becomes a bullet. The NAME line's `name - summary` is the one exception.
+- **Escape a literal `*` as `\*`.** An unclosed one silently eats text.
+- **Never start a line with `[`, `|`, or `:`.** scdoc reads it as a table
+  row anywhere, not only after a blank line; escape it as `\[`, which
+  wrapped SYNOPSIS lines need. A line starting `; ` silently vanishes as a
+  comment, and one starting `. ` is a numbered list.
+- **A word-initial `_` underlines.** Mid-word underscores are literal.
+- Indent with TABs only, and double every backslash, inside literal blocks
+  too: a Windows path `\\NAS\media` is written `\\\\NAS\\media`.
+- Wrap at 80 columns, counting a TAB as eight.
+
+Validate by compiling every page with scdoc and checking the roff with
+`groff -man -ww -z`, and check that every option string of every command
+appears bold in its page.
+
 ## DELIVERABLES
 
 1. The `plexdo` package under `src/`, laid out as above
 2. `pyproject.toml`, `Makefile`, `MANIFEST.in`, `requirements.txt`,
    `.gitignore`, `.gitattributes`
 3. `README.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `LICENSE`
-4. `man/plexdo.1`
+4. `man/plexdo.1`, and the scdoc command pages beside it
 5. `completions/` and its mirror in `src/plexdo/data/`
 6. `tests/`
-7. `.github/workflows/ci.yml`
+7. `.github/workflows/ci.yml`, `publish.yml`, and `wiki.yml`, with
+   `tools/wiki-pages.sh`
 8. `AI.prompt.md` - this file, containing the full prompt that regenerates the
    project including this requirement itself
 

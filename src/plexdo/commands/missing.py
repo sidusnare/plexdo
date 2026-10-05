@@ -9,7 +9,7 @@ import textwrap
 from plexapi.server import PlexServer
 from plexapi.video import Show
 
-from plexdo.console import clean_text, output
+from plexdo.console import clean_text, output, output_format
 from plexdo.constants import LOG
 from plexdo.identify import resolve_identifier
 from plexdo.sections import resolve_sections
@@ -159,11 +159,16 @@ def cmd_find_missing(plex: PlexServer, args: argparse.Namespace) -> None:
 
     if not rows:
         LOG.info("Every season examined is complete.")
-        print("No gaps found.")
+        # A machine-readable format gets an empty document, not prose that
+        # would break whatever parses it.
+        if output_format(args) == "table":
+            print("No gaps found.")
+        else:
+            output([], args)
         return
 
     LOG.info("%d season(s) with gaps", len(rows))
-    output(_flatten(rows) if args.format == "table" else rows, args)
+    output(_flatten(rows) if output_format(args) == "table" else rows, args)
 
 
 def _scan_libraries(plex: PlexServer, args: argparse.Namespace) -> List[Dict[str, Any]]:

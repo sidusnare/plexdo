@@ -47,7 +47,9 @@ plexdo login                       # prompts, saves a token to token_path
 plexdo list-libraries
 ```
 
-`write-config-example --help` prints the exact template it would write.
+`write-config-example --help` prints the exact template it would write. It
+refuses to replace a config file that already exists unless given
+`-o/--overwrite`, and `--dry-run` only says where it would write.
 
 ### Configuration
 
@@ -288,7 +290,8 @@ is removed and replaced.
 
 `build-chronological` estimates missing air dates from the median interval
 between neighbouring episodes in the same season, and prompts only when that is
-impossible.
+impossible. A film with no release date is prompted for too. Without a
+terminal to answer on, it stops and names the item that needs a date.
 
 `build-concatenated` joins playlists end to end, keeping the order within each
 and the order they were named in. Every source is read before anything is
@@ -647,6 +650,24 @@ man -l man/plexdo.1     # straight from a source checkout
 
 It documents every command, the configuration and token file formats, exit
 status, and the environment variables consulted.
+
+Each command also has a detailed page of its own, covering every option, how
+options conflict with or depend on one another, what each global option means
+for that command, its output, and worked examples. They are written in
+[scdoc](https://git.sr.ht/~sircmpwn/scdoc) source format under `man/`:
+`plexdo-COMMAND.1.scd` for each command, and `plexdo-conventions.7.scd` for
+what they share - naming users and libraries, output formats, path
+rewriting, pacing, and exit status. With scdoc installed:
+
+```bash
+scdoc < man/plexdo-wait.1.scd | man -l -
+for f in man/*.scd; do scdoc < "$f" > "${f%.scd}"; done   # build them all
+```
+
+The same pages are published to the [project wiki](https://github.com/sidusnare/plexdo/wiki),
+one wiki page per command, kept in step with `main` by
+`.github/workflows/wiki.yml`. `make wiki` builds them locally into
+`build/wiki/`, and needs [pandoc](https://pandoc.org/) as well as scdoc.
 
 ## Platform support
 

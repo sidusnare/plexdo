@@ -99,7 +99,7 @@ CONFIG_EXAMPLE = (
     "# username = you@example.com\n"
     "# password = your-plex-password\n"
     "\n"
-    # Per-user credentials, one section per user ID (see `plexdo\n"
+    "# Per-user credentials, one section per user ID (see `plexdo\n"
     "# list-users`). These are used only when the server refuses the\n"
     "# admin-issued token for that user, which happens when nothing has been\n"
     "# shared with them. The resulting token is saved to token_path, so the\n"

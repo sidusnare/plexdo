@@ -1,10 +1,11 @@
 include Makefile
-recursive-include man *.1
+recursive-include man *.1 *.scd
 include README.md
 include LICENSE
 include requirements.txt
 include AI.prompt.md
 recursive-include completions *
+include tools/wiki-pages.sh
 recursive-include src/plexdo/data *
 recursive-include tests *.py
 include CHANGELOG.md CONTRIBUTING.md SECURITY.md

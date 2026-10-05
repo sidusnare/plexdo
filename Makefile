@@ -50,7 +50,7 @@ PS_TARGET   := $(DESTDIR)$(PS_COMPLETION_DIR)/plexdo.ps1
         install-completion-fish install-completion-powershell install-man \
         uninstall-man check-version \
         smoke check-assets test \
-        build check lint dist-check clean distclean
+        build check lint dist-check clean distclean wiki
 
 # ---------------------------------------------------------------------------
 
@@ -68,6 +68,7 @@ help:
 	@echo "  test                  run the test suite"
 	@echo "  lint                  run pylint over src/plexdo"
 	@echo "  dist-check            twine check the built artifacts"
+	@echo "  wiki                  man/*.scd -> GitHub wiki pages in build/wiki"
 	@echo "  check                 lint + build + dist-check"
 	@echo "  clean                 remove build artifacts and caches"
 	@echo "  distclean             clean, and remove dist/ as well"
@@ -167,6 +168,13 @@ lint:
 dist-check:
 	$(PYTHON) -m twine check dist/*
 
+# One GitHub wiki page per man/*.scd page, via scdoc and pandoc; the wiki
+# workflow publishes what this builds. Needs both tools installed.
+WIKI_DIR := build/wiki
+
+wiki:
+	sh tools/wiki-pages.sh man $(WIKI_DIR)
+
 # The version appears in three places; drift is silent otherwise.
 check-version:
 	@v=$$(sed -n 's/^__version__ = "\(.*\)"/\1/p' src/$(PACKAGE)/__init__.py); \
@@ -203,7 +211,7 @@ check-assets:
 	done; \
 	cmp -s "$(MAN_PAGE)" "src/$(PACKAGE)/data/plexdo.1" || { \
 		echo "stale mirror: src/$(PACKAGE)/data/plexdo.1 differs from $(MAN_PAGE)" >&2; fail=1; }; \
-	for f in $$(find src completions man -type f ! -path "*egg-info*" ! -name "*.pyc") \
+	for f in $$(find src completions man tools -type f ! -path "*egg-info*" ! -name "*.pyc") \
 		         Makefile pyproject.toml; do \
 		if LC_ALL=C grep -qP "[^\x00-\x7F]" "$$f" 2>/dev/null; then \
 			echo "non-ASCII characters in $$f" >&2; fail=1; \

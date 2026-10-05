@@ -12,7 +12,7 @@ from plexapi.server import PlexServer
 
 from plexdo.console import clean_text, output
 from plexdo.constants import LOG, MediaItem
-from plexdo.titles import display_title
+from plexdo.titles import display_title, find_item
 
 
 def resolve_playlist(user_plex: PlexServer, identifier: str) -> Playlist:
@@ -24,14 +24,17 @@ def resolve_playlist(user_plex: PlexServer, identifier: str) -> Playlist:
     """
     try:
         rk = int(identifier)
-        item = user_plex.fetchItem(rk)
+    except ValueError:
+        rk = None  # not numeric, so a title
+    if rk is not None:
+        item = find_item(user_plex, rk)
+        if item is None:
+            sys.exit(f"Playlist not found: no item has ratingKey {rk}")
         if not isinstance(item, Playlist):
             sys.exit(
                 f"ratingKey {rk} is not a playlist (got {type(item).__name__})"
             )
         return item
-    except ValueError:
-        pass  # identifier is not numeric - fall through to name lookup
     try:
         return user_plex.playlist(identifier)
     except NotFound:

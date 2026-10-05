@@ -137,8 +137,23 @@ def cmd_login(_plex: Optional[PlexServer], args: argparse.Namespace) -> None:
         output({"token_path": str(path), "verified": verified}, args)
 
 
-def cmd_write_config_example(_plex: Optional[PlexServer], _args: argparse.Namespace) -> None:
-    """Write a template config file."""
+def cmd_write_config_example(_plex: Optional[PlexServer], args: argparse.Namespace) -> None:
+    """Write a template config file, refusing to replace one unasked."""
+    existing = CONFIG_PATH.exists()
+    if existing and not args.overwrite:
+        # Checked before --dry-run too, so a rehearsal fails where the real
+        # run would, as a refused playlist name does.
+        sys.exit(
+            f"A config file already exists at {CONFIG_PATH}. Nothing has "
+            "been written.\nRe-run with --overwrite to replace it with the "
+            "template, or see the template with --help."
+        )
+    if args.dry_run:
+        action = "replace the existing file" if existing else "create it"
+        print(f"--dry-run: would write the template to {CONFIG_PATH} "
+              f"({action}).", file=sys.stderr)
+        return
+
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     CONFIG_PATH.write_text(CONFIG_EXAMPLE, encoding="utf-8")
     if os.name != "nt":
@@ -175,13 +190,13 @@ def register(
         help="Prompt for a two-factor code interactively.",
     )
 
-    sub.add_parser(
+    p_wce = sub.add_parser(
         "write-config-example", parents=parents,
         help="Write a template config file.",
         description=textwrap.fill(
             f"Write a template config file to {CONFIG_PATH} with mode 0600, "
             "creating parent directories as needed. An existing file at that "
-            "path will be overwritten.",
+            "path is only replaced when --overwrite is given.",
             width=78,
         ),
         epilog=(
@@ -189,6 +204,10 @@ def register(
             + textwrap.indent(CONFIG_EXAMPLE, "  ")
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_wce.add_argument(
+        "-o", "--overwrite", action="store_true", default=False,
+        help="Replace an existing config file instead of refusing to.",
     )
 
 

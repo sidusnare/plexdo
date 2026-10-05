@@ -4,6 +4,47 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.27] - 2026-10-05
+
+### Added
+- A detailed manual page for every command, in scdoc source format under
+  `man/`: `plexdo-COMMAND.1.scd` for each command, covering every option,
+  which options conflict with or depend on one another, what each global
+  option does for that command, its output, its exit status, and worked
+  examples; and `plexdo-conventions.7.scd` for what the commands share. The
+  sources ship in the sdist.
+- `write-config-example -o/--overwrite`. Without it, an existing config file
+  is now refused rather than replaced.
+- The command pages are published to the project wiki, one page each, by
+  `.github/workflows/wiki.yml` whenever one changes on `main`, and built on
+  pull requests to catch a page that does not compile. `make wiki` builds
+  them locally, with scdoc and pandoc. Pages written on the wiki by hand are
+  left alone.
+
+### Fixed
+- `build-chronological` crashed on any film without a release date: the date
+  prompt read episode-only attributes. It now asks for a film's date just as
+  it does an episode's, names an episode with no number as `S01E??` rather
+  than crashing on it too, and stops with an explanation instead of a
+  traceback when there is no terminal to answer on.
+- The config template lost its "Per-user credentials" heading, so that
+  paragraph began mid-sentence: the line had no opening quote and was read as
+  a Python comment.
+- `write-config-example` replaced an existing config file without asking, and
+  ignored `--dry-run`, writing the file anyway. It now refuses an existing
+  file without `--overwrite`, and a dry run writes nothing.
+- `find-missing` printed `No gaps found.` as plain text in every format,
+  breaking `--json` and the other machine-readable formats; they now get an
+  empty list.
+- `copy-playlist-to-user` wrote two documents to a machine-readable stream,
+  the item list and then the outcome; it now writes the outcome alone.
+- An unknown numeric playlist, or an unknown ratingKey given to `list-show`,
+  `build-interleaved`, or `build-chronological`, ended in a Python traceback
+  rather than a message.
+- The manual page gave exit status 1 for an argument that cannot be parsed,
+  which exits 2, and said `rescan -s` lists scan jobs when it lists all of the
+  server's background activity.
+
 ## [1.1.26] - 2026-10-05
 
 ### Added
@@ -334,6 +375,7 @@ multi-user token handling, watched-state synchronisation, a status report,
 photo galleries, YAML/CSV/CLIXML output, shell completions for bash, zsh, and
 fish, a manual page, and packaging for PyPI. See the commit history.
 
+[1.1.27]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.27
 [1.1.26]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.26
 [1.1.25]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.25
 [1.1.24]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.24

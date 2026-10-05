@@ -259,8 +259,12 @@ _plexdo_subcommand() {
       _arguments $_plexdo_global_opts \
         '--section[Show only one section]:section:(server sessions users accounts connections scans activities tasks)'
       ;;
-    list-users|list-libraries|write-config-example)
+    list-users|list-libraries)
       _arguments $_plexdo_global_opts
+      ;;
+    write-config-example)
+      _arguments $_plexdo_global_opts \
+        '(-o --overwrite)'{-o,--overwrite}'[Replace an existing config file]'
       ;;
     list-playlists)
       _arguments $_plexdo_global_opts '1:user:_plexdo_users'

@@ -1,7 +1,7 @@
 .\" Man page for plexdo (plexdo).
 .\" Regenerate or edit alongside AI.prompt.md; the .TH version must match
 .\" __version__ in src/plexdo/__init__.py.
-.TH PLEXDO 1 "2026-10-05" "plexdo 1.1.26" "User Commands"
+.TH PLEXDO 1 "2026-10-05" "plexdo 1.1.27" "User Commands"
 .
 .SH NAME
 plexdo \- command\-line interface for Plex Media Server
@@ -173,7 +173,9 @@ Round\-robin the episodes of several shows into one playlist.
 .BI build\-chronological " name ratingKey ..."
 Order shows and movies by original air date. An episode with no date is
 estimated from the median interval between its neighbours in the same season,
-and you are prompted only when that is impossible.
+and you are prompted only when that is impossible. A film with no release date
+is prompted for too. Without a terminal to answer on, the command stops naming
+the item that needs a date.
 .TP
 .BI build\-randomize " user source dest"
 Shuffle a playlist into a new one, using
@@ -356,7 +358,8 @@ irregularly, so this is off by default.
 Trigger a library scan for new files.
 .B \-s
 .RB ( \-\-status )
-lists active scan jobs instead and needs no library.
+lists the server's background activity instead, library scans among it, and
+needs no library.
 .B \-n
 .RB ( \-\-now )
 cancels pending scans on every library first.
@@ -443,8 +446,13 @@ is insecure: it is recorded in shell history and is briefly visible to
 .BR ps (1).
 Prefer the configuration file or the interactive prompt.
 .TP
-.B write\-config\-example
-Write a template configuration file.
+.BI write\-config\-example " " [ \-o ]
+Write a template configuration file. An existing one is refused unless
+.BR \-o ,
+.BR \-\-overwrite
+is given, and
+.B \-\-dry\-run
+writes nothing.
 .B \-\-help
 prints the exact template that would be written.
 .
@@ -543,7 +551,12 @@ Success.
 .TP
 .B 1
 Failure: missing configuration or token, an unknown ID, an inaccessible user,
-a name collision refused without \fB\-\-overwrite\fR, or an invalid argument.
+a name collision refused without \fB\-\-overwrite\fR, or an unsupported
+combination of options.
+.TP
+.B 2
+The command line could not be understood: an unknown command or option, a
+missing argument, or a value of the wrong kind.
 .TP
 .B 130
 .B wait

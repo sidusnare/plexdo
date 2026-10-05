@@ -20,7 +20,7 @@ from plexdo.m3u import write_m3u
 from plexdo.paths import add_prefix_argument, mapper_for
 from plexdo.playlists import resolve_playlist
 from plexdo.throttle import paced
-from plexdo.titles import fetch_show, non_special_episodes, shuffle_list
+from plexdo.titles import fetch_item, fetch_show, non_special_episodes, shuffle_list
 
 
 def _round_robin(episode_lists: List[List[Episode]]) -> Iterator[Episode]:
@@ -70,7 +70,7 @@ def _build_chronological_items(
     last_used_date: Optional[datetime.datetime] = None
 
     for rk in rating_keys:
-        media_item = plex.fetchItem(rk)
+        media_item = fetch_item(plex, rk)
         LOG.debug("Processing ratingKey=%d type=%s", rk, type(media_item).__name__)
 
         if isinstance(media_item, Show):
@@ -84,7 +84,7 @@ def _build_chronological_items(
         elif isinstance(media_item, Movie):
             dt = parse_date(media_item.originallyAvailableAt)
             if dt is None:
-                dt = prompt_for_date(media_item, last_used_date)  # type: ignore[arg-type]
+                dt = prompt_for_date(media_item, last_used_date)
             last_used_date = dt
             dated_items.append((media_item, dt))
 

@@ -2,9 +2,10 @@
 
 """Air-date estimation for episodes missing originallyAvailableAt."""
 
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 import datetime
 import statistics
+import sys
 
 from plexapi.video import Episode
 
@@ -95,16 +96,47 @@ def _estimate_date(
     return datetime.datetime.fromtimestamp(avg_ts)
 
 
-def prompt_for_date(ep: Episode, last_used: Optional[datetime.datetime]) -> datetime.datetime:
-    """Interactively ask the user for a missing air date."""
+def _date_label(item: Any) -> str:
+    """How to name an item when asking for its date.
+
+    An episode is named by show, season, and episode; anything else, a film
+    in practice, by its title and year. Every attribute is optional, since
+    an item missing its date is often missing other metadata too.
+    """
+    title = getattr(item, "title", None) or "(untitled)"
+    if isinstance(item, Episode):
+        # An unknown number shows as ?? rather than 00, which would read as
+        # a real episode 0.
+        season, number = (
+            "??" if value is None else f"{value:02d}"
+            for value in (item.seasonNumber, item.index)
+        )
+        return f"{item.grandparentTitle} S{season}E{number} - {title}"
+    year = vars(item).get("year")
+    return f"{title} ({year})" if year else title
+
+
+def prompt_for_date(item: Any, last_used: Optional[datetime.datetime]) -> datetime.datetime:
+    """Ask on the terminal for a date Plex does not have, episode or film.
+
+    Asks again until a valid YYYY-MM-DD is given. Running out of input, as a
+    script with no terminal does, ends the command with an explanation
+    rather than a traceback.
+    """
+    label = _date_label(item)
     example = last_used.strftime("%Y-%m-%d") if last_used else "2000-01-01"
     prompt = (
-        f"\nCannot resolve air date for: {ep.grandparentTitle} "
-        f"S{ep.seasonNumber:02d}E{ep.index:02d} - {ep.title}\n"
+        f"\nCannot resolve air date for: {label}\n"
         f"Enter date (YYYY-MM-DD) [example: {example}]: "
     )
     while True:
-        raw = input(prompt).strip()
+        try:
+            raw = input(prompt).strip()
+        except EOFError:
+            sys.exit(
+                f"\nNo air date given for {label}: set its date in Plex, or "
+                "run the command where it can ask."
+            )
         try:
             return datetime.datetime.strptime(raw, "%Y-%m-%d")
         except ValueError:

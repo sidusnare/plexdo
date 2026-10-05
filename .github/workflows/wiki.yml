@@ -1,0 +1,129 @@
+name: Wiki
+
+# Publishes one GitHub wiki page per man/*.scd page: tools/wiki-pages.sh
+# converts each one scdoc -> roff -> pandoc -> GitHub-flavoured Markdown, and
+# man/plexdo-wait.1.scd becomes the wiki page plexdo-wait.
+#
+# One-time setup: enable the wiki under Settings > Features > Wikis, then
+# create its first page by hand. GitHub only creates the wiki's repository
+# at that point, and until it exists there is nothing to push to.
+#
+# Generated pages begin with a hidden "Generated from" comment. A page that
+# carries it and whose source has been removed is deleted; a page written by
+# hand never carries it and is never deleted. Editing a generated page on the
+# wiki is pointless: the next run overwrites it from its source.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "man/*.scd"
+      - "tools/wiki-pages.sh"
+      - ".github/workflows/wiki.yml"
+  # Pull requests convert the pages without publishing them, so a page that
+  # does not compile, or refers to one that does not exist, fails review.
+  pull_request:
+    paths:
+      - "man/*.scd"
+      - "tools/wiki-pages.sh"
+      - ".github/workflows/wiki.yml"
+  # A full resync, for after the wiki has been edited by hand.
+  workflow_dispatch:
+
+# Converting the pages needs nothing more than reading the repository; only
+# the publish job raises its own permission, to push to the wiki.
+permissions:
+  contents: read
+
+# Two runs pushing to the wiki at once would race, the later failing on a
+# stale checkout; queue them instead of cancelling, so no update is lost.
+concurrency:
+  group: wiki
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build pages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install scdoc and pandoc
+        run: sudo apt-get update && sudo apt-get install -y scdoc pandoc
+
+      # Fails on a page scdoc rejects, and on a reference to a page that
+      # does not exist, rather than publishing a broken link.
+      - name: Convert
+        run: make wiki
+
+      - name: Upload pages
+        uses: actions/upload-artifact@v7
+        with:
+          name: wiki
+          path: build/wiki/
+          if-no-files-found: error
+
+  publish:
+    name: Publish to the wiki
+    needs: build
+    # Only what has reached main is published: a pull request, or a manual
+    # run from another branch, builds the pages and stops there.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # GITHUB_TOKEN pushes to the wiki under this
+    steps:
+      # Without this, a missing wiki surfaces as checkout's bare "repository
+      # not found", which does not say what to do about it.
+      - name: Wiki exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          wiki="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git"
+          if ! git ls-remote "$wiki" > /dev/null 2>&1; then
+            echo "::error::The wiki has no repository yet. Enable it under" \
+                 "Settings > Features > Wikis, create its first page by hand," \
+                 "and run this workflow again."
+            exit 1
+          fi
+
+      - name: Check out the wiki
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository }}.wiki
+          path: wiki
+
+      - name: Download pages
+        uses: actions/download-artifact@v8
+        with:
+          name: wiki
+          path: pages/
+
+      - name: Sync pages
+        working-directory: wiki
+        run: |
+          # A generated page whose source is gone goes too. Only pages
+          # carrying the mark are candidates: hand-written ones never are.
+          for page in *.md; do
+            [ -e "$page" ] || continue
+            if head -n 1 "$page" | grep -q '^<!-- Generated from ' &&
+               [ ! -e "../pages/$page" ]; then
+              git rm --quiet "$page"
+              echo "removed $page"
+            fi
+          done
+
+          cp ../pages/*.md .
+          git add --all
+          if git diff --cached --quiet; then
+            echo "The wiki is already up to date."
+            exit 0
+          fi
+          git diff --cached --stat
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --quiet \
+            -m "Update manual pages from ${GITHUB_SHA::7}" \
+            -m "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
+          git push

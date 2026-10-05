@@ -38,8 +38,8 @@ def item_view_offset(item: Any) -> int:
 
 
 def fetch_show(plex: PlexServer, rating_key: int) -> Show:
-    """Fetch a Show by ratingKey, failing fast on wrong type."""
-    item = plex.fetchItem(rating_key)
+    """Fetch a Show by ratingKey, failing fast if absent or of another type."""
+    item = fetch_item(plex, rating_key)
     if not isinstance(item, Show):
         sys.exit(f"ratingKey {rating_key} is not a Show (got {type(item).__name__})")
     return item

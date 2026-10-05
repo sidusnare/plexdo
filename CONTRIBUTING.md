@@ -78,5 +78,25 @@ action left on an old major starts warning and eventually stops running;
 `actions/checkout@v7`, `setup-python@v7`, `upload-artifact@v7`, and
 `download-artifact@v8` are all on node24.
 
+## The wiki
+
+`.github/workflows/wiki.yml` publishes every `man/*.scd` page to the project
+wiki whenever one changes on `main`: `man/plexdo-wait.1.scd` becomes the
+wiki page `plexdo-wait`. Pull requests touching the pages build them without
+publishing, so a page that does not compile, or links to one that does not
+exist, fails there first. `make wiki` does the same build locally, given
+scdoc and pandoc.
+
+It needs setting up once: enable the wiki under Settings > Features > Wikis
+and create its first page by hand, since GitHub only creates the wiki's
+repository then. Until then the publish job fails saying exactly that.
+
+Change the pages in `man/`, never on the wiki: a generated page is
+overwritten on the next run. Each starts with a hidden `Generated from`
+comment, and a page carrying it whose source has been removed is deleted.
+Pages written on the wiki by hand never carry it, so they are left alone,
+unless one is given the same name as a generated page. Run the workflow
+from the Actions tab to resync everything after editing the wiki by hand.
+
 `AI.prompt.md` is the authoritative specification. When behaviour changes,
 update it in the same commit.

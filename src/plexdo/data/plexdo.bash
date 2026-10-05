@@ -369,6 +369,8 @@ _plexdo_complete() {
                 COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --prefix -p" -- "$cur") ) ;;
             clean-playlist)
                 COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --include-partial" -- "$cur") ) ;;
+            write-config-example)
+                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --overwrite -o" -- "$cur") ) ;;
             wait)
                 COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) -s --session -r --rating-key -a --all -i --interval --fast-interval --no-credits --offset --paused --now" -- "$cur") ) ;;
             *)
@@ -387,8 +389,16 @@ _plexdo_complete() {
 
     case "$cmd" in
 
-        list-libraries|list-users|write-config-example)
+        list-libraries|list-users)
             COMPREPLY=() ;;
+
+        # [-o]
+        write-config-example)
+            if [[ "$cur" == -* ]]; then
+                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --overwrite -o" -- "$cur") )
+            else
+                COMPREPLY=()
+            fi ;;
 
         # <library_id> [--album ALBUM]
         list-titles|list-library)
