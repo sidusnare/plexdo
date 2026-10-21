@@ -202,14 +202,17 @@ _~/.local/etc/plexdo.ini_, or _%LOCALAPPDATA%\\PlexDo\\plexdo.ini_ on Windows
 	The configuration: the server URL in *[plex] url*, where the token
 	store lives in *[plex] token_path*, and optionally *cache_dir*,
 	*username*, and *password*. A section named for a numeric user ID
-	holds that user's own *username* and *password*. Environment
+	holds that user's own *username* and *password*, or, for a
+	PIN-protected member of the Plex Home, its *pin*, which
+	*plexdo-player-remote-play*(1) uses to switch into it. Environment
 	variables are expanded in every *[plex]* value. A warning is printed
 	when the file is readable by group or other. *plexdo
 	write-config-example* writes a commented template.
 
 _$XDG_RUNTIME_DIR/.plex.token_, or _%TEMP%\\plexdo.token_ on Windows
 	The default token store: a JSON object mapping each username to its
-	token, written by *plexdo login* with mode 0600.
+	token, written by *plexdo login* with mode 0600, and emptied by
+	*plexdo logout*.
 
 _~/.cache/plexdo/_, or _%LOCALAPPDATA%\\PlexDo\\Cache\\_ on Windows
 	The shell completion cache, written as a side effect of listing:
@@ -241,8 +244,9 @@ _~/.cache/plexdo/_, or _%LOCALAPPDATA%\\PlexDo\\Cache\\_ on Windows
 *plexdo-remove-playlist*(1), *plexdo-append-playlist*(1),
 *plexdo-clean-playlist*(1), *plexdo-show-metadata*(1), *plexdo-read*(1),
 *plexdo-rescan*(1), *plexdo-status*(1), *plexdo-wait*(1),
+*plexdo-player-remote-play*(1),
 *plexdo-build-interleaved*(1), *plexdo-build-chronological*(1),
 *plexdo-build-randomize*(1), *plexdo-build-concatenated*(1),
 *plexdo-copy-playlist-all-users*(1), *plexdo-copy-playlist-to-user*(1),
-*plexdo-copy-watched*(1), *plexdo-login*(1), and
+*plexdo-copy-watched*(1), *plexdo-login*(1), *plexdo-logout*(1), and
 *plexdo-write-config-example*(1).

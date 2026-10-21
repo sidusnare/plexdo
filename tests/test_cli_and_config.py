@@ -26,9 +26,10 @@ def test_registry_has_no_duplicate_command_names():
     assert len(names) == len(set(names))
 
 
-def test_only_login_and_config_bootstrap_run_without_a_server():
+def test_only_login_logout_and_config_bootstrap_run_without_a_server():
     handlers, needs_plex = build_registry()
-    assert set(handlers) - needs_plex == {"login", "write-config-example"}
+    assert set(handlers) - needs_plex == {"login", "logout",
+                                          "write-config-example"}
 
 
 @pytest.mark.parametrize("flag,attr,value", [

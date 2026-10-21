@@ -8,7 +8,7 @@ save, so upgrading needs no manual step.
 """
 
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Iterable, Optional
 import json
 import os
 
@@ -86,3 +86,21 @@ def admin_token(path: Path, username: Optional[str]) -> Optional[str]:
     if len(store) == 1:
         return next(iter(store.values()))
     return None
+
+
+def forget_tokens(path: Path, usernames: Iterable[str]) -> int:
+    """Remove usernames' tokens, returning how many entries are left.
+
+    A store left empty is deleted rather than kept as an empty object, so
+    no secrets file outlives its last secret and the next command says to
+    run `login`, which is the advice that then applies.
+    """
+    store = load_store(path)
+    for username in usernames:
+        store.pop(username, None)
+    if store:
+        save_store(path, store)
+    elif path.exists():
+        path.unlink()
+        LOG.debug("Token store %s is empty; removed it", path)
+    return len(store)

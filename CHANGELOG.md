@@ -4,6 +4,49 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.28] - 2026-10-15
+
+### Added
+- `logout [-u USERNAME]` signs the saved tokens out of plex.tv, invalidating
+  them, and removes them from the token file: every one by default, or the
+  one saved under `-u`, which is an error when the file has no such name. A
+  token plex.tv already refuses is removed too; one that could not be signed
+  out is kept for another try, and the exit status is 1. A token file left
+  empty is deleted.
+- `player-remote-play HOST ratingKey` connects directly to a Plex player and
+  tells it to start playing an item. A host name is resolved by plexdo and
+  only the IP address is sent, since some players refuse a Host header
+  carrying a name as a defence against DNS rebinding; each address is tried
+  until a player answers. Each Plex app listens on its own port, so unless
+  `--port` gives it the player is asked over GDM (UDP 32412), and one that
+  does not answer is tried on the common apps' ports: 32500 (Android, Fire
+  TV), 8324 (Roku), 32433 (Plex HTPC), 3005 (Plex Home Theater), skipping
+  any that take no TCP connection within two seconds. The command is sent as
+  plexdo's own account when it is the server's admin or is signed in to the
+  player, otherwise as an account from a `[<user_id>]` section that is
+  signed in to the player, and otherwise as plexdo's own anyway, with a
+  warning. `--player-user` names the account instead, by plex.tv user id,
+  username, or email, or a managed user's name. It may be plexdo's own
+  account; a member of plexdo's Plex Home, managed users included, which
+  plexdo switches into without a password (a PIN-protected member takes
+  `pin` from its `[<user_id>]` section); or an account with a
+  `[<user_id>]` section. Anything else is an error.
+- The player is told to fetch from whichever of the server's addresses is
+  most like its own - the configured URL and every direct address plex.tv
+  lists, ranked by family, then private or global scope, then the longest
+  shared prefix - so a player on another routed private network, or at
+  another IPv6 site behind router ACLs, gets an address it can reach.
+  Loopback, link-local, and relayed addresses never qualify, and plex.tv
+  addresses go by their `plex.direct` names so https certificates check out.
+  `--server-url` gives the address outright, and the output shows the one
+  chosen.
+
+### Fixed
+- plexapi's informational messages, such as `Failed to parse "" to
+  datetime`, no longer reach stderr without `-v`: plexapi sets its own
+  logger to INFO, and the stderr handler now filters by the level asked
+  for.
+
 ## [1.1.27] - 2026-10-05
 
 ### Added
@@ -375,6 +418,7 @@ multi-user token handling, watched-state synchronisation, a status report,
 photo galleries, YAML/CSV/CLIXML output, shell completions for bash, zsh, and
 fish, a manual page, and packaging for PyPI. See the commit history.
 
+[1.1.28]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.28
 [1.1.27]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.27
 [1.1.26]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.26
 [1.1.25]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.25

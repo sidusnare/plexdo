@@ -142,4 +142,5 @@ The configuration and the token store are described under *FILES* in
 
 # SEE ALSO
 
-*plexdo-write-config-example*(1), *plexdo-conventions*(7), *plexdo*(1)
+*plexdo-logout*(1), *plexdo-write-config-example*(1),
+*plexdo-conventions*(7), *plexdo*(1)

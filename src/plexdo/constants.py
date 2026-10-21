@@ -108,4 +108,11 @@ CONFIG_EXAMPLE = (
     "# [99]\n"
     "# username = bob@example.com\n"
     "# password = bobs-plex-password\n"
+    "#\n"
+    "# A member of your Plex Home, managed users included, needs no password:\n"
+    "# `plexdo player-remote-play --player-user` switches into it. One with a\n"
+    "# PIN needs only that.\n"
+    "#\n"
+    "# [100]\n"
+    "# pin = 1234\n"
 )

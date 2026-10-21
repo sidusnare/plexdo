@@ -132,6 +132,14 @@ password may contain one freely.
 Both the config file and the token file are checked at startup and a warning is
 printed if either is readable by group or other.
 
+`plexdo logout` signs every saved token out of plex.tv, so it stops working
+wherever a copy of the file might be, and removes it from the file;
+`plexdo logout -u bob@example.com` does just that one, and is an error if the
+file holds no such name. A token plex.tv already refuses is removed too. One
+that could not be signed out, because plex.tv was unreachable, is kept so a
+second run can finish, and the exit status is 1. A file left empty is
+deleted.
+
 ## Commands
 
 Every command accepts `-f/--format`, `-v/--verbose`, `--debug`, `--dry-run`,
@@ -550,6 +558,95 @@ second look before exiting. `--all` takes neither `-s` nor `-r`.
 
 A poll that fails is retried; five failures in a row end the wait with an
 error. Interrupting it exits 130, so a command chained with `&&` does not run.
+
+### Playing on a player
+
+```bash
+plexdo player-remote-play 10.20.0.40 881            # a film on the TV at that address
+plexdo player-remote-play livingroom-tv.lan 881     # resolved here; the TV sees an IP
+plexdo player-remote-play livingroom-tv.lan 881 --dry-run --json | jq '{account, fetchFrom}'
+```
+
+`player-remote-play` connects straight to a Plex player and tells it to start
+playing an item at once, as casting from a Plex app on the same network does. The player must allow remote
+control (*Advertise as player* in most Plex apps), but the server need not know
+of it.
+
+The player is addressed by IP only. Some players refuse a request whose Host
+header carries a name, as a defence against DNS rebinding, so a host name is
+resolved by plexdo and only the address goes on the wire; each address the
+name has is tried until a player answers.
+
+Each Plex app listens on its own port: 32500 for Android and Fire TV, 8324 for
+Roku, 32433 for Plex HTPC, and others besides. Unless `--port` gives it, plexdo
+asks the player over GDM, Plex's discovery protocol, and a player that does not
+answer (GDM is IPv4 only, and firewalls may drop it) is tried on those common
+ports in turn.
+
+A player takes commands from an account it trusts, normally the one signed in
+to it. The command is sent as plexdo's own account when that is the server's
+admin or is signed in to the player; otherwise as the account from a
+`[<user_id>]` section that the player is signed in to; otherwise as plexdo's
+own account anyway, with a warning.
+
+The item is fetched as the account sending the command too, because the player
+plays with the play queue and token of whoever fetched it and switches its own
+user to match. When the server refuses an account's own token, as it does a
+managed user's, the token the server issues for that user is used instead; when
+it will have neither, `--player-user` is an error, and otherwise a warning says
+the player will switch to plexdo's account.
+
+`--player-user` names that account instead, by plex.tv user id, username, or
+email, overriding all of the above, the admin shortcut included:
+
+```bash
+plexdo player-remote-play livingroom-tv.lan 881 --player-user bob@example.com
+```
+
+It must be plexdo's own account (`0` means it when plexdo is the admin, as
+everywhere else), a member of plexdo's Plex Home, or have a `[<user_id>]`
+section with credentials; anything else is an error rather than a quiet
+fallback to another account.
+
+A Home member, including a managed user, which `list-users` shows as `home` or
+`managed`, needs no password: plexdo switches into it through plex.tv, as a
+Plex app's user switcher does. A managed user has no username or email, so name
+it by id or by the name `list-users` shows:
+
+```bash
+plexdo player-remote-play livingroom-tv.lan 881 --player-user Clare
+```
+
+A member with a PIN needs it in a section named for its id:
+
+```ini
+[826699965]
+pin = 1234
+```
+
+For anyone else, a section whose id or `username` is the value is used
+directly; otherwise the sections are signed in one at a time and compared by
+id, username, and email.
+
+The player then fetches the item from the server, and the address it is given
+has to work from the player's network, not plexdo's. Every address the server
+has is a candidate - the configured `[plex] url`, and each direct address
+plex.tv lists - and the one most like the player's own address wins:
+
+1. the same family, IPv4 for an IPv4 player and IPv6 for an IPv6 one;
+2. the same scope, private (RFC 1918, ULA, carrier-grade NAT) or global;
+3. the longest shared prefix, which picks the server's interface nearest
+   the player on a routed network.
+
+So a player on another routed private network gets the server's private
+address nearest it, and a player at another IPv6 site, behind router ACLs
+permitting direct connections, gets the server's global IPv6 address rather
+than a ULA that would not be routed. Loopback, link-local, and relayed
+addresses never qualify, and plex.tv addresses are sent by their `plex.direct`
+names so https certificates check out. `--server-url` gives the address
+outright when the networks are joined some way the ranking cannot see, such as
+NAT. plexdo does not test the chosen address: from another segment, a test
+would only say what plexdo can reach, not what the player can.
 
 ### Server management
 

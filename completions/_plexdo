@@ -197,6 +197,7 @@ _plexdo_commands() {
     'rescan:Trigger a library rescan or show scan status'
     'status:Show server identity, sessions, users, scans, and tasks'
     'wait:Sleep until a session'\''s current play is over'
+    'player-remote-play:Connect to a player directly and tell it to play an item'
     'find-missing:Find gaps in episode numbering across every show'
     'build-interleaved:Round-robin interleaved playlist from shows'
     'build-chronological:Date-sorted playlist from shows and movies'
@@ -206,6 +207,7 @@ _plexdo_commands() {
     'copy-playlist-to-user:Copy a playlist to a specific user'
     'copy-watched:Synchronise watched state between two users'
     'login:Authenticate with plex.tv and save a token'
+    'logout:Sign out of plex.tv and remove the saved tokens'
     'write-config-example:Write a template config file'
   )
   _describe -t commands 'plexdo command' cmds
@@ -291,6 +293,14 @@ _plexdo_subcommand() {
         '--offset[Signed seconds: negative ends early, positive sleeps after]:seconds:' \
         '--paused[Count a play as over once paused this many seconds]:seconds:' \
         '--now[With -r: exit at once if the video is not playing]'
+      ;;
+    player-remote-play)
+      _arguments $_plexdo_global_opts \
+        '--port[Port the player listens on for remote control]:port:' \
+        '--player-user[Account signed in to the player: user id, username, or email]:user:' \
+        '--server-url[Server address the player should fetch from]:url:' \
+        '1:player host name or address:_hosts' \
+        '2:rating key:_plexdo_rating_keys'
       ;;
     clean-playlist)
       _arguments $_plexdo_global_opts \
@@ -378,6 +388,10 @@ _plexdo_subcommand() {
         '(-p --password)'{-p,--password}'[Plex password (INSECURE: visible in ps and shell history)]:password:' \
         '(-c --code)'{-c,--code}'[Two-factor authentication code]:code:' \
         '(-2 --two-factor)'{-2,--two-factor}'[Prompt for a two-factor code]'
+      ;;
+    logout)
+      _arguments $_plexdo_global_opts \
+        '(-u --username)'{-u,--username}'[Sign out only this name from the token file]:username:'
       ;;
     *)
       _arguments $_plexdo_global_opts

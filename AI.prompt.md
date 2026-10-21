@@ -98,7 +98,8 @@ src/plexdo/
     config.py       load_config, cached_config, connect_plex, read_token,
                     token_store_path, config_optional, section_optional,
                     check_file_permissions
-    tokens.py       load_store, save_store, lookup, store_token, admin_token
+    tokens.py       load_store, save_store, lookup, store_token, admin_token,
+                    forget_tokens
     cache.py        cache_dir, write_cache
     convert.py      parse_date, format_duration
     console.py      output, output_format, clean_text, table_limit,
@@ -109,7 +110,9 @@ src/plexdo/
                     cache_row, season_records
     identify.py     resolve_identifier
     accounts.py     server_for_user, account_type, resolve_user_arguments,
-                    user_roster, UserAccessError
+                    user_roster, UserAccessError, connect_with_token,
+                    configured_sections, configured_account,
+                    configured_accounts
     sections.py     resolve_section, resolve_sections,
                     resolve_library_arguments
     titles.py       display_title, find_item, fetch_item, fetch_show,
@@ -127,6 +130,8 @@ src/plexdo/
     paths.py        mapper_for, library_roots, add_prefix_argument
     airdates.py     resolve_episode_date and its helpers
     throttle.py     paced, throttle_delay
+    playback.py     fetch_address, parse_ip, url_host, url_of, play_fields,
+                    add_play_arguments, Candidate, IPAddress
     security.py     scrub_password_argument
     data/           the four completions and the man page, as package data
     commands/       one module per group (see COMMANDS)
@@ -141,7 +146,7 @@ Every module in `commands/` exposes exactly three names:
 - `COMMANDS` maps command name to handler.
 - `REQUIRES_PLEX` is the subset needing a server; `auth` has an empty
   frozenset because `login` and `write-config-example` run before a token
-  exists.
+  exists, and `logout` must work once the server no longer accepts one.
 
 `commands/__init__.py` holds a `MODULES` tuple whose order sets the order of
 subcommands in `--help`, plus `register_all(sub, parents)` and
@@ -224,7 +229,11 @@ it has shared nothing with:
    token is then **saved** so the login happens once
 
 Each stage returns None rather than raising, so the next is tried and a stale
-stored token falls through to a fresh login. When all three fail, raise
+stored token falls through to a fresh login. Stage 3's sign-in is
+`_login_section`, shared with `configured_accounts()`, which yields each
+`[<user_id>]` account signed in - by its stored token while plex.tv accepts it,
+else by its password, saving the token - one at a time, so a caller that finds
+its account early signs in no more. When all three fail, raise
 `UserAccessError` explaining that admin rights do not override per-user
 scoping and that a `[<user_id>]` section would fix it. It must be an ordinary
 `Exception`, **not** a `sys.exit`: `copy-playlist-all-users` catches per-user
@@ -428,7 +437,7 @@ touched.
 - `list-libraries` - columns `id`, `type`, `title`; writes the libraries cache.
 - `list-titles LIBRARY [--album A]` - registered with
   `aliases=["list-library"]`. argparse reports whichever spelling was typed,
-  so `COMMANDS` needs an entry for both, giving 28 registry entries for 27
+  so `COMMANDS` needs an entry for both, giving 30 registry entries for 29
   commands; the smoke test floor must allow for it. Table columns are
   `ratingKey`, `title`, `releaseDate`, `rating`, `studio`; a machine-readable
   format carries every listed field and, for a show library, nests each show's
@@ -668,6 +677,124 @@ string and returns nothing for an empty one, so the library appears empty.
     let `&&` run. Ctrl-C exits 130 for the same reason.
   - Time, sleep and jitter come in as one `Clock`, so the loop is tested
     without waiting.
+- `player-remote-play HOST RATINGKEY [--port P] [--player-user USER]
+  [--server-url URL]` -
+  connects to the player itself with plexapi's `PlexClient` and calls
+  `playMedia`, not proxied through the server, so the server need not know
+  the player.
+  - **IP only on the wire.** Some players refuse a Host header carrying a
+    name, as a DNS rebinding defence, so resolve a name here with
+    `getaddrinfo` and build every URL from the address; bracket IPv6. Try
+    each address in the resolver's order until a player answers at
+    `/resources`. Something answering without a `machineIdentifier`, or
+    with a reply plexapi cannot parse, is not a player and the next
+    address or port is tried; none answering is a `sys.exit` naming each
+    URL, and suggesting `--port` when it was not given.
+  - **The player's port.** Plex apps differ: 32500 Android/Fire TV, 8324
+    Roku, 32433 Plex HTPC/Plex Media Player, 3005 Plex Home Theater,
+    Plexamp anywhere. `--port` has no default and, given, is used as is.
+    Without it, send a unicast GDM `M-SEARCH * HTTP/1.0` to UDP 32412 at
+    each IPv4 address (2 s); a `200 OK` reply from that address whose
+    `Content-Type` (if any) names a player gives the port to use. Silence,
+    an IPv6 address, or an unusable reply falls back to `_KNOWN_PORTS` in
+    the order above, each first checked with a 2 s TCP connect so dropped
+    guesses do not each cost the 10 s probe timeout. Tests stub GDM and
+    the connect check by default, and exercise both for real on loopback.
+  - **Probe without a token**: what answers may not be the player, and a
+    token is a credential. Only a 401 earns a retry with plexdo's token.
+  - **Whom to send as.** A player trusts the account signed in to it. Send
+    as plexdo's own account when it is the server's admin
+    (`plex.myPlexUsername`, an email, matching its email or username,
+    ignoring case) or when the player's machine identifier is among its
+    plex.tv `devices()`; otherwise as the first `configured_accounts()`
+    entry whose devices include the player; otherwise as plexdo's own
+    anyway, with a warning naming the `[<user id>]` fix. plex.tv being
+    unreachable for any of this is a warning and plexdo's own token, never
+    the end of the command.
+  - **The sending account also fetches the item.** `playMedia` builds the
+    play queue and mints the delegation token on `media._server`, and the
+    player switches its user to whoever that is, so an item fetched as
+    plexdo makes a Roku signed in as a managed user switch to plexdo's
+    user. `_server_as` tries `connect_with_token` with the account's own
+    token, then, since a server refuses a managed user's plex.tv token,
+    `connect_as_shared_user` with the matching `current.users()` entry
+    (the admin-minted server token every per-user command uses). Neither
+    working is a `sys.exit` for `--player-user` (strict) and a warning
+    saying the player will switch, then plexdo's server, for the
+    automatic choice.
+  - **`--player-user`** names the account instead - a plex.tv id, username,
+    or email, ignoring case - and overrides every rule above, the admin
+    shortcut included. plexdo's own account when it matches, or when the
+    value is `0` and plexdo is the admin, since `0` means the admin
+    everywhere else. Then a Plex Home member (`home` true in
+    `current.users()`, managed users included) matching by id, username,
+    or email, or by title when it has no username, as a managed user has
+    none: `switchHomeUser(user, pin=)` gives its plex.tv account without a
+    password, `pin` coming from its `[<user_id>]` section; the switched
+    token is not stored, as switching is cheap and needs no secret. A
+    refused switch falls through to the sections, and with none is a
+    `sys.exit` naming the PIN and the section. Otherwise a
+    `configured_sections()` entry whose id or
+    username is the value is taken at its word without a sign-in to check;
+    failing that, sign the rest in one at a time through
+    `configured_account` and compare id, username, and email, because a
+    section may file the account under the email when given the username.
+    Nothing to act as, or plex.tv unreachable, is a `sys.exit`: never send as
+    some other account than the one asked for. Deliberately not in
+    `USER_ID_ARGUMENTS`: the value is matched against accounts, not the
+    roster, whose titles are display names rather than usernames.
+  - **The fetch address** is `playback.fetch_address`, below.
+  - A 401 from the player is a `sys.exit` explaining the account rule. A
+    `ParseError` is success: plexapi parses only after checking the status,
+    and some players answer a command with a bare `OK`.
+  - `--dry-run` resolves, probes, chooses the account and the address, and
+    sends nothing; choosing may still sign in a configured account. Output
+    carries `player`, `machineIdentifier`, `product`, `host`,
+    `playerAddress` (the URL used), `account`, `ratingKey`, `title`,
+    `fetchFrom`, `status`.
+  - Every library item plexapi returns carries a `listType`, or a playlist a
+    `playlistType`, so `playMedia` accepts all of them; no type check is
+    needed, and one would be dead code.
+
+#### The address a player fetches from
+
+`playMedia` tells the player to fetch from the media's server URL, plexdo's
+configured one, which suits plexdo's network and not necessarily the
+player's: plexdo often runs on another routed segment, or another IPv6 site.
+`playback.fetch_address` chooses instead, and the command passes protocol,
+address, and port to `playMedia`, whose `**params` override its own:
+
+- Candidates: the configured URL, listed first, and every connection plex.tv
+  lists for the server except relays, which are throttled below what video
+  needs. Drop any whose address is loopback, link-local, unspecified, or
+  multicast - for a plex.tv connection, test its bare `address`, not just
+  its URI's host, which is a plex.direct name that says nothing.
+- Name a plex.tv candidate by its URI's host, normally a plex.direct name
+  over https, and rank it by its bare address: https to a bare IP fails the
+  certificate.
+- Rank against the player's IP, an IPv6-mapped IPv4 address read as IPv4:
+  same family; then same scope by `ipaddress.is_global`, so RFC 1918, ULA,
+  and carrier-grade NAT are private alike; then the longest shared prefix. A
+  host name, family unknown, ranks between a family match and a mismatch.
+  Scope outranks prefix: bits shared across the private/global line mean
+  nothing. A tie keeps the first, the configured URL.
+- Bracket an IPv6 literal sent as the address: the player joins address and
+  port into a URL.
+- Do not probe the chosen address. A probe runs from plexdo's network, which
+  is the very network that may differ from the player's.
+- `--server-url` bypasses all of it, loopback included, for a player on the
+  server's own machine or networks joined by NAT; it must be an http or
+  https URL with a host, port defaulting to 32400.
+- With no candidate left, `sys.exit` asking for `--server-url` or a
+  reachable `[plex] url`. Show the address chosen in the output
+  (`fetchFrom`).
+- Tests must use genuinely global addresses for anything about scope: the
+  documentation ranges, 2001:db8::/32 and 192.0.2.0/24 among them, are not
+  global to `ipaddress`, and would leave the rule unexercised.
+
+The ratingKey argument, `--server-url`, and the record's closing fields come
+from `playback.add_play_arguments` and `play_fields`, so a second playback
+command would not repeat them and trip `duplicate-code`.
 
 ### Setup
 
@@ -681,6 +808,18 @@ string and returns nothing for an empty one, so the library appears empty.
   from `sys.argv`, with a warning that is blunt about what cannot be fixed:
   the value is already in shell history and was visible during interpreter
   startup. On Windows the rewrite has no equivalent.
+- `logout [-u USERNAME]` - signs each stored token out at plex.tv
+  (`MyPlexAccount(token=...).signout()`) and removes it from the store via
+  `tokens.forget_tokens`. `-u` names a store key, exactly then ignoring
+  case; one the store lacks is a `sys.exit` listing those it has, since
+  signing out nobody would read as success. A token plex.tv already refuses
+  (`Unauthorized` on loading the account) is `already signed out` and
+  removed; any other failure leaves the token valid, so it is **kept** for a
+  retry and the run exits 1 after removing the rest. Sign a token filed
+  under two names out once. A store left empty is deleted rather than kept
+  as `{}`: no secrets file outlives its last secret, and the next command's
+  "run `plexdo login`" is then the right advice. `--dry-run` contacts
+  nothing. Needs no server, so it works when the server is down.
 - `write-config-example [-o]` - writes `CONFIG_EXAMPLE`, mode 0600. An
   existing config is refused without `-o/--overwrite`, and that check comes
   before `--dry-run`, so a rehearsal fails where the real run would; a
@@ -698,7 +837,9 @@ string and returns nothing for an empty one, so the library appears empty.
 ratingKey, wrong media type, playlist or user or library not found,
 unsupported library type, album not found, a refused name collision, a smart
 playlist asked to give up an entry, an unknown sessionKey, an existing config
-file without `--overwrite`, an air date with no input to answer for it. A
+file without `--overwrite`, an air date with no input to answer for it, a
+`logout -u` name not in the token store, a player host that does not resolve
+or where no player answers. A
 command line argparse cannot parse exits 2, its own convention. An
 interrupted `wait` exits 130. No bare
 `except`; the broad ones are in `_cancel_all_scans`, the per-user copy loop,
@@ -787,7 +928,11 @@ sleeps through that window, that it ends on a stop or on autoplay moving on,
 that a failed poll is retried; that `--paused` ends a play on its deadline and
 a resume restarts the count; and that `--all` waits for a play started during
 its confirming poll, takes that second look even when nothing played, and
-judges an unfetchable video by its session; path rewriting
+judges an unfetchable video by its session; that `logout` keeps a token it
+could not sign out and removes one plex.tv already refuses; that
+`player-remote-play` sends only IPs, probes without a token, and picks its
+account by the rules above; that the fetch address follows family, then
+scope, then prefix; path rewriting
 picking the longest matching root; the token store reading a legacy bare-token
 file; that `loaded_fields` and `file_paths` never trigger a reload; and that
 global flags survive being given before the subcommand.

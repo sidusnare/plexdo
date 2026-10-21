@@ -20,7 +20,7 @@ $script:PlexdoCacheDir = $null
 $script:PlexdoValueOptions = @(
     '--m3u', '--album', '--sort', '--media-type', '--library-id', '--section',
     '--prefix', '--throttle', '-p', '-l', '--library', '-t', '--title', '-u', '--user',
-    '--username',
+    '--username', '--port', '--player-user', '--server-url',
     '-c', '--code', '-f', '--format'
 )
 
@@ -43,6 +43,7 @@ $script:PlexdoCommands = [ordered]@{
     'rescan'                  = 'Trigger a library rescan or show scan status'
     'status'                  = 'Show server identity, sessions, users, and tasks'
     'wait'                    = 'Sleep until a session''s current play is over'
+    'player-remote-play'      = 'Connect to a player directly and tell it to play an item'
     'find-missing'            = 'Find gaps in episode numbering across every show'
     'build-interleaved'       = 'Round-robin playlist from shows'
     'build-chronological'     = 'Date-sorted playlist from shows and movies'
@@ -52,6 +53,7 @@ $script:PlexdoCommands = [ordered]@{
     'copy-playlist-to-user'   = 'Copy a playlist to a specific user'
     'copy-watched'            = 'Synchronise watched state between two users'
     'login'                   = 'Authenticate with plex.tv and save a token'
+    'logout'                  = 'Sign out of plex.tv and remove the saved tokens'
     'write-config-example'    = 'Write a template config file'
 }
 
@@ -340,10 +342,12 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
                 '^status$'                          { $flags['--section'] = 'Show only one section' }
                 '^write-config-example$'            { $flags['--overwrite'] = 'Replace an existing config file' }
                 '^wait$'                            { $flags['--session'] = 'Follow the session with this sessionKey'; $flags['--rating-key'] = 'Wait for this video'; $flags['--interval'] = 'Seconds between polls'; $flags['--fast-interval'] = 'Seconds between polls near the end point'; $flags['--no-credits'] = 'Ignore the credits marker and wait for the end'; $flags['--offset'] = 'Signed seconds: negative ends early, positive sleeps after'; $flags['--all'] = 'Wait for every play by every user'; $flags['--paused'] = 'Count a play as over once paused this many seconds'; $flags['--now'] = 'With -r: exit at once if the video is not playing' }
+                '^player-remote-play$'              { $flags['--port'] = 'Port the player listens on for remote control'; $flags['--player-user'] = 'Account signed in to the player: user id, username, or email'; $flags['--server-url'] = 'Server address the player should fetch from' }
                 '^find-missing$'                    { $flags['--library'] = 'Library to look in'; $flags['--all'] = 'Check every show'; $flags['--season'] = 'Season number, or several comma separated'; $flags['--include-specials'] = 'Also check season 0' }
                 '^clean-playlist$'                  { $flags['--include-partial'] = 'Also remove part-played items' }
                 '^copy-watched$'                    { $flags['--one-way'] = 'Only write to the second user'; $flags['--library'] = 'Restrict to one library'; $flags['--title'] = 'Restrict to one item'; $flags['--unwatch'] = 'Propagate the unwatched state instead' }
                 '^login$'                           { $flags['--username'] = 'Plex username or email'; $flags['--password'] = 'Plex password (INSECURE)'; $flags['--code'] = 'Two-factor code'; $flags['--two-factor'] = 'Prompt for a two-factor code' }
+                '^logout$'                          { $flags['--username'] = 'Sign out only this name from the token file' }
             }
             $results = $flags.GetEnumerator() | ForEach-Object { New-PlexdoResult $_.Key $_.Value }
         } else {
@@ -356,6 +360,7 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
                 'read'           { if ($index -eq 0) { $results = Get-PlexdoLibraries }
                                    elseif ($index -eq 1) { $results = Get-PlexdoRatingKeys } }
                 'list-show'      { if ($index -eq 0) { $results = Get-PlexdoRatingKeys } }
+                'player-remote-play' { if ($index -eq 1) { $results = Get-PlexdoRatingKeys } }
                 'show-metadata'  { if ($index -eq 0) { $results = Get-PlexdoRatingKeys } }
                 'list-playlists' { if ($index -eq 0) { $results = Get-PlexdoUsers } }
                 'search'         { if ($index -eq 0) { $results = Get-PlexdoUsers } }

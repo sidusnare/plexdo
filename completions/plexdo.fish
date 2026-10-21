@@ -113,7 +113,7 @@ function __plexdo_positionals
             continue
         end
         switch $t
-            case --m3u --album --sort --media-type --library-id -l --library -t --title -u --user --username -p --password -c --code -f --format --section -p --prefix --throttle -s --season
+            case --m3u --album --sort --media-type --library-id -l --library -t --title -u --user --username -p --password -c --code -f --format --section -p --prefix --throttle -s --season --port --player-user --server-url
                 set skip 1
                 continue
             case '-*'
@@ -204,9 +204,9 @@ end
 
 set -l plexdo_cmds list-libraries list-titles list-library list-show export-titles search status find-missing \
     list-users list-playlists list-playlist export-playlist remove-playlist \
-    append-playlist clean-playlist show-metadata read rescan status wait find-missing build-interleaved \
+    append-playlist clean-playlist show-metadata read rescan status wait player-remote-play find-missing build-interleaved \
     build-chronological build-randomize build-concatenated copy-playlist-all-users \
-    copy-playlist-to-user copy-watched login write-config-example
+    copy-playlist-to-user copy-watched login logout write-config-example
 
 # No bare filename completion anywhere; each rule opts in explicitly.
 complete -c plexdo -f
@@ -236,6 +236,7 @@ for prog in plexdo
     complete -c $prog -n __plexdo_no_subcommand -a status -d 'Show server identity, sessions, users, scans, and tasks'
     complete -c $prog -n __plexdo_no_subcommand -a find-missing -d 'Find gaps in episode numbering across every show'
     complete -c $prog -n __plexdo_no_subcommand -a wait -d 'Sleep until a session\'s current play is over'
+    complete -c $prog -n __plexdo_no_subcommand -a player-remote-play -d 'Connect to a player directly and tell it to play an item'
     complete -c $prog -n __plexdo_no_subcommand -a build-interleaved -d 'Round-robin playlist from shows'
     complete -c $prog -n __plexdo_no_subcommand -a build-chronological -d 'Date-sorted playlist from shows and movies'
     complete -c $prog -n __plexdo_no_subcommand -a build-randomize -d 'Randomize a playlist into a new one'
@@ -244,6 +245,7 @@ for prog in plexdo
     complete -c $prog -n __plexdo_no_subcommand -a copy-playlist-to-user -d 'Copy a playlist to a specific user'
     complete -c $prog -n __plexdo_no_subcommand -a copy-watched -d 'Synchronise watched state between two users'
     complete -c $prog -n __plexdo_no_subcommand -a login -d 'Authenticate with plex.tv and save a token'
+    complete -c $prog -n __plexdo_no_subcommand -a logout -d 'Sign out of plex.tv and remove the saved tokens'
     complete -c $prog -n __plexdo_no_subcommand -a write-config-example -d 'Write a template config file'
 
     # Global flags: valid before or after the command name.
@@ -266,7 +268,9 @@ for prog in plexdo
         -d 'Also remove part-played items'
     complete -c $prog -n "__fish_seen_subcommand_from list-show show-metadata; and __plexdo_at 0" \
         -a '(__plexdo_rating_keys)' -d 'item'
-    complete -c $prog -n "__fish_seen_subcommand_from read; and __plexdo_at 1" \
+    complete -c $prog -n "__fish_seen_subcommand_from player-remote-play; and __plexdo_at 0" \
+        -a '(__fish_print_hostnames)' -d 'player host'
+    complete -c $prog -n "__fish_seen_subcommand_from read player-remote-play; and __plexdo_at 1" \
         -a '(__plexdo_rating_keys)' -d 'item'
     complete -c $prog -n "__fish_seen_subcommand_from append-playlist; and not __plexdo_at 0; and not __plexdo_at 1" \
         -a '(__plexdo_rating_keys)' -d 'item'
@@ -327,6 +331,9 @@ for prog in plexdo
     complete -c $prog -l no-credits -n '__fish_seen_subcommand_from wait' -d 'Ignore the credits marker and wait for the end'
     complete -c $prog -x -l offset -n '__fish_seen_subcommand_from wait' -d 'Signed seconds: negative ends early, positive sleeps after'
     complete -c $prog -l now -n '__fish_seen_subcommand_from wait' -d 'With -r: exit at once if the video is not playing'
+    complete -c $prog -x -l port -n '__fish_seen_subcommand_from player-remote-play' -d 'Port the player listens on for remote control'
+    complete -c $prog -x -l player-user -n '__fish_seen_subcommand_from player-remote-play' -d 'Account signed in to the player: user id, username, or email'
+    complete -c $prog -x -l server-url -n '__fish_seen_subcommand_from player-remote-play' -d 'Server address the player should fetch from'
     complete -c $prog -s a -l all -n '__fish_seen_subcommand_from wait' -d 'Wait for every play by every user'
     complete -c $prog -x -l paused -n '__fish_seen_subcommand_from wait' -d 'Count a play as over once paused this many seconds'
     complete -c $prog -l one-way -n '__fish_seen_subcommand_from copy-watched' -d 'Only write to the second user'
@@ -339,4 +346,5 @@ for prog in plexdo
     complete -c $prog -x -s p -l password -n '__fish_seen_subcommand_from login' -d 'Plex password (INSECURE: visible in ps)'
     complete -c $prog -x -s c -l code -n '__fish_seen_subcommand_from login' -d 'Two-factor authentication code'
     complete -c $prog -s 2 -l two-factor -n '__fish_seen_subcommand_from login' -d 'Prompt for a two-factor code'
+    complete -c $prog -x -s u -l username -n '__fish_seen_subcommand_from logout' -d 'Sign out only this name from the token file'
 end

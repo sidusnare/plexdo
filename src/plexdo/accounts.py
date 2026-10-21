@@ -2,7 +2,7 @@
 
 """User lookup, per-user servers, and account classification."""
 
-from typing import Any, List, Optional, Tuple
+from typing import Any, Iterator, List, Optional, Tuple
 import sys
 
 from plexapi.exceptions import BadRequest, NotFound, Unauthorized
@@ -56,7 +56,7 @@ def _access_denied(user_title: str, user_id: int) -> UserAccessError:
     )
 
 
-def _connect_with(plex: PlexServer, token: str) -> Optional[PlexServer]:
+def connect_with_token(plex: PlexServer, token: str) -> Optional[PlexServer]:
     """Return a server connected with a token, or None if it is refused."""
     try:
         # pylint: disable-next=protected-access
@@ -85,7 +85,7 @@ def _candidate_usernames(user_id: int, user: MyPlexUser) -> List[str]:
     return seen
 
 
-def _connect_as_shared_user(plex: PlexServer, user: MyPlexUser) -> Optional[PlexServer]:
+def connect_as_shared_user(plex: PlexServer, user: MyPlexUser) -> Optional[PlexServer]:
     """Stage 1: the admin-issued, server-scoped token for this user."""
     try:
         token = user.get_token(plex.machineIdentifier)
@@ -95,7 +95,7 @@ def _connect_as_shared_user(plex: PlexServer, user: MyPlexUser) -> Optional[Plex
     if not token:
         LOG.debug("get_token returned nothing for %r", user.title)
         return None
-    return _connect_with(plex, token)
+    return connect_with_token(plex, token)
 
 
 def _connect_from_store(
@@ -107,7 +107,7 @@ def _connect_from_store(
         token = lookup(path, name)
         if not token:
             continue
-        server = _connect_with(plex, token)
+        server = connect_with_token(plex, token)
         if server is not None:
             LOG.info("Using stored token for %r", name)
             return server
@@ -115,10 +115,13 @@ def _connect_from_store(
     return None
 
 
-def _connect_by_login(
-    plex: PlexServer, user_id: int
-) -> Optional[PlexServer]:
-    """Stage 3: log in with the credentials in the [<user_id>] section."""
+def _login_section(user_id: int) -> Optional[Tuple[str, MyPlexAccount]]:
+    """Sign in with the credentials in the [<user_id>] section, if any.
+
+    Returns the configured username with the account, since that is the
+    name its token is filed under, or None when there are no credentials or
+    plex.tv refuses them.
+    """
     cfg = cached_config()
     section = str(user_id)
     username = section_optional(cfg, section, "username")
@@ -129,13 +132,23 @@ def _connect_by_login(
 
     LOG.info("Logging in as %r for user id %s", username, section)
     try:
-        account = MyPlexAccount(username=username, password=password)
+        return username, MyPlexAccount(username=username, password=password)
     except (Unauthorized, BadRequest) as exc:
         LOG.warning("Login failed for %r: %s", username, exc)
         return None
 
+
+def _connect_by_login(
+    plex: PlexServer, user_id: int
+) -> Optional[PlexServer]:
+    """Stage 3: log in with the credentials in the [<user_id>] section."""
+    login = _login_section(user_id)
+    if login is None:
+        return None
+    username, account = login
+
     token = account.authenticationToken
-    server = _connect_with(plex, token)
+    server = connect_with_token(plex, token)
     if server is None:
         LOG.warning(
             "%r signed in to plex.tv but that account cannot reach this "
@@ -143,9 +156,64 @@ def _connect_by_login(
         )
         return None
 
-    store_token(token_store_path(cfg), username, token)
+    store_token(token_store_path(cached_config()), username, token)
     LOG.info("Saved a token for %r for future runs", username)
     return server
+
+
+def _stored_account(username: str) -> Optional[MyPlexAccount]:
+    """The plex.tv account behind a stored token, or None if it is stale."""
+    token = lookup(token_store_path(cached_config()), username)
+    if not token:
+        return None
+    try:
+        return MyPlexAccount(token=token)
+    except Unauthorized as exc:
+        LOG.debug("Stored token for %r was rejected: %s", username, exc)
+        return None
+
+
+def configured_sections() -> List[Tuple[int, str]]:
+    """(user id, username) for each [<user_id>] section naming a username."""
+    cfg = cached_config()
+    found = []
+    for section in cfg.sections():
+        username = section_optional(cfg, section, "username")
+        if section.isdigit() and username:
+            found.append((int(section), username))
+    return found
+
+
+def configured_account(user_id: int, username: str) -> Optional[MyPlexAccount]:
+    """The account of one [<user_id>] section, signed in, or None.
+
+    A token already stored for the section's username is used when plex.tv
+    still accepts it; otherwise the section's password signs in, and the
+    new token is saved so that happens once.
+    """
+    account = _stored_account(username)
+    if account is not None:
+        return account
+    login = _login_section(user_id)
+    if login is None:
+        return None
+    account = login[1]
+    store_token(token_store_path(cached_config()), username,
+                account.authenticationToken)
+    LOG.info("Saved a token for %r for future runs", username)
+    return account
+
+
+def configured_accounts() -> Iterator[Tuple[int, MyPlexAccount]]:
+    """Each account with a [<user_id>] section in the config, signed in.
+
+    Accounts are produced one at a time, so a caller that finds what it
+    wants early signs in no more.
+    """
+    for user_id, username in configured_sections():
+        account = configured_account(user_id, username)
+        if account is not None:
+            yield user_id, account
 
 
 def server_for_user(plex: PlexServer, user_id: int) -> PlexServer:
@@ -171,7 +239,7 @@ def server_for_user(plex: PlexServer, user_id: int) -> PlexServer:
     user: MyPlexUser = _find_user_by_id(account, user_id)
 
     for stage, connect in (
-        ("admin-issued token", lambda: _connect_as_shared_user(plex, user)),
+        ("admin-issued token", lambda: connect_as_shared_user(plex, user)),
         ("stored token", lambda: _connect_from_store(plex, user, user_id)),
         ("configured credentials", lambda: _connect_by_login(plex, user_id)),
     ):

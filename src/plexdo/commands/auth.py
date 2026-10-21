@@ -3,7 +3,7 @@
 """Authentication and config bootstrap commands."""
 
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import argparse
 import configparser
 import getpass
@@ -11,14 +11,19 @@ import os
 import sys
 import textwrap
 
-from plexapi.exceptions import BadRequest, Unauthorized
+from plexapi.exceptions import BadRequest, PlexApiException, Unauthorized
 from plexapi.myplex import MyPlexAccount
 from plexapi.server import PlexServer
+from requests import RequestException
 
-from plexdo.config import config_optional, load_config
+from plexdo.config import config_optional, load_config, token_store_path
 from plexdo.console import output, output_format
 from plexdo.constants import CONFIG_EXAMPLE, CONFIG_PATH, LOG
-from plexdo.tokens import ADMIN_KEY, store_token
+from plexdo.tokens import (ADMIN_KEY, TokenStore, forget_tokens, load_store,
+                           store_token)
+
+# Outcomes after which a token is gone from plex.tv, so from the file too.
+_SIGNED_OUT = ("signed out", "already signed out")
 
 
 def _prompt_username(supplied: Optional[str]) -> str:
@@ -137,6 +142,101 @@ def cmd_login(_plex: Optional[PlexServer], args: argparse.Namespace) -> None:
         output({"token_path": str(path), "verified": verified}, args)
 
 
+def _logout_targets(store: TokenStore, wanted: Optional[str], path: Path) -> List[str]:
+    """The stored names to sign out: every one, or the one asked for.
+
+    The name matches exactly first and then ignoring case, as an email
+    address would; a name the file does not hold is an error listing those
+    it does, since signing out nobody would read as success.
+    """
+    if wanted is None:
+        return sorted(store)
+    matches = [wanted] if wanted in store else [
+        name for name in store if name.lower() == wanted.lower()
+    ]
+    if len(matches) > 1:
+        sys.exit(f"{wanted!r} matches {', '.join(matches)} in the token file "
+                 f"{path}, ignoring case; give the name exactly.")
+    if not matches:
+        sys.exit(
+            f"No session for {wanted!r} in the token file {path}; nothing "
+            f"has been signed out. It holds: "
+            f"{', '.join(sorted(store)) or 'no sessions'}."
+        )
+    return matches
+
+
+def _sign_out(token: str) -> Tuple[str, str]:
+    """Invalidate one token at plex.tv, returning (status, detail).
+
+    A token plex.tv already refuses is as good as signed out, so it is
+    reported that way and removed with the rest; any other failure leaves
+    the token valid, and it is kept so a later run can try again.
+    """
+    try:
+        MyPlexAccount(token=token).signout()
+    except Unauthorized:
+        return "already signed out", "plex.tv no longer accepted the token"
+    except (PlexApiException, RequestException) as exc:
+        return "failed", str(exc)
+    return "signed out", ""
+
+
+def _logout_line(record: Dict[str, str]) -> str:
+    """One table line for one stored session."""
+    user, status, detail = record["user"], record["status"], record["detail"]
+    if status == "dry run":
+        return f"{user}: would sign out and remove."
+    if status == "signed out":
+        return f"{user}: signed out and removed."
+    if status == "already signed out":
+        return f"{user}: already signed out ({detail}); removed."
+    return f"{user}: could not sign out ({detail}); kept."
+
+
+def cmd_logout(_plex: Optional[PlexServer], args: argparse.Namespace) -> None:
+    """Sign out of plex.tv and remove the saved tokens."""
+    path = token_store_path(load_config())
+    store = load_store(path)
+    names = _logout_targets(store, args.username, path)
+    table = output_format(args) == "table"
+    if not names:
+        if table:
+            print(f"No sessions to sign out of in {path}.")
+        else:
+            output([], args)
+        return
+
+    # A token filed under two names is signed out once and reported twice.
+    outcomes: Dict[str, Tuple[str, str]] = {}
+    records = []
+    for name in names:
+        token = store[name]
+        if token not in outcomes:
+            outcomes[token] = (("dry run", "") if args.dry_run
+                               else _sign_out(token))
+        status, detail = outcomes[token]
+        records.append({"user": name, "status": status, "detail": detail})
+        if table:
+            print(_logout_line(records[-1]))
+
+    done = [r["user"] for r in records if r["status"] in _SIGNED_OUT]
+    if done:
+        left = forget_tokens(path, done)
+        LOG.info("Removed %d session(s) from %s; %d left.", len(done), path, left)
+        if not left and table:
+            print(f"No sessions are left, so {path} has been removed; run "
+                  "plexdo login to sign in again.")
+    if not table:
+        output(records, args)
+    failed = sum(r["status"] == "failed" for r in records)
+    if failed:
+        sys.exit(
+            f"{failed} session(s) could not be signed out and were kept in "
+            f"{path}; run logout again once plex.tv can be reached."
+        )
+
+
 def cmd_write_config_example(_plex: Optional[PlexServer], args: argparse.Namespace) -> None:
     """Write a template config file, refusing to replace one unasked."""
     existing = CONFIG_PATH.exists()
@@ -190,6 +290,18 @@ def register(
         help="Prompt for a two-factor code interactively.",
     )
 
+    p_logout = sub.add_parser(
+        "logout", parents=parents,
+        help="Sign out of plex.tv and remove the saved tokens.",
+    )
+    p_logout.add_argument(
+        "-u", "--username", default=None, metavar="USER",
+        help=(
+            "Sign out only this name from the token file (str), as login "
+            "saved it. Default: every session in the file."
+        ),
+    )
+
     p_wce = sub.add_parser(
         "write-config-example", parents=parents,
         help="Write a template config file.",
@@ -213,8 +325,10 @@ def register(
 
 COMMANDS = {
     "login": cmd_login,
+    "logout": cmd_logout,
     "write-config-example": cmd_write_config_example,
 }
 
-# login and write-config-example both run before a token necessarily exists.
+# login and write-config-example run before a token necessarily exists, and
+# logout must still work once the server will no longer accept one.
 REQUIRES_PLEX: frozenset = frozenset()

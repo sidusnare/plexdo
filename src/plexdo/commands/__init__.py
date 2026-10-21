@@ -12,7 +12,7 @@ Every command module exposes three names:
     Maps each command name to its handler function.
 ``REQUIRES_PLEX``
     The subset of those names needing a connected server. Commands outside it
-    (``login``, ``write-config-example``) run before a token necessarily exists.
+    (``login``, ``logout``, ``write-config-example``) do not need one.
 
 Adding a command means adding a module here - ``cli`` needs no edit.
 """
@@ -21,8 +21,8 @@ import argparse
 from typing import Any, Callable, Dict, FrozenSet, List, Tuple
 
 from plexdo.commands import (auth, build, copy, libraries, metadata, missing,
-                             playlists, rescan, search, status, stream, users,
-                             wait, watched)
+                             playlists, remote, rescan, search, status, stream,
+                             users, wait, watched)
 
 # Order determines the order subcommands appear in --help.
 MODULES = (
@@ -36,6 +36,7 @@ MODULES = (
     rescan,
     status,
     wait,
+    remote,
     build,
     copy,
     watched,

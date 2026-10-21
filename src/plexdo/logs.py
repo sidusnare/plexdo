@@ -16,6 +16,9 @@ def configure_logging(verbose: bool, debug: bool) -> None:
         level = logging.WARNING
 
     handler = logging.StreamHandler(sys.stderr)
+    # The handler filters too: plexapi sets its own logger to INFO, whose
+    # records would otherwise reach stderr whatever the level chosen here.
+    handler.setLevel(level)
     handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
     logging.getLogger().addHandler(handler)
     logging.getLogger().setLevel(level)

@@ -1,7 +1,7 @@
 .\" Man page for plexdo (plexdo).
 .\" Regenerate or edit alongside AI.prompt.md; the .TH version must match
 .\" __version__ in src/plexdo/__init__.py.
-.TH PLEXDO 1 "2026-10-05" "plexdo 1.1.27" "User Commands"
+.TH PLEXDO 1 "2026-10-15" "plexdo 1.1.28" "User Commands"
 .
 .SH NAME
 plexdo \- command\-line interface for Plex Media Server
@@ -436,6 +436,35 @@ With
 .BR \-r :
 if the video is not playing, exit 0 at once rather than waiting for it.
 .RE
+.TP
+.BI player\-remote\-play " host ratingKey " [ \-\-port " PORT" "] [" \-\-player\-user " USER" "] [" \-\-server\-url " URL" ]
+Connect to a player directly and tell it to start playing an item at once,
+replacing whatever it was playing. A
+.I host
+that is a name is resolved here, and only the address is sent, since some
+players refuse a Host header carrying a name as a defence against DNS
+rebinding; each address the name has is tried until a player answers on
+.BR \-\-port ,
+or, without it, on the port the player gives when asked over GDM, or on
+the ports the common Plex apps use. The command is sent as
+.BR plexdo \(aqs
+own account when that is the server\(aqs admin or is signed in to the
+player, otherwise as an account from a per\-user configuration section
+that is signed in to it, and otherwise as
+.BR plexdo \(aqs
+own anyway, with a warning.
+.B \-\-player\-user
+names the account signed in to the player instead, by plex.tv user id,
+username, or email, or a managed user\(aqs name; it must be
+.BR plexdo \(aqs
+own account, a member of its Plex Home, switched into without a password,
+or have a per\-user configuration section, and is an error otherwise. The player is told to fetch from whichever of
+the server\(aqs addresses is most like its own: the configured URL and every
+direct address plex.tv lists are ranked by family, then by private or global
+scope, then by the longest shared prefix. Loopback, link\-local, and relayed
+addresses never qualify.
+.B \-\-server\-url
+gives the address outright instead.
 .
 .SS Setup
 .TP
@@ -445,6 +474,14 @@ Authenticate against plex.tv and save the token.
 is insecure: it is recorded in shell history and is briefly visible to
 .BR ps (1).
 Prefer the configuration file or the interactive prompt.
+.TP
+.BI logout " " [ \-u " USER" ]
+Sign every session in the token store out of plex.tv, invalidating its
+token, and remove it from the store; with
+.BR \-u ,
+only the one saved under that name, which must be in the store. A token
+plex.tv already refuses is removed too; one that could not be signed out is
+kept, and the exit status is 1. A store left empty is deleted.
 .TP
 .BI write\-config\-example " " [ \-o ]
 Write a template configuration file. An existing one is refused unless
@@ -521,6 +558,8 @@ When a command meets a 401 for a user, three sources are tried in turn: the
 server\-scoped token the admin can mint, a token already in the store, and a
 fresh login with that user\(aqs configured credentials. A token obtained by the
 last is saved, so the login happens once rather than on every run.
+.B plexdo logout
+signs the tokens out and removes them.
 .
 .SH SHELL COMPLETION
 Completions are provided for
@@ -654,6 +693,18 @@ Restart the server once the current episode reaches its credits:
 .PP
 .EX
 plexdo wait && sudo systemctl restart plexmediaserver
+.EE
+.PP
+Start a film on the living room TV, by its name on the local network:
+.PP
+.EX
+plexdo player\-remote\-play livingroom\-tv.lan 881
+.EE
+.PP
+Sign out of plex.tv and remove every saved token:
+.PP
+.EX
+plexdo logout
 .EE
 .PP
 Machine\-readable output:

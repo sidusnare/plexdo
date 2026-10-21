@@ -266,10 +266,10 @@ PYEOF
 
 _plexdo_commands() {
     echo "list-libraries list-titles list-library list-users list-playlists list-playlist \
-list-show show-metadata search read rescan status wait find-missing build-interleaved build-chronological build-randomize \
+list-show show-metadata search read rescan status wait player-remote-play find-missing build-interleaved build-chronological build-randomize \
 build-concatenated \
 copy-playlist-all-users copy-playlist-to-user export-playlist remove-playlist \
-append-playlist clean-playlist export-titles copy-watched login write-config-example"
+append-playlist clean-playlist export-titles copy-watched login logout write-config-example"
 }
 
 _plexdo_global_flags() {
@@ -300,7 +300,7 @@ _plexdo_positional_count() {
     for (( i=1; i < cword; i++ )); do
         word="${words[$i]}"
         if (( skip_next )); then skip_next=0; continue; fi
-        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle|-s|--season|-l|--library|-u|--user) skip_next=1; continue ;; esac
+        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle|-s|--season|-l|--library|-u|--user|--port|--player-user|--server-url) skip_next=1; continue ;; esac
         if [[ "$word" == -* ]]; then continue; fi
         if (( ! found_cmd )); then
             [[ "$word" == "$cmd" ]] && found_cmd=1
@@ -318,7 +318,7 @@ _plexdo_nth_positional() {
     for (( i=1; i < cword; i++ )); do
         word="${words[$i]}"
         if (( skip_next )); then skip_next=0; continue; fi
-        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle|-s|--season|-l|--library|-u|--user) skip_next=1; continue ;; esac
+        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle|-s|--season|-l|--library|-u|--user|--port|--player-user|--server-url) skip_next=1; continue ;; esac
         if [[ "$word" == -* ]]; then continue; fi
         if (( ! found_cmd )); then
             [[ "$word" == "$cmd" ]] && found_cmd=1
@@ -373,6 +373,10 @@ _plexdo_complete() {
                 COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --overwrite -o" -- "$cur") ) ;;
             wait)
                 COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) -s --session -r --rating-key -a --all -i --interval --fast-interval --no-credits --offset --paused --now" -- "$cur") ) ;;
+            player-remote-play)
+                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --port --player-user --server-url" -- "$cur") ) ;;
+            logout)
+                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --username -u" -- "$cur") ) ;;
             *)
                 COMPREPLY=( $(compgen -W "$(_plexdo_global_flags)" -- "$cur") ) ;;
         esac
@@ -479,6 +483,10 @@ _plexdo_complete() {
                 COMPREPLY=()
             fi ;;
 
+        # [-u USER]; the token file's names are not cached
+        logout)
+            COMPREPLY=() ;;
+
         # <user_a> <user_b> [-1] [-l ID] [-t KEY] [--unwatch]
         copy-watched)
             if [[ "$prev" == "--library" || "$prev" == "-l" ]]; then
@@ -583,6 +591,15 @@ _plexdo_complete() {
                 -r|--rating-key) _plexdo_complete_rating_key ;;
                 -s|--session|-i|--interval|--fast-interval|--offset|--paused) COMPREPLY=() ;;
                 *) COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) -s --session -r --rating-key -a --all -i --interval --fast-interval --no-credits --offset --paused --now" -- "$cur") ) ;;
+            esac ;;
+
+        # <host> <ratingKey> [--port PORT] [--player-user USER] [--server-url URL]
+        player-remote-play)
+            case "$prev" in --port|--player-user|--server-url) COMPREPLY=(); return ;; esac
+            case $pos in
+                0) COMPREPLY=( $(compgen -A hostname -- "$cur") ) ;;
+                1) _plexdo_complete_rating_key ;;
+                *) COMPREPLY=() ;;
             esac ;;
 
         # <user_id> <playlist> [--include-partial]
