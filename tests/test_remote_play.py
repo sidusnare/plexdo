@@ -2,6 +2,7 @@
 
 """player-remote-play: reaching a player by address, and whom to send as."""
 
+import configparser
 import ipaddress
 import json
 import socket
@@ -115,6 +116,13 @@ class PlayerAt:
         client.playMedia = play_media
         self.built.append(client)
         return client
+
+
+@pytest.fixture(autouse=True)
+def no_config(monkeypatch):
+    """An empty config, so no test reads the plexdo.ini of whoever runs it,
+    or fails where there is none, as on CI."""
+    monkeypatch.setattr(remote, "cached_config", configparser.ConfigParser)
 
 
 @pytest.fixture(autouse=True)
