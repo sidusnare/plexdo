@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.29] - 2026-10-22
+
+### Fixed
+- The `player-remote-play` tests for Plex Home members no longer read the
+  `plexdo.ini` of whoever runs them, so they pass where there is none, as
+  on CI, and a PIN in a real config cannot change their outcome.
+
 ## [1.1.28] - 2026-10-15
 
 ### Added
@@ -418,6 +425,7 @@ multi-user token handling, watched-state synchronisation, a status report,
 photo galleries, YAML/CSV/CLIXML output, shell completions for bash, zsh, and
 fish, a manual page, and packaging for PyPI. See the commit history.
 
+[1.1.29]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.29
 [1.1.28]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.28
 [1.1.27]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.27
 [1.1.26]: https://github.com/sidusnare/plexdo/releases/tag/v1.1.26
