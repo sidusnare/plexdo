@@ -289,7 +289,15 @@ nothing to do with this version.
   template plexdo writes; markdownlint-cli2, pinned in `package.json` at the
   newest release supporting the Node of Debian stable (0.22.1 for Node 20),
   passes on every Markdown file with `MD024 siblings_only` and `MD013` at 80
-  columns, code blocks and tables exempt.
+  columns, code blocks and tables exempt. That release pins dependencies
+  with published vulnerabilities, so `package.json` `overrides` force the
+  fixed versions: `markdown-it` 14.3.3, `js-yaml` 4.3.2, `smol-toml` 1.9.0,
+  and `katex` 0.18.2. KaTeX is outside the `^0.16` range
+  `micromark-extension-math` asks for, which is safe only because
+  markdownlint imports that package's syntax extension and never calls its
+  KaTeX renderer, which is merely loaded. Drop each override once the
+  pinned markdownlint-cli2 depends on a fixed version itself; `npm audit`
+  must report nothing.
 - A linter suppression covers one line and one rule, with a comment saying
   why the code cannot change instead.
 - One Google rule is knowingly not followed: its guide imports modules, not
