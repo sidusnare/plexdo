@@ -12,12 +12,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [2.0.0-rc.1] - 2026-10-28
+## [2.0.0] - 2026-10-28
 
-The first release candidate for 2.0.0. These changes are incompatible with
-1.x, hence the MAJOR release; the first run of any command moves a 1.x
-setup across by itself, as **Changed** describes. On PyPI this version is
-`2.0.0rc1`, the PEP 440 spelling of the same pre-release.
+These changes are incompatible with 1.x, hence the MAJOR release; the first
+run of any command moves a 1.x setup across by itself, as **Changed**
+describes. Nothing has changed since 2.0.0-rc.1.
 
 ### Changed
 
@@ -77,6 +76,11 @@ setup across by itself, as **Changed** describes. On PyPI this version is
   one per word.
 - Bash completion of `login --` offers login's own options, not only the
   global ones.
+
+## [2.0.0-rc.1] - 2026-10-28
+
+The release candidate for 2.0.0, with the changes listed there. On PyPI
+this version is `2.0.0rc1`, the PEP 440 spelling of the same pre-release.
 
 ## [1.1.29] - 2026-10-22
 
@@ -539,7 +543,8 @@ multi-user token handling, watched-state synchronisation, a status report,
 photo galleries, YAML/CSV/CLIXML output, shell completions for bash, zsh, and
 fish, a manual page, and packaging for PyPI. See the commit history.
 
-[Unreleased]: https://github.com/sidusnare/plexdo/compare/v2.0.0-rc.1...HEAD
+[Unreleased]: https://github.com/sidusnare/plexdo/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/sidusnare/plexdo/compare/v1.1.29...v2.0.0
 [2.0.0-rc.1]: https://github.com/sidusnare/plexdo/compare/v1.1.29...v2.0.0-rc.1
 [1.1.29]: https://github.com/sidusnare/plexdo/compare/v1.1.28...v1.1.29
 [1.1.28]: https://github.com/sidusnare/plexdo/compare/v1.1.27...v1.1.28
