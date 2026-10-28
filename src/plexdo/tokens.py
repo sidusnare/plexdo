@@ -84,8 +84,13 @@ def save_password(username: str, password: str) -> None:
     LOG.debug("Saved the password for %r", username)
 
 
-def forget_passwords(usernames: Iterable[str]) -> int:
-    """Remove usernames' saved passwords, returning how many were removed."""
+def forget_logins(usernames: Iterable[str]) -> int:
+    """Remove usernames' saved passwords, returning how many were removed.
+
+    Named for the logins it forgets rather than for passwords: its result is
+    a count, and static analysis takes the result of a function named for
+    passwords to be one, then reports logging it as a leak.
+    """
     passwords = secret_store.load("passwords")
     removed = [name for name in usernames if passwords.pop(name, None)]
     if removed:

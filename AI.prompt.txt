@@ -324,6 +324,23 @@ cell, `_jsonable` preserves structure.
 A constant referenced only by its own test is ceremony, not a source of truth;
 assert the literal in the test instead.
 
+**Name nothing like a secret that is not one.** CodeQL's
+`py/clear-text-logging-sensitive-data`, like other scanners, decides what is
+sensitive from names: a variable, attribute, parameter, or function matching
+`secret` or `password` (`pass(wd|word|code|phrase)`), or a lookup by such a
+string, is a secret to it, and so is everything computed from one, until it
+reaches a log call or `print` and is reported as a leak. A name containing
+`file`, `path`, or `url` is exempt. So the secrets file's path is
+`Paths.secrets_file`, never `Paths.secrets`; the count of forgotten saved
+passwords comes from `forget_logins`, not `forget_passwords`; the
+`--save-password` flag's dest is `remember_login`; the migration's counts are
+variables of their own rather than `moved["passwords"]`; and the tuples of
+option names are `STORE_CHOICES`, `_KEYRING_OPTIONS`, and
+`_SCRUBBED_OPTIONS`. The converse matters as much: what does hold a password
+or a token keeps a name saying so (`password`, `saved_password`, `secrets`),
+so that a real leak is still reported. The public option names
+`secret_store` and `secrets_file` are API and do not change.
+
 ### Character set
 
 Source, completions, man page, and build files are **plain ASCII**. Write `-`
@@ -354,7 +371,7 @@ src/plexdo/
     __main__.py     python -m plexdo
     cli.py          build_parser, main
     constants.py    windows_app_dir, default_paths, Paths, PATHS, CONFIG_PATH,
-                    DEFAULT_CACHE_DIR, DEFAULT_SECRETS_FILE, SECRET_STORES,
+                    DEFAULT_CACHE_DIR, DEFAULT_SECRETS_FILE, STORE_CHOICES,
                     config_text, CONFIG_EXAMPLE, LOG
     logs.py         configure_logging
     config.py       load_config, parse_config, cached_config, config_optional,
@@ -364,7 +381,7 @@ src/plexdo/
                     FileStore, Store
     tokens.py       load_store, lookup, store_token, admin_token,
                     forget_tokens, saved_password, save_password,
-                    forget_passwords, saved_pin, save_pin
+                    forget_logins, saved_pin, save_pin
     connection.py   connect_plex, read_token, server_url
     migrate.py      migrate_legacy_config
     arguments.py    add_user_argument, add_library_argument,

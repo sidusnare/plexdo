@@ -254,7 +254,7 @@ def test_windows_keeps_everything_under_localappdata():
     paths = default_paths(True, WIN_ENV)
     assert paths.config == WIN_APP / "config.yaml"
     assert paths.cache == WIN_APP / "Cache"
-    assert paths.secrets == WIN_APP / "secrets.json"
+    assert paths.secrets_file == WIN_APP / "secrets.json"
     assert paths.legacy_config == WIN_APP / "plexdo.ini"
 
 
@@ -274,7 +274,8 @@ def test_posix_defaults_follow_the_xdg_base_directories():
     assert paths.config == Path("~/.config/plexdo/config.yaml").expanduser()
     assert paths.cache == Path("~/.cache/plexdo").expanduser()
     assert (
-        paths.secrets == Path("~/.local/state/plexdo/secrets.json").expanduser()
+        paths.secrets_file
+        == Path("~/.local/state/plexdo/secrets.json").expanduser()
     )
     assert paths.legacy_config == Path("~/.local/etc/plexdo.ini").expanduser()
 
@@ -290,7 +291,7 @@ def test_the_xdg_variables_move_each_directory():
     )
     assert paths.config == Path("/c/plexdo/config.yaml")
     assert paths.cache == Path("/k/plexdo")
-    assert paths.secrets == Path("/s/plexdo/secrets.json")
+    assert paths.secrets_file == Path("/s/plexdo/secrets.json")
 
 
 def test_a_relative_xdg_variable_is_ignored_as_the_specification_says():

@@ -24,7 +24,7 @@ from plexdo import secret_store
 from plexdo.constants import CONFIG_PATH, LOG, PATHS, config_text
 from plexdo.tokens import ADMIN_KEY
 
-_SECRET_KEYS = ("password", "pin")
+_SCRUBBED_OPTIONS = ("password", "pin")
 
 
 def _legacy_tokens(path: Path) -> dict[str, str]:
@@ -81,7 +81,7 @@ def _merge(kind: str, found: dict[str, str]) -> int:
 def _scrub(ini_path: Path, ini: configparser.ConfigParser) -> Path:
     """Rewrite the old INI file without its secrets, and rename it aside."""
     for section in ini.sections():
-        for key in _SECRET_KEYS:
+        for key in _SCRUBBED_OPTIONS:
             ini.remove_option(section, key)
     aside = ini_path.with_name(ini_path.name + ".migrated")
     fd = os.open(aside, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
@@ -156,14 +156,12 @@ def migrate_legacy_config() -> None:
     tokens = _legacy_tokens(token_path) if token_path.is_file() else {}
 
     store = secret_store.describe()
-    moved = {
-        kind: _merge(kind, found)
-        for kind, found in (
-            ("tokens", tokens),
-            ("passwords", found.passwords),
-            ("pins", found.pins),
-        )
-    }
+    # Counts, each in a variable of its own: one looked up as
+    # moved["passwords"] reads to static analysis as a password, and its
+    # logging as a leak.
+    tokens_moved = _merge("tokens", tokens)
+    logins_moved = _merge("passwords", found.passwords)
+    pins_moved = _merge("pins", found.pins)
 
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(CONFIG_PATH, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -185,9 +183,9 @@ def migrate_legacy_config() -> None:
         "password(s), and %d PIN(s) to %s. The old file, without its "
         "secrets, is now %s%s.",
         CONFIG_PATH,
-        moved["tokens"],
-        moved["passwords"],
-        moved["pins"],
+        tokens_moved,
+        logins_moved,
+        pins_moved,
         store,
         aside,
         f", and the old token file {token_path} is gone" if tokens else "",

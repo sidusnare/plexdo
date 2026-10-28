@@ -266,7 +266,7 @@ def login(**options):
                 "password": None,
                 "code": None,
                 "two_factor": False,
-                "save_password": False,
+                "remember_login": False,
                 "dry_run": False,
                 "format": "json",
                 **options,
@@ -283,7 +283,7 @@ def test_login_saves_the_token_and_not_the_password(signing_in):
 
 
 def test_save_password_keeps_it_for_the_next_sign_in(signing_in, monkeypatch):
-    login(save_password=True)
+    login(remember_login=True)
     assert saved_password("bob@example.com") == "typed-pw"
     monkeypatch.setattr(
         auth.getpass,
@@ -295,7 +295,7 @@ def test_save_password_keeps_it_for_the_next_sign_in(signing_in, monkeypatch):
 
 
 def test_login_dry_run_saves_nothing(signing_in, secrets):
-    login(save_password=True, dry_run=True)
+    login(remember_login=True, dry_run=True)
     assert not secrets.entries
 
 

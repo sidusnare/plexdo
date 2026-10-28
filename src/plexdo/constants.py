@@ -53,7 +53,7 @@ class Paths(NamedTuple):
 
     config: Path  # the YAML configuration
     cache: Path  # the shell completion cache
-    secrets: Path  # secrets, when no keyring is used
+    secrets_file: Path  # secrets, when no keyring is used
     legacy_config: Path  # the INI file of plexdo 1.x, migrated once
     legacy_token: str  # 1.x's default token_path, before expansion
 
@@ -93,7 +93,7 @@ def default_paths(is_windows: bool, env: Mapping[str, str]) -> Paths:
 PATHS = default_paths(os.name == "nt", os.environ)
 CONFIG_PATH = PATHS.config
 DEFAULT_CACHE_DIR = PATHS.cache
-DEFAULT_SECRETS_FILE = PATHS.secrets
+DEFAULT_SECRETS_FILE = PATHS.secrets_file
 
 
 LOG = logging.getLogger("plexdo")
@@ -104,7 +104,7 @@ PERMISSIVE_MODE_MASK = 0o077
 
 
 # Where secrets may be kept, as plex: secret_store names them.
-SECRET_STORES = ("auto", "keyring", "file")
+STORE_CHOICES = ("auto", "keyring", "file")
 
 
 _ENV_NOTE_POSIX = (

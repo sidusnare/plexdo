@@ -23,7 +23,7 @@ from plexdo.constants import (
     CONFIG_PATH,
     LOG,
     PERMISSIVE_MODE_MASK,
-    SECRET_STORES,
+    STORE_CHOICES,
 )
 
 # The parsed configuration: {"plex": {option: text}, "users": {id: {...}}},
@@ -34,7 +34,7 @@ _PLEX_OPTIONS = ("url", "username", "cache_dir", "secret_store", "secrets_file")
 _USER_OPTIONS = ("username",)
 
 # Secrets plexdo 1.x kept in its INI file, which must not come back here.
-_SECRET_OPTIONS = ("password", "pin", "token", "token_path")
+_KEYRING_OPTIONS = ("password", "pin", "token", "token_path")
 
 
 def check_file_permissions(path: Path, label: str) -> None:
@@ -121,7 +121,7 @@ def _options(raw: Any, allowed: tuple[str, ...], where: str) -> dict[str, str]:
     options = {}
     for key, value in raw.items():
         name = str(key)
-        if name in _SECRET_OPTIONS:
+        if name in _KEYRING_OPTIONS:
             LOG.warning(
                 "%s: %s in %s is ignored: secrets are kept in the system "
                 "keyring now. Remove it from the file, and see plexdo login "
@@ -170,10 +170,10 @@ def parse_config(text: str) -> Config:
         if key in plex:
             plex[key] = expand_environment(plex[key], f"plex: {key}")
     store = plex.get("secret_store", "auto")
-    if store not in SECRET_STORES:
+    if store not in STORE_CHOICES:
         sys.exit(
             f"plex: secret_store in {CONFIG_PATH} is {store!r}; it must "
-            f"be one of {', '.join(SECRET_STORES)}."
+            f"be one of {', '.join(STORE_CHOICES)}."
         )
 
     users_raw = raw.get("users") or {}

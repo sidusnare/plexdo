@@ -120,7 +120,7 @@ def test_passwords_are_filed_by_username_apart_from_tokens(secrets):
     assert tokens.saved_password("bob@x") == "pw"
     assert tokens.saved_password("carol@x") is None
     assert lookup("bob@x") is None
-    assert tokens.forget_passwords(["bob@x", "nobody"]) == 1
+    assert tokens.forget_logins(["bob@x", "nobody"]) == 1
     assert "passwords" not in secrets.entries
 
 

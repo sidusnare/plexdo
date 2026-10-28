@@ -12,6 +12,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.0.2] - 2026-10-28
+
+### Changed
+
+- Values that are not secrets, such as the secrets file's path, a count of
+  removed passwords, and the `--save-password` flag, are no longer named as
+  if they were, so code scanning (CodeQL's clear-text logging check) no
+  longer reports their logging as a leak. Nothing a user sees changes; no
+  secret was ever logged.
+
 ## [2.0.1] - 2026-10-28
 
 ### Security
@@ -553,7 +563,8 @@ multi-user token handling, watched-state synchronisation, a status report,
 photo galleries, YAML/CSV/CLIXML output, shell completions for bash, zsh, and
 fish, a manual page, and packaging for PyPI. See the commit history.
 
-[Unreleased]: https://github.com/sidusnare/plexdo/compare/v2.0.1...HEAD
+[Unreleased]: https://github.com/sidusnare/plexdo/compare/v2.0.2...HEAD
+[2.0.2]: https://github.com/sidusnare/plexdo/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/sidusnare/plexdo/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/sidusnare/plexdo/compare/v1.1.29...v2.0.0
 [2.0.0-rc.1]: https://github.com/sidusnare/plexdo/compare/v1.1.29...v2.0.0-rc.1
