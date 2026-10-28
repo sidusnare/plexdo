@@ -1,14 +1,15 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Value coercion helpers for rating keys and dates."""
 
-from typing import Optional
 import datetime
 
 from plexdo.constants import DateInput
 
 
-def parse_date(value: DateInput) -> Optional[datetime.datetime]:
+def parse_date(value: DateInput) -> datetime.datetime | None:
     """Normalize a date-like value to datetime.datetime, or None."""
     if value is None:
         return None
@@ -26,7 +27,7 @@ def parse_date(value: DateInput) -> Optional[datetime.datetime]:
     raise TypeError(f"Unsupported date type: {type(value)}")
 
 
-def format_duration(milliseconds: Optional[int]) -> str:
+def format_duration(milliseconds: int | None) -> str:
     """Convert milliseconds to a human-readable H:MM:SS string."""
     if milliseconds is None:
         return ""

@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Resolution of a numeric ID or a human-readable title to a numeric ID.
 
@@ -6,16 +8,15 @@ Shared by user arguments (accounts) and library arguments (sections) so the
 precedence rules, warnings, and error messages stay identical for both.
 """
 
-from typing import Any, List, Tuple
 import re
 import sys
+from typing import Any
 
 from plexdo.console import clean_text
 from plexdo.constants import LOG
 
-
 # (numeric id, title) pairs describing everything a value could refer to.
-Roster = List[Tuple[int, str]]
+Roster = list[tuple[int, str]]
 
 
 def _titles_matching(roster: Roster, value: str) -> Roster:
@@ -56,8 +57,14 @@ def resolve_identifier(
                 LOG.warning(
                     "%r is both a %s ID and the title of %s %d; matching the "
                     "%s ID. Pass %d to select the %s titled %r.",
-                    text, kind, kind, matches[0][0], kind,
-                    matches[0][0], kind, text,
+                    text,
+                    kind,
+                    kind,
+                    matches[0][0],
+                    kind,
+                    matches[0][0],
+                    kind,
+                    text,
                 )
             return number
         if matches:

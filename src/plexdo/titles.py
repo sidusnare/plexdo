@@ -1,10 +1,12 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Item title formatting and common item helpers."""
 
-from typing import Any, List
 import secrets
 import sys
+from typing import Any
 
 from plexapi.exceptions import NotFound
 from plexapi.server import PlexServer
@@ -41,11 +43,13 @@ def fetch_show(plex: PlexServer, rating_key: int) -> Show:
     """Fetch a Show by ratingKey, failing fast if absent or of another type."""
     item = fetch_item(plex, rating_key)
     if not isinstance(item, Show):
-        sys.exit(f"ratingKey {rating_key} is not a Show (got {type(item).__name__})")
+        sys.exit(
+            f"ratingKey {rating_key} is not a Show (got {type(item).__name__})"
+        )
     return item
 
 
-def non_special_episodes(show: Show) -> List[Episode]:
+def non_special_episodes(show: Show) -> list[Episode]:
     """Return all episodes from non-special (season > 0) seasons."""
     return [
         ep
@@ -54,7 +58,7 @@ def non_special_episodes(show: Show) -> List[Episode]:
     ]
 
 
-def shuffle_list(lst: List[Any]) -> List[Any]:
+def shuffle_list(lst: list[Any]) -> list[Any]:
     """Fisher-Yates shuffle using secrets.randbelow."""
     result = list(lst)
     for i in range(len(result) - 1, 0, -1):

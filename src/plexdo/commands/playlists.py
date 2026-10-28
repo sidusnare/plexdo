@@ -1,16 +1,24 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Playlist inspection and mutation commands."""
 
-from typing import Any, Dict, List, Optional, Sequence, Tuple
 import argparse
 import sys
+from collections.abc import Sequence
+from typing import Any
 
 from plexapi.exceptions import NotFound
 from plexapi.playlist import Playlist
 from plexapi.server import PlexServer
 
 from plexdo.accounts import server_for_user
+from plexdo.arguments import (
+    add_m3u_argument,
+    add_rating_keys_argument,
+    add_user_argument,
+)
 from plexdo.cache import write_cache
 from plexdo.console import output, output_format
 from plexdo.constants import LOG, MediaItem
@@ -41,7 +49,7 @@ def cmd_list_playlist(plex: PlexServer, args: argparse.Namespace) -> None:
     user_plex = server_for_user(plex, args.user_id)
     playlist: Playlist = resolve_playlist(user_plex, args.playlist)
 
-    items: List[MediaItem] = list(playlist.items())
+    items: list[MediaItem] = list(playlist.items())
     rows = [
         {
             "index": i + 1,
@@ -61,11 +69,16 @@ def cmd_export_playlist(plex: PlexServer, args: argparse.Namespace) -> None:
     user_plex = server_for_user(plex, args.user_id)
     playlist: Playlist = resolve_playlist(user_plex, args.playlist)
 
-    items: List[MediaItem] = list(playlist.items())
+    items: list[MediaItem] = list(playlist.items())
     if not items:
         sys.exit(f"Playlist '{args.playlist}' is empty - nothing to export.")
 
-    LOG.info("Exporting %d items from '%s' to %s", len(items), args.playlist, args.m3u)
+    LOG.info(
+        "Exporting %d items from '%s' to %s",
+        len(items),
+        args.playlist,
+        args.m3u,
+    )
     write_m3u(items, args.m3u, mapper_for(plex, args))
     print(f"Exported {len(items)} items to: {args.m3u}")
 
@@ -75,7 +88,9 @@ def cmd_remove_playlist(plex: PlexServer, args: argparse.Namespace) -> None:
     user_plex = server_for_user(plex, args.user_id)
     playlist: Playlist = resolve_playlist(user_plex, args.playlist)
 
-    LOG.info("Removing playlist '%s' for user_id=%d", args.playlist, args.user_id)
+    LOG.info(
+        "Removing playlist '%s' for user_id=%d", args.playlist, args.user_id
+    )
     if args.dry_run:
         LOG.info("--dry-run: skipping playlist deletion.")
         return
@@ -89,7 +104,7 @@ def cmd_append_playlist(plex: PlexServer, args: argparse.Namespace) -> None:
     playlist: Playlist = resolve_playlist(user_plex, args.playlist)
 
     rating_keys = [int(k) for k in args.rating_keys]
-    new_items: List[MediaItem] = []
+    new_items: list[MediaItem] = []
     for rk in rating_keys:
         try:
             new_items.append(user_plex.fetchItem(rk))
@@ -119,7 +134,7 @@ def cmd_append_playlist(plex: PlexServer, args: argparse.Namespace) -> None:
     LOG.info("Appended %d item(s) to '%s'.", len(new_items), args.playlist)
 
 
-def _watched_label(item: MediaItem, include_partial: bool) -> Optional[str]:
+def _watched_label(item: MediaItem, include_partial: bool) -> str | None:
     """Return why an entry is being dropped, or None if it stays.
 
     A part-played item is not a watched one - it is the thing the user is in
@@ -134,7 +149,7 @@ def _watched_label(item: MediaItem, include_partial: bool) -> Optional[str]:
 
 def _watched_entries(
     items: Sequence[MediaItem], include_partial: bool
-) -> List[Tuple[int, MediaItem, str]]:
+) -> list[tuple[int, MediaItem, str]]:
     """Return (position, item, label) for every entry to be removed.
 
     The position is the entry's own place in the playlist as it stands, not
@@ -149,8 +164,8 @@ def _watched_entries(
 
 
 def _removal_rows(
-    entries: List[Tuple[int, MediaItem, str]]
-) -> List[Dict[str, Any]]:
+    entries: list[tuple[int, MediaItem, str]],
+) -> list[dict[str, Any]]:
     """Build the preview of the entries a clean run will remove."""
     return [
         {
@@ -167,7 +182,9 @@ def _report_nothing_watched(
     playlist_name: str, total: int, args: argparse.Namespace
 ) -> None:
     """Report a playlist that needs no cleaning, in the caller's format."""
-    LOG.info("Nothing watched in '%s'; all %d item(s) kept.", playlist_name, total)
+    LOG.info(
+        "Nothing watched in '%s'; all %d item(s) kept.", playlist_name, total
+    )
     if output_format(args) == "table":
         print(f"Nothing watched in {playlist_name!r}.", file=sys.stderr)
     else:
@@ -187,7 +204,7 @@ def cmd_clean_playlist(plex: PlexServer, args: argparse.Namespace) -> None:
             "been changed."
         )
 
-    items: List[MediaItem] = list(playlist.items())
+    items: list[MediaItem] = list(playlist.items())
     entries = _watched_entries(items, args.include_partial)
     if not entries:
         _report_nothing_watched(args.playlist, len(items), args)
@@ -213,62 +230,107 @@ def cmd_clean_playlist(plex: PlexServer, args: argparse.Namespace) -> None:
         playlist.removeItems([item])
     LOG.info(
         "Removed %d watched item(s) from '%s'; %d remain.",
-        len(entries), args.playlist, len(items) - len(entries),
+        len(entries),
+        args.playlist,
+        len(items) - len(entries),
     )
 
 
 def register(
     sub: "argparse._SubParsersAction",
-    parents: "List[argparse.ArgumentParser]",
+    parents: "list[argparse.ArgumentParser]",
 ) -> None:
     """Register the playlist inspection and mutation subparsers."""
-    p_lpl = sub.add_parser("list-playlists", parents=parents, help="List playlists for a user.")
-    p_lpl.add_argument("user_id", metavar="USER", help="User ID (int) or user title (str); use 0 for the admin account. Obtain both with list-users.")
+    p_lpl = sub.add_parser(
+        "list-playlists", parents=parents, help="List playlists for a user."
+    )
+    add_user_argument(p_lpl)
 
-    p_lp = sub.add_parser("list-playlist", parents=parents, help="List items in a specific playlist.")
-    p_lp.add_argument("user_id", metavar="USER", help="User ID (int) or user title (str); use 0 for the admin account. Obtain both with list-users.")
-    p_lp.add_argument(
-        "playlist", type=str,
-        help="Playlist name (str) or ratingKey (int). Obtain either with list-playlists.",
+    p_lp = sub.add_parser(
+        "list-playlist",
+        parents=parents,
+        help="List items in a specific playlist.",
     )
+    add_user_argument(p_lp)
     p_lp.add_argument(
-        "--m3u", metavar="PATH",
-        help="Also export an M3U file at PATH using Plex server filesystem paths.",
+        "playlist",
+        type=str,
+        help=(
+            "Playlist name (str) or ratingKey (int). Obtain either with "
+            "list-playlists."
+        ),
     )
+    add_m3u_argument(p_lp)
     add_prefix_argument(p_lp)
 
-    p_ep = sub.add_parser("export-playlist", parents=parents, help="Export an existing playlist to an M3U file.")
-    p_ep.add_argument("user_id", metavar="USER", help="User ID (int) or user title (str); use 0 for the admin account. Obtain both with list-users.")
-    p_ep.add_argument("playlist", help="To export. " + "Playlist name (str) or ratingKey (int). Obtain either with list-playlists.")
+    p_ep = sub.add_parser(
+        "export-playlist",
+        parents=parents,
+        help="Export an existing playlist to an M3U file.",
+    )
+    add_user_argument(p_ep)
     p_ep.add_argument(
-        "m3u", metavar="PATH",
+        "playlist",
+        help="To export. "
+        + "Playlist name (str) or ratingKey (int). Obtain either with "
+        "list-playlists.",
+    )
+    p_ep.add_argument(
+        "m3u",
+        metavar="PATH",
         help="Destination M3U file path.",
     )
     add_prefix_argument(p_ep)
 
-    p_rp = sub.add_parser("remove-playlist", parents=parents, help="Delete a playlist from a user's account.")
-    p_rp.add_argument("user_id", metavar="USER", help="User ID (int) or user title (str); use 0 for the admin account. Obtain both with list-users.")
-    p_rp.add_argument("playlist", help="To delete. " + "Playlist name (str) or ratingKey (int). Obtain either with list-playlists.")
+    p_rp = sub.add_parser(
+        "remove-playlist",
+        parents=parents,
+        help="Delete a playlist from a user's account.",
+    )
+    add_user_argument(p_rp)
+    p_rp.add_argument(
+        "playlist",
+        help="To delete. "
+        + "Playlist name (str) or ratingKey (int). Obtain either with "
+        "list-playlists.",
+    )
 
     p_ap = sub.add_parser(
-        "append-playlist", parents=parents,
+        "append-playlist",
+        parents=parents,
         help="Append one or more items to an existing playlist.",
     )
-    p_ap.add_argument("user_id", metavar="USER", help="User ID (int) or user title (str); use 0 for the admin account. Obtain both with list-users.")
-    p_ap.add_argument("playlist", help="To append to. " + "Playlist name (str) or ratingKey (int). Obtain either with list-playlists.")
+    add_user_argument(p_ap)
     p_ap.add_argument(
-        "rating_keys", nargs="+", type=int, metavar="ratingKey",
-        help="One or more item ratingKeys to append (int). Obtain with list-titles or list-show.",
+        "playlist",
+        help="To append to. "
+        + "Playlist name (str) or ratingKey (int). Obtain either with "
+        "list-playlists.",
+    )
+    add_rating_keys_argument(
+        p_ap,
+        (
+            "One or more item ratingKeys to append (int). Obtain with "
+            "list-titles or list-show."
+        ),
     )
 
     p_cp = sub.add_parser(
-        "clean-playlist", parents=parents,
+        "clean-playlist",
+        parents=parents,
         help="Remove watched items from an existing playlist.",
     )
-    p_cp.add_argument("user_id", metavar="USER", help="User ID (int) or user title (str); use 0 for the admin account. Obtain both with list-users.")
-    p_cp.add_argument("playlist", help="To clean. " + "Playlist name (str) or ratingKey (int). Obtain either with list-playlists.")
+    add_user_argument(p_cp)
     p_cp.add_argument(
-        "--include-partial", dest="include_partial", action="store_true",
+        "playlist",
+        help="To clean. "
+        + "Playlist name (str) or ratingKey (int). Obtain either with "
+        "list-playlists.",
+    )
+    p_cp.add_argument(
+        "--include-partial",
+        dest="include_partial",
+        action="store_true",
         default=False,
         help=(
             "Also remove items that are only part-played. By default a "

@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Playlist creation guards and the copy naming rules."""
 
@@ -13,7 +15,9 @@ ITEMS = [FakeItem(1, "A"), FakeItem(2, "B")]
 
 
 def plex_with(*titles):
-    return FakePlex(playlists=[FakePlaylist(t, 900 + i) for i, t in enumerate(titles)])
+    return FakePlex(
+        playlists=[FakePlaylist(t, 900 + i) for i, t in enumerate(titles)]
+    )
 
 
 def test_empty_playlist_is_refused(args):
@@ -53,12 +57,16 @@ def test_dry_run_touches_nothing(args):
 
 # --- copy destination naming --------------------------------------------
 
+
 def test_free_name_is_used_as_is():
     assert _resolve_dest_name(plex_with(), "Mix") == ("Mix", False)
 
 
 def test_taken_name_falls_back_to_admin_copy():
-    assert _resolve_dest_name(plex_with("Mix"), "Mix") == ("Mix admin copy", False)
+    assert _resolve_dest_name(plex_with("Mix"), "Mix") == (
+        "Mix admin copy",
+        False,
+    )
 
 
 def test_both_names_taken_means_skip_rather_than_clobber():
@@ -76,15 +84,21 @@ def test_overwrite_on_an_empty_destination_is_not_a_replacement():
 
 # --- clean-playlist: which entries count as watched ----------------------
 
+
 def labelled(items, include_partial=False):
     """(position, title, label) for the entries a clean run would remove."""
-    return [(pos, item.title, label)
-            for pos, item, label in _watched_entries(items, include_partial)]
+    return [
+        (pos, item.title, label)
+        for pos, item, label in _watched_entries(items, include_partial)
+    ]
 
 
 def test_played_entries_are_removed_and_the_rest_kept():
-    items = [FakeItem(1, "A", viewCount=1), FakeItem(2, "B"),
-             FakeItem(3, "C", viewCount=2)]
+    items = [
+        FakeItem(1, "A", viewCount=1),
+        FakeItem(2, "B"),
+        FakeItem(3, "C", viewCount=2),
+    ]
     assert labelled(items) == [(1, "A", "played"), (3, "C", "played")]
 
 
@@ -105,9 +119,11 @@ def test_include_partial_removes_a_resume_point():
 
 
 def test_is_played_beats_a_stale_view_count():
-    """plexapi's isPlayed is authoritative; viewCount is only the fallback."""
-    items = [FakeItem(1, "A", isPlayed=False, viewCount=3),
-             FakeItem(2, "B", isWatched=True, viewCount=0)]
+    """The isPlayed flag of plexapi is authoritative; viewCount falls back."""
+    items = [
+        FakeItem(1, "A", isPlayed=False, viewCount=3),
+        FakeItem(2, "B", isWatched=True, viewCount=0),
+    ]
     assert labelled(items) == [(2, "B", "played")]
 
 
@@ -116,6 +132,7 @@ def test_an_untouched_playlist_yields_nothing_to_remove():
 
 
 # --- build-concatenated: joining sources end to end ----------------------
+
 
 def joined(sources, unique=False):
     """Titles of the concatenation, in order."""

@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 SidusNare
+SPDX-License-Identifier: GPL-3.0-or-later
+SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
+-->
+
 # plexdo
 
 A command-line interface for Plex Media Server built on
@@ -42,8 +48,8 @@ same program.
 ## Getting started
 
 ```bash
-plexdo write-config-example        # writes ~/.local/etc/plexdo.ini (mode 0600)
-plexdo login                       # prompts, saves a token to token_path
+plexdo write-config-example        # writes ~/.config/plexdo/config.yaml
+plexdo login                       # prompts, saves a token in the keyring
 plexdo list-libraries
 ```
 
@@ -51,94 +57,92 @@ plexdo list-libraries
 refuses to replace a config file that already exists unless given
 `-o/--overwrite`, and `--dry-run` only says where it would write.
 
+Coming from plexdo 1.x? Nothing to do: the first run of any command moves
+`~/.local/etc/plexdo.ini` to `config.yaml`, and its passwords, PINs, and the
+tokens from its token file into the keyring. The old file is renamed
+`plexdo.ini.migrated` with the secrets taken out, and the token file is
+deleted, so no secret is left in plaintext.
+
 ### Configuration
 
-The configuration file lives where the platform expects it:
+The files live where the platform expects them, following the XDG Base
+Directory Specification on Linux, BSD, and macOS:
 
-| | configuration | completion cache | default `token_path` |
+| | configuration | completion cache | secrets, without a keyring |
 | --- | --- | --- | --- |
-| Linux, macOS | `~/.local/etc/plexdo.ini` | `~/.cache/plexdo` | `$XDG_RUNTIME_DIR/.plex.token` |
-| Windows | `%LOCALAPPDATA%\PlexDo\plexdo.ini` | `%LOCALAPPDATA%\PlexDo\Cache` | `%TEMP%\plexdo.token` |
+| Linux, BSD, macOS | `$XDG_CONFIG_HOME/plexdo/config.yaml` | `$XDG_CACHE_HOME/plexdo` | `$XDG_STATE_HOME/plexdo/secrets.json` |
+| Windows | `%LOCALAPPDATA%\PlexDo\config.yaml` | `%LOCALAPPDATA%\PlexDo\Cache` | `%LOCALAPPDATA%\PlexDo\secrets.json` |
 
-`cache_dir` in the `[plex]` section moves the completion cache anywhere you
-like; the platform default is written into the template as a comment, and the
-shell completions read the same setting.
+The XDG variables default to `~/.config`, `~/.cache`, and `~/.local/state`.
+The configuration is YAML and holds no secret. `write-config-example` writes
+every option with an explanation of what it means, the values it takes, and its
+default:
 
-`plexdo write-config-example` writes to the right one for you, and its
-`--help` prints the exact template, with the notes that apply to your
-platform.
-
-```ini
-[plex]
-url = http://localhost:32400
-
-# Values may contain environment variables as $VAR or ${VAR}, and ~ for your
-# home directory. XDG_RUNTIME_DIR is a private, user-only tmpfs on most Linux
-# systems, which suits a secret -- but it is cleared at logout, so you will
-# need to run `plexdo login` again after each reboot. Point token_path
-# somewhere persistent if you would rather not.
-token_path = $XDG_RUNTIME_DIR/.plex.token
-
-# Optional credentials used by `plexdo login`.
-# The password is stored in plaintext, so keep this file mode 0600.
-# Supplying --username on the command line ignores the password below.
-# username = you@example.com
-# password = your-plex-password
+```yaml
+---
+plex:
+  url: "http://localhost:32400"      # the server; required
+  # username: "you@example.com"      # the account `plexdo login` signs in as
+  # cache_dir: "~/.cache/plexdo"     # the completion cache
+  # secret_store: "auto"             # auto, keyring, or file
+  # secrets_file: "~/.local/state/plexdo/secrets.json"
 ```
+
+Values may contain environment variables as `$VAR` or `${VAR}`, and `~` for
+your home directory. A name that is not set is left as literal text and warned
+about, rather than failing later as a puzzling "no such file". An option plexdo
+does not know is warned about by name, so a typo does not go unnoticed.
+
+### Secrets
+
+Tokens, passwords, and Plex Home PINs are kept in the system keyring: the
+Secret Service (GNOME Keyring, KWallet) on Linux and BSD, the Keychain on macOS,
+and Credential Manager on Windows. Each kind is one keyring entry under the
+service `plexdo`. A token survives a reboot, so `plexdo login` is needed once.
+
+Where there is no keyring, as on a headless server, secrets go in the
+`secrets.json` above, created readable by your account alone, with a warning
+that it is not encrypted. Set `secret_store: file` to use that file always -
+on a machine whose keyring is locked when plexdo runs, as under cron - and to
+silence the warning; `secret_store: keyring` refuses to fall back.
+
+A password is saved only if you ask: `plexdo login --save-password` keeps it
+beside the token, so plexdo can sign in again by itself once the token stops
+working. A password or PIN in the configuration file is ignored, with a warning.
 
 ### Multiple users
 
 A Plex server refuses an admin-issued token for a user it has shared nothing
-with, so acting on that user needs their own credentials. Add a section named
-for their user ID (from `plexdo list-users`):
+with, so acting on that user needs their own login. Add an entry for them under
+`users`, keyed by their user ID (from `plexdo list-users`), and sign them in
+once:
 
-```ini
-[99]
-username = bob@example.com
-password = bobs-plex-password
+```yaml
+users:
+  99:
+    username: "bob@example.com"
+```
+
+```bash
+plexdo login --username bob@example.com --save-password
 ```
 
 When a command hits a 401 for a user, three sources are tried in order:
 
 1. the server-scoped token the admin can mint for them
-2. a token already saved in the token file
-3. a fresh login with the credentials in their `[<user_id>]` section
+2. a token already saved for them
+3. a fresh login as their `users` entry, with the password `--save-password`
+   kept
 
-A token obtained by step 3 is written back to the token file, so the login
-happens once rather than on every run.
-
-### The token file
-
-`token_path` holds a JSON object of username to token:
-
-```json
-{
-  "@admin": "xxxxxxxxxxxxxxxxxxxx",
-  "bob@example.com": "yyyyyyyyyyyyyyyyyyyy"
-}
-```
-
-`@admin` is the reserved key used when no `[plex] username` is set; `@` cannot
-appear in a Plex username, so it never collides with a real one. The file is
-written atomically with mode 0600. A file from an earlier version holding a
-single bare token is read as the admin token and converted to JSON on the next
-write - no manual migration needed.
-
-Environment variables are expanded in every value. A name that is not set is
-left as literal text and warned about, rather than failing later as a puzzling
-"no such file". `%` needs no escaping - interpolation is disabled, so a
-password may contain one freely.
-
-Both the config file and the token file are checked at startup and a warning is
-printed if either is readable by group or other.
+A token obtained by step 3 is saved, so the login happens once rather than on
+every run.
 
 `plexdo logout` signs every saved token out of plex.tv, so it stops working
-wherever a copy of the file might be, and removes it from the file;
-`plexdo logout -u bob@example.com` does just that one, and is an error if the
-file holds no such name. A token plex.tv already refuses is removed too. One
-that could not be signed out, because plex.tv was unreachable, is kept so a
-second run can finish, and the exit status is 1. A file left empty is
-deleted.
+wherever a copy of it might be, and removes it, with any password saved for the
+account; `plexdo logout -u bob@example.com` does just that one, and is an error
+if there is no such session. A token plex.tv already refuses is removed too.
+One that could not be signed out, because plex.tv was unreachable, is kept so a
+second run can finish, and the exit status is 1.
 
 ## Commands
 
@@ -198,10 +202,11 @@ plexdo --throttle 1 find-missing      # gentler on a Raspberry Pi
 
 When pacing kicks in it says so, with the expected duration:
 
-```
+```text
 Pacing 500 requests 0.25s apart to go easy on the server; about 2m04s,
 or --throttle 0 to disable.
 ```
+
 Anywhere a **library** is required you may pass either the numeric library ID
 or its title, so `plexdo list-titles 3` and `plexdo list-titles "TV Shows"`
 are equivalent. The same applies to `--library-id` on `search` and `-l` on
@@ -269,7 +274,7 @@ unaired episode cannot be told from a missing one. Season 0 is skipped by
 default because specials are numbered irregularly, though naming it with
 `-s 0` includes it.
 
-```
+```text
 ┌──────────────┬───────────┬────────┬─────────┬──────────────┬──────┬─────────┐
 │ show         │ ratingKey │ season │ missing │ missingCount │ have │ highest │
 ├──────────────┼───────────┼────────┼─────────┼──────────────┼──────┼─────────┤
@@ -330,7 +335,7 @@ plexdo build-interleaved "Mixed Run" 101 202 -a      # for everyone
 With either flag the item list is printed once, and then one line per user as
 that user completes, so a long run shows progress:
 
-```
+```text
 Mixed Run (42 items)
 ┌───────┬───────────┬───────────────────────────┐
 │ index │ ratingKey │ title                     │
@@ -368,7 +373,7 @@ existing order. It previews what it will drop, numbered by each entry's place
 in the playlist as it stands, so the list lines up with what Plex shows rather
 than renumbering around the gaps:
 
-```
+```text
 ┌───────┬───────────┬─────────────────────────────┬─────────┐
 │ index │ ratingKey │ title                       │ state   │
 ├───────┼───────────┼─────────────────────────────┼─────────┤
@@ -391,7 +396,7 @@ with a one-line warning and carries on.
 `copy-playlist-all-users` prints the item list once and then one line per
 user, since the list is identical for everyone:
 
-```
+```text
 Movie Night (3 items)
 ┌───────┬───────────┬───────────────────┐
 │ index │ ratingKey │ title             │
@@ -445,7 +450,7 @@ plexdo export-playlist 0 "Mix" ~/mix.m3u -p /Volumes/plex
 plexdo export-titles 5 ~/photos.html -p smb://nas/pix
 ```
 
-```
+```text
 /mnt/media/TV/Breaking Bad/S01E01.mkv   ->   \\NAS\media\Breaking Bad\S01E01.mkv
 ```
 
@@ -523,7 +528,7 @@ It polls every 10 seconds (`-i`), then every second (`--fast-interval`) from
 30 seconds before the end point on, so the end is caught within about a
 second. Each delay varies by up to 20% either way. Every poll prints a line:
 
-```
+```text
 Waiting for "The Wire - The Target" (Alice) to reach the credits at 55:40.
 Alice | playing: The Wire - The Target | waiting for: The Wire - The Target | 55:00 / 58:12 | waited 0:00 | ~0:40 left
 Alice | playing: The Wire - The Target | waiting for: The Wire - The Target | 55:15 / 58:12 | waited 0:10 | ~0:25 left
@@ -568,9 +573,9 @@ plexdo player-remote-play livingroom-tv.lan 881 --dry-run --json | jq '{account,
 ```
 
 `player-remote-play` connects straight to a Plex player and tells it to start
-playing an item at once, as casting from a Plex app on the same network does. The player must allow remote
-control (*Advertise as player* in most Plex apps), but the server need not know
-of it.
+playing an item at once, as casting from a Plex app on the same network does.
+The player must allow remote control (*Advertise as player* in most Plex apps),
+but the server need not know of it.
 
 The player is addressed by IP only. Some players refuse a request whose Host
 header carries a name, as a defence against DNS rebinding, so a host name is
@@ -585,9 +590,9 @@ ports in turn.
 
 A player takes commands from an account it trusts, normally the one signed in
 to it. The command is sent as plexdo's own account when that is the server's
-admin or is signed in to the player; otherwise as the account from a
-`[<user_id>]` section that the player is signed in to; otherwise as plexdo's
-own account anyway, with a warning.
+admin or is signed in to the player; otherwise as the account from a `users`
+entry that the player is signed in to; otherwise as plexdo's own account
+anyway, with a warning.
 
 The item is fetched as the account sending the command too, because the player
 plays with the play queue and token of whoever fetched it and switches its own
@@ -604,9 +609,9 @@ plexdo player-remote-play livingroom-tv.lan 881 --player-user bob@example.com
 ```
 
 It must be plexdo's own account (`0` means it when plexdo is the admin, as
-everywhere else), a member of plexdo's Plex Home, or have a `[<user_id>]`
-section with credentials; anything else is an error rather than a quiet
-fallback to another account.
+everywhere else), a member of plexdo's Plex Home, or have a `users` entry
+signed in once with `plexdo login --username`; anything else is an error
+rather than a quiet fallback to another account.
 
 A Home member, including a managed user, which `list-users` shows as `home` or
 `managed`, needs no password: plexdo switches into it through plex.tv, as a
@@ -617,20 +622,19 @@ it by id or by the name `list-users` shows:
 plexdo player-remote-play livingroom-tv.lan 881 --player-user Clare
 ```
 
-A member with a PIN needs it in a section named for its id:
+A member with a PIN needs it saved in the keyring, once, by its id:
 
-```ini
-[826699965]
-pin = 1234
+```bash
+plexdo set-pin 826699965
 ```
 
-For anyone else, a section whose id or `username` is the value is used
-directly; otherwise the sections are signed in one at a time and compared by
+For anyone else, a `users` entry whose id or `username` is the value is used
+directly; otherwise the entries are signed in one at a time and compared by
 id, username, and email.
 
 The player then fetches the item from the server, and the address it is given
 has to work from the player's network, not plexdo's. Every address the server
-has is a candidate - the configured `[plex] url`, and each direct address
+has is a candidate - the configured `plex: url`, and each direct address
 plex.tv lists - and the one most like the player's own address wins:
 
 1. the same family, IPv4 for an IPv4 player and IPv6 for an IPv6 one;
@@ -658,13 +662,13 @@ plexdo rescan 3 --now       # cancel pending scans first
 
 ## Shell completion
 
-Completion is provided for **bash, zsh, fish, and PowerShell**. All three cover user and library IDs
-*and* their titles, rating keys, playlist names and keys, and photo album
-names, reading a 15-minute cache under `~/.cache/plexdo` that the list
-commands populate as a side effect. Numeric IDs are shown with the title they
-belong to - `7  (Alice)`, `101  (Breaking Bad - Pilot)` - and only the ID is
-inserted once you narrow to one. When a cache is stale it refreshes in the
-background, so completion never blocks.
+Completion is provided for **bash, zsh, fish, and PowerShell**. All four cover
+user and library IDs *and* their titles, rating keys, playlist names and keys,
+and photo album names, reading a 15-minute cache under `~/.cache/plexdo` that
+the list commands populate as a side effect. Numeric IDs are shown with the
+title they belong to - `7  (Alice)`, `101  (Breaking Bad - Pilot)` - and only
+the ID is inserted once you narrow to one. When a cache is stale it refreshes
+in the background, so completion never blocks.
 
 `make install` sets all three up for you. To manage them separately:
 
@@ -711,12 +715,15 @@ The bash script needs no `bash-completion` package - only bash 4+ and
 
 ## Layout
 
-```
+```text
 src/plexdo/
 ├── cli.py            argument parsing and dispatch
 ├── commands/         one module per command group, each exposing
 │                     register(), COMMANDS, and REQUIRES_PLEX
-├── config.py         config, token, and permission checks
+├── config.py         the YAML configuration
+├── secret_store.py   the system keyring, or a private file
+├── tokens.py         saved tokens, passwords, and PINs
+├── migrate.py        the one-time move from 1.x
 ├── console.py        JSON and box-drawn table output
 ├── accounts.py       per-user servers and account classification
 ├── playlists.py      playlist resolution and copy naming rules
@@ -732,9 +739,13 @@ Adding a command means adding a module under `commands/` and listing it in
 
 ```bash
 pip install -e ".[dev]"
-pylint src/plexdo          # expected: 10.00/10
-python -m build            # sdist + wheel
+npm ci                     # markdownlint-cli2
+make check                 # tests, every linter, the build
+make derive                # after changing the version in pyproject.toml
 ```
+
+The version is defined only in `pyproject.toml`; `make derive` writes it into
+the man page and `sbom.spdx.json`, an SPDX 3.0 software bill of materials.
 
 ## Manual
 
@@ -745,8 +756,8 @@ man plexdo
 man -l man/plexdo.1     # straight from a source checkout
 ```
 
-It documents every command, the configuration and token file formats, exit
-status, and the environment variables consulted.
+It documents every command, the configuration file, where secrets are kept,
+exit status, and the environment variables consulted.
 
 Each command also has a detailed page of its own, covering every option, how
 options conflict with or depend on one another, what each global option means
@@ -777,13 +788,11 @@ Linux, macOS, and Windows are all supported.
 | **macOS** | Completion scripts fall back to BSD `stat -f %m`, and the bash script avoids `mapfile` so it works with the bash 3.2 that macOS still ships. `make` uses only portable `install -d` / `install -m`. |
 | **Windows** | Tables fall back to ASCII box characters when the console encoding cannot represent Unicode ones (a legacy cp1252 console would otherwise abort with `UnicodeEncodeError`), and characters a title contains but the console cannot render are substituted rather than crashing. POSIX permission checks and `chmod` are skipped, since Windows uses ACLs and `os.stat` reports a synthetic mode that would trip the check on every run. |
 
-Two caveats specific to Windows. `%TEMP%` is per-user but is not protected by
-file permissions and Windows may clear it, so protecting the token file is your
-responsibility there: `chmod` cannot restrict it, so place it somewhere your
-user account alone can read. And `--password` scrubbing is best-effort - the
-`Py_GetArgcArgv` trick that hides the value from `ps` has no Windows
-equivalent, so the value stays visible in the process list; a warning says so.
-Use the config file or the interactive prompt instead.
+On Windows, `--password` scrubbing is best-effort: the `Py_GetArgcArgv` trick
+that hides the value from `ps` has no Windows equivalent, so the value stays
+visible in the process list; a warning says so. Use the interactive prompt
+instead. Secrets go in Credential Manager, which Windows protects for your
+account.
 
 The bash, zsh, and fish completions all fall back to `python` where `python3`
 is absent, which matters under Git Bash.

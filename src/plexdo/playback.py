@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Starting playback on a player: where it fetches the media from.
 
@@ -12,10 +14,10 @@ private network or across IPv6 sites. --server-url settles it outright
 when the topology is one no heuristic could see.
 """
 
-from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Union
 import argparse
 import ipaddress
 import sys
+from typing import Any, NamedTuple
 from urllib.parse import urlsplit
 
 from plexapi.exceptions import PlexApiException
@@ -25,8 +27,7 @@ from requests import RequestException
 from plexdo.constants import LOG
 from plexdo.titles import display_title
 
-
-IPAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
+IPAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
 
 _DEFAULT_PORT = 32400
 
@@ -35,13 +36,13 @@ class Candidate(NamedTuple):
     """One address the player could be told to fetch the media from."""
 
     protocol: str
-    host: str                   # what the player is given: a name or an IP
+    host: str  # what the player is given: a name or an IP
     port: int
-    ip: Optional[IPAddress]     # the address behind it, for ranking
-    source: str                 # where it came from, for messages
+    ip: IPAddress | None  # the address behind it, for ranking
+    source: str  # where it came from, for messages
 
 
-def parse_ip(text: Optional[str]) -> Optional[IPAddress]:
+def parse_ip(text: str | None) -> IPAddress | None:
     """An IP address from text, or None for a name or nothing.
 
     An IPv4 address the server reports in IPv6-mapped form, ::ffff:10.0.0.5,
@@ -56,7 +57,7 @@ def parse_ip(text: Optional[str]) -> Optional[IPAddress]:
     return ip
 
 
-def _usable(ip: Optional[IPAddress], host: str) -> bool:
+def _usable(ip: IPAddress | None, host: str) -> bool:
     """Whether an address could mean the server to a player elsewhere.
 
     Loopback means the player itself, a link-local address is meaningless
@@ -64,11 +65,15 @@ def _usable(ip: Optional[IPAddress], host: str) -> bool:
     """
     if ip is None:
         return host.lower() != "localhost"
-    return not (ip.is_loopback or ip.is_link_local or ip.is_unspecified
-                or ip.is_multicast)
+    return not (
+        ip.is_loopback
+        or ip.is_link_local
+        or ip.is_unspecified
+        or ip.is_multicast
+    )
 
 
-def _candidate_from_url(url: str, source: str) -> Optional[Candidate]:
+def _candidate_from_url(url: str, source: str) -> Candidate | None:
     """A candidate from a URL, or None when it cannot serve another device."""
     parts = urlsplit(url)
     host = parts.hostname or ""
@@ -77,10 +82,12 @@ def _candidate_from_url(url: str, source: str) -> Optional[Candidate]:
     ip = parse_ip(host)
     if not _usable(ip, host):
         return None
-    return Candidate(parts.scheme, host, parts.port or _DEFAULT_PORT, ip, source)
+    return Candidate(
+        parts.scheme, host, parts.port or _DEFAULT_PORT, ip, source
+    )
 
 
-def _plex_tv_candidates(plex: PlexServer) -> List[Candidate]:
+def _plex_tv_candidates(plex: PlexServer) -> list[Candidate]:
     """Every direct address plex.tv lists for the server.
 
     Relayed connections are left out: they are throttled far below what
@@ -93,16 +100,20 @@ def _plex_tv_candidates(plex: PlexServer) -> List[Candidate]:
         resource = plex.myPlexAccount().resource(plex.friendlyName)
         connections = list(resource.connections)
     except (PlexApiException, RequestException) as exc:
-        LOG.info("Could not read the server's addresses from plex.tv (%s); "
-                 "only the configured URL is a candidate.", exc)
+        LOG.info(
+            "Could not read the server's addresses from plex.tv (%s); "
+            "only the configured URL is a candidate.",
+            exc,
+        )
         return []
     found = []
     for conn in connections:
         if conn.relay:
             continue
         where = "local" if conn.local else "remote"
-        candidate = _candidate_from_url(conn.uri or conn.httpuri,
-                                        f"plex.tv {where} address")
+        candidate = _candidate_from_url(
+            conn.uri or conn.httpuri, f"plex.tv {where} address"
+        )
         actual = parse_ip(conn.address)
         # The URI's host is usually a plex.direct name, which says nothing
         # about the address behind it; that has to pass the same test.
@@ -117,7 +128,7 @@ def _shared_prefix(first: IPAddress, second: IPAddress) -> int:
     return first.max_prefixlen - (int(first) ^ int(second)).bit_length()
 
 
-def _rank(candidate: Candidate, player_ip: IPAddress) -> Tuple[int, int, int]:
+def _rank(candidate: Candidate, player_ip: IPAddress) -> tuple[int, int, int]:
     """How well a candidate suits a player at player_ip; higher is better.
 
     First the family: an IPv4 player is given an IPv4 address, an IPv6 one
@@ -138,8 +149,8 @@ def _rank(candidate: Candidate, player_ip: IPAddress) -> Tuple[int, int, int]:
 
 
 def _choose_address(
-    candidates: List[Candidate], player_ip: IPAddress
-) -> Optional[Candidate]:
+    candidates: list[Candidate], player_ip: IPAddress
+) -> Candidate | None:
     """The candidate to send a player at player_ip, or None if none at all.
 
     A tie keeps the earlier candidate, so plexdo's configured URL, listed
@@ -163,8 +174,10 @@ def url_of(candidate: Candidate) -> str:
 
 
 def fetch_address(
-    plex: PlexServer, player_title: str, player_ip: IPAddress,
-    server_url: Optional[str],
+    plex: PlexServer,
+    player_title: str,
+    player_ip: IPAddress,
+    server_url: str | None,
 ) -> Candidate:
     """Where to tell a player at player_ip to fetch the media from.
 
@@ -175,34 +188,48 @@ def fetch_address(
     if server_url is not None:
         parts = urlsplit(server_url)
         if parts.scheme not in ("http", "https") or not parts.hostname:
-            sys.exit(f"--server-url must be an http or https URL with a host, "
-                     f"such as http://10.1.2.3:32400; got {server_url!r}.")
-        return Candidate(parts.scheme, parts.hostname,
-                         parts.port or _DEFAULT_PORT,
-                         parse_ip(parts.hostname), "--server-url")
+            sys.exit(
+                f"--server-url must be an http or https URL with a host, "
+                f"such as http://10.1.2.3:32400; got {server_url!r}."
+            )
+        return Candidate(
+            parts.scheme,
+            parts.hostname,
+            parts.port or _DEFAULT_PORT,
+            parse_ip(parts.hostname),
+            "--server-url",
+        )
 
     base = plex._baseurl  # pylint: disable=protected-access
     configured = _candidate_from_url(base, "configured URL")
-    candidates = ([configured] if configured else []) + \
-        _plex_tv_candidates(plex)
+    candidates = ([configured] if configured else []) + _plex_tv_candidates(
+        plex
+    )
     chosen = _choose_address(candidates, player_ip)
     if chosen is None:
         sys.exit(
             f"No address for the server is usable from another device: the "
             f"configured URL, {base}, is a loopback address, and plex.tv "
             "lists no direct one. Pass --server-url with an address the "
-            "player can reach, or set [plex] url to one."
+            "player can reach, or set plex: url to one."
         )
-    LOG.info("Player %s is at %s; telling it to fetch from %s (%s).",
-             player_title, player_ip, url_of(chosen), chosen.source)
+    LOG.info(
+        "Player %s is at %s; telling it to fetch from %s (%s).",
+        player_title,
+        player_ip,
+        url_of(chosen),
+        chosen.source,
+    )
     return chosen
 
 
 def play_fields(
     item: Any, fetch: Candidate, args: argparse.Namespace
-) -> Dict[str, Any]:
-    """The fields closing every playback record: what, from where, and
-    whether it was sent."""
+) -> dict[str, Any]:
+    """The fields closing every playback record.
+
+    They say what was sent, where it is fetched from, and whether it was.
+    """
     return {
         "ratingKey": int(item.ratingKey),
         "title": display_title(item),
@@ -214,14 +241,19 @@ def play_fields(
 def add_play_arguments(parser: Any) -> None:
     """Add the ratingKey and --server-url every playback command takes."""
     parser.add_argument(
-        "rating_key", type=int, metavar="ratingKey",
+        "rating_key",
+        type=int,
+        metavar="ratingKey",
         help=(
             "The item to play (int): a film, episode, show, season, track, "
             "album, photo, or playlist. Obtain with list-titles or search."
         ),
     )
     parser.add_argument(
-        "--server-url", dest="server_url", default=None, metavar="URL",
+        "--server-url",
+        dest="server_url",
+        default=None,
+        metavar="URL",
         help=(
             "The server address the player should fetch from, such as "
             "http://10.1.2.3:32400, used exactly as given. By default it is "

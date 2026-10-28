@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
+#
 # plexdo - a command-line interface for Plex Media Server.
 # Copyright (C) 2026 SidusNare
 #
@@ -13,8 +17,6 @@
 #
 # You should have received a copy of the GNU General Public License along
 # with this program. If not, see <https://www.gnu.org/licenses/>.
-#
-# SPDX-License-Identifier: GPL-3.0-or-later
 
 """Allow the package to be run as ``python -m plexdo``."""
 

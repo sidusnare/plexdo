@@ -1,23 +1,30 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Watched-state synchronisation between two users."""
 
-from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Tuple
 import argparse
 import datetime
 import sys
+from collections.abc import Sequence
+from typing import Any, NamedTuple
 
 from plexapi.server import PlexServer
 
 from plexdo.accounts import server_for_user
+from plexdo.arguments import add_rating_key_option
 from plexdo.console import output, output_format
 from plexdo.constants import LOG
 from plexdo.convert import parse_date
 from plexdo.sections import resolve_sections
 from plexdo.throttle import paced
-from plexdo.titles import (display_title, fetch_item, item_is_played,
-                           item_view_offset)
-
+from plexdo.titles import (
+    display_title,
+    fetch_item,
+    item_is_played,
+    item_view_offset,
+)
 
 # Library type -> the leaf libtype that actually carries watch state.
 # Photo libraries have none and are skipped entirely.
@@ -34,7 +41,7 @@ class WatchState(NamedTuple):
 
     played: bool
     offset: int
-    last_viewed: Optional[datetime.datetime]
+    last_viewed: datetime.datetime | None
     item: Any
 
 
@@ -99,7 +106,7 @@ def _viewed_sort_key(
 
 def _select_winner(
     first: WatchState, second: WatchState, unwatch: bool
-) -> Optional[Tuple[WatchState, WatchState]]:
+) -> tuple[WatchState, WatchState] | None:
     """Return (winner, loser), or None when no update is needed."""
     first_data, second_data = _has_watch_data(first), _has_watch_data(second)
     if not (first_data or second_data) or _states_match(first, second):
@@ -113,9 +120,7 @@ def _select_winner(
 
     first_key = _viewed_sort_key(first, unwatch)
     second_key = _viewed_sort_key(second, unwatch)
-    first_wins = (
-        first_key <= second_key if unwatch else first_key >= second_key
-    )
+    first_wins = first_key <= second_key if unwatch else first_key >= second_key
     return (first, second) if first_wins else (second, first)
 
 
@@ -140,17 +145,19 @@ def _apply_action(change: PlannedChange) -> None:
         _call_first_method(item, ("updateProgress",), change.winner.offset)
 
 
-def _watchable_sections(user_plex: PlexServer, library_id: Optional[int]) -> List[Any]:
+def _watchable_sections(
+    user_plex: PlexServer, library_id: int | None
+) -> list[Any]:
     """Return the library sections that carry watch state."""
     sections = resolve_sections(user_plex, library_id)
     return [s for s in sections if s.type in _WATCHABLE_LIBTYPES]
 
 
 def _collect_watch_states(
-    user_plex: PlexServer, library_id: Optional[int], rating_key: Optional[int]
-) -> Dict[int, WatchState]:
+    user_plex: PlexServer, library_id: int | None, rating_key: int | None
+) -> dict[int, WatchState]:
     """Return ratingKey -> WatchState for one user, honouring the filters."""
-    states: Dict[int, WatchState] = {}
+    states: dict[int, WatchState] = {}
 
     if rating_key is not None:
         item = fetch_item(user_plex, rating_key)
@@ -167,12 +174,12 @@ def _collect_watch_states(
 
 
 def _build_sync_plan(
-    states_a: Dict[int, WatchState],
-    states_b: Dict[int, WatchState],
+    states_a: dict[int, WatchState],
+    states_b: dict[int, WatchState],
     args: argparse.Namespace,
-) -> List[PlannedChange]:
+) -> list[PlannedChange]:
     """Compare both users' states and return the changes required."""
-    plan: List[PlannedChange] = []
+    plan: list[PlannedChange] = []
     for rating_key in sorted(set(states_a) & set(states_b)):
         first, second = states_a[rating_key], states_b[rating_key]
         selected = _select_winner(first, second, args.unwatch)
@@ -180,22 +187,26 @@ def _build_sync_plan(
             continue
         winner, loser = selected
         if args.one_way and loser is first:
-            LOG.debug("--one-way: skipping write to first user for %d", rating_key)
+            LOG.debug(
+                "--one-way: skipping write to first user for %d", rating_key
+            )
             continue
-        plan.append(PlannedChange(
-            rating_key=rating_key,
-            title=display_title(loser.item),
-            action=_planned_action(winner),
-            target="a" if loser is first else "b",
-            winner=winner,
-            loser=loser,
-        ))
+        plan.append(
+            PlannedChange(
+                rating_key=rating_key,
+                title=display_title(loser.item),
+                action=_planned_action(winner),
+                target="a" if loser is first else "b",
+                winner=winner,
+                loser=loser,
+            )
+        )
     return plan
 
 
 def _plan_rows(
-    plan: List[PlannedChange], args: argparse.Namespace
-) -> List[Dict[str, Any]]:
+    plan: list[PlannedChange], args: argparse.Namespace
+) -> list[dict[str, Any]]:
     """Build display rows describing the planned changes."""
     labels = {"a": f"user {args.user_a}", "b": f"user {args.user_b}"}
     return [
@@ -222,7 +233,10 @@ def cmd_copy_watched(plex: PlexServer, args: argparse.Namespace) -> None:
     )
     LOG.info(
         "Collected %d item(s) for user %d and %d for user %d",
-        len(states_a), args.user_a, len(states_b), args.user_b,
+        len(states_a),
+        args.user_a,
+        len(states_b),
+        args.user_b,
     )
 
     plan = _build_sync_plan(states_a, states_b, args)
@@ -247,7 +261,7 @@ def cmd_copy_watched(plex: PlexServer, args: argparse.Namespace) -> None:
 
 def register(
     sub: "argparse._SubParsersAction",
-    parents: "List[argparse.ArgumentParser]",
+    parents: "list[argparse.ArgumentParser]",
 ) -> None:
     """Register the copy-watched subparser."""
     uid_help = (
@@ -255,25 +269,44 @@ def register(
         "Obtain both with list-users."
     )
     parser = sub.add_parser(
-        "copy-watched", parents=parents,
+        "copy-watched",
+        parents=parents,
         help="Synchronise watched state and resume points between two users.",
     )
     parser.add_argument("user_a", metavar="USER", help=f"First {uid_help}")
     parser.add_argument("user_b", metavar="USER", help=f"Second {uid_help}")
     parser.add_argument(
-        "-1", "--one-way", dest="one_way", action="store_true", default=False,
+        "-1",
+        "--one-way",
+        dest="one_way",
+        action="store_true",
+        default=False,
         help="Only write to the second user; never modify the first.",
     )
     parser.add_argument(
-        "-l", "--library", dest="library_id", default=None, metavar="LIBRARY",
-        help="Restrict to one library, by ID or title. Obtain both with list-libraries.",
+        "-l",
+        "--library",
+        dest="library_id",
+        default=None,
+        metavar="LIBRARY",
+        help=(
+            "Restrict to one library, by ID or title. Obtain both with "
+            "list-libraries."
+        ),
+    )
+    add_rating_key_option(
+        parser,
+        "-t",
+        "--title",
+        help_text=(
+            "Restrict to a single item ratingKey. Obtain with list-titles or "
+            "search."
+        ),
     )
     parser.add_argument(
-        "-t", "--title", dest="rating_key", type=int, default=None, metavar="KEY",
-        help="Restrict to a single item ratingKey. Obtain with list-titles or search.",
-    )
-    parser.add_argument(
-        "--unwatch", action="store_true", default=False,
+        "--unwatch",
+        action="store_true",
+        default=False,
         help=(
             "Invert the sync: if either user has an item unwatched, mark it "
             "unwatched for both; if both have progress, the earliest "

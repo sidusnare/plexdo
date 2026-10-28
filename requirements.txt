@@ -1,6 +1,12 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
+#
 # Runtime dependencies for plexdo
 # Installing the package (pip install plexdo) pulls these in automatically;
 # this file is for working from a source checkout.
 
 PlexAPI>=4.15.10
 requests>=2.31
+keyring>=24.0
+PyYAML>=6.0

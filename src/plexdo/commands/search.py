@@ -1,43 +1,51 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Library search command."""
 
-from typing import Any, Dict, List, Optional
 import argparse
+from typing import Any
 
 from plexapi.server import PlexServer
 
 from plexdo.accounts import server_for_user
+from plexdo.arguments import add_user_argument
 from plexdo.console import output
 from plexdo.constants import LOG
 from plexdo.sections import resolve_sections
 from plexdo.titles import display_title
 
+_SEARCH_MEDIA_TYPES = (
+    "movie",
+    "show",
+    "episode",
+    "track",
+    "photo",
+    "album",
+    "artist",
+)
 
-_SEARCH_MEDIA_TYPES = ("movie", "show", "episode", "track", "photo", "album", "artist")
 
-
-def _search_result_row(item: Any) -> Dict[str, Any]:
+def _search_result_row(item: Any) -> dict[str, Any]:
     """Build a result row from a search hit, resolving the library id."""
     # plexapi attaches a librarySectionID attribute to all fetched items.
-    lib_id = int(
-        getattr(item, "librarySectionID", 0)
-    )
+    lib_id = int(getattr(item, "librarySectionID", 0))
     return {
         "ratingKey": int(item.ratingKey),
         "libraryId": lib_id,
-        "type":      item.type,
-        "title":     display_title(item),
+        "type": item.type,
+        "title": display_title(item),
     }
 
 
 def _search_in_section(
     section: Any,
     query: str,
-    media_type: Optional[str],
-) -> List[Dict[str, Any]]:
+    media_type: str | None,
+) -> list[dict[str, Any]]:
     """Search a single library section, optionally filtered by media type."""
-    kwargs: Dict[str, Any] = {}
+    kwargs: dict[str, Any] = {}
     if media_type:
         kwargs["libtype"] = media_type
     try:
@@ -51,12 +59,12 @@ def _search_in_section(
 def _search_all_sections(
     user_plex: PlexServer,
     query: str,
-    media_type: Optional[str],
-    library_id: Optional[int],
-) -> List[Dict[str, Any]]:
+    media_type: str | None,
+    library_id: int | None,
+) -> list[dict[str, Any]]:
     """Run the search across one or all library sections."""
     sections = resolve_sections(user_plex, library_id)
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for section in sections:
         rows.extend(_search_in_section(section, query, media_type))
     return rows
@@ -65,11 +73,14 @@ def _search_all_sections(
 def cmd_search(plex: PlexServer, args: argparse.Namespace) -> None:
     """Search Plex for titles matching a query string."""
     user_plex = server_for_user(plex, args.user_id)
-    library_id: Optional[int] = args.library_id
-    media_type: Optional[str] = args.media_type
+    library_id: int | None = args.library_id
+    media_type: str | None = args.media_type
 
     LOG.info(
-        "Searching for %r (type=%s library=%s)", args.query, media_type, library_id
+        "Searching for %r (type=%s library=%s)",
+        args.query,
+        media_type,
+        library_id,
     )
     rows = _search_all_sections(user_plex, args.query, media_type, library_id)
 
@@ -80,32 +91,39 @@ def cmd_search(plex: PlexServer, args: argparse.Namespace) -> None:
 
 def register(
     sub: "argparse._SubParsersAction",
-    parents: "List[argparse.ArgumentParser]",
+    parents: "list[argparse.ArgumentParser]",
 ) -> None:
     """Register the search subparser."""
     parser = sub.add_parser(
-        "search", parents=parents,
+        "search",
+        parents=parents,
         help="Search Plex for titles matching a query string.",
     )
-    parser.add_argument(
-        "user_id", metavar="USER",
-        help="User ID (int) or user title (str); use 0 for the admin account. Obtain both with list-users.",
-    )
+    add_user_argument(parser)
     parser.add_argument(
         "query",
         help="Search string (str). Plex performs a prefix/substring match.",
     )
     parser.add_argument(
-        "--media-type", dest="media_type",
-        choices=list(_SEARCH_MEDIA_TYPES), default=None, metavar="TYPE",
+        "--media-type",
+        dest="media_type",
+        choices=list(_SEARCH_MEDIA_TYPES),
+        default=None,
+        metavar="TYPE",
         help=(
             "Restrict results to a single media type. "
             f"Choices: {', '.join(_SEARCH_MEDIA_TYPES)}."
         ),
     )
     parser.add_argument(
-        "--library-id", dest="library_id", default=None, metavar="LIBRARY",
-        help="Restrict search to one library, by ID or title. Obtain both with list-libraries.",
+        "--library-id",
+        dest="library_id",
+        default=None,
+        metavar="LIBRARY",
+        help=(
+            "Restrict search to one library, by ID or title. Obtain both "
+            "with list-libraries."
+        ),
     )
 
 

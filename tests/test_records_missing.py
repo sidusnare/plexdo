@@ -1,14 +1,23 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Listing records and episode-gap detection."""
 
 import datetime
+import xml.etree.ElementTree as ET
 
 import pytest
 
 from conftest import FakeItem, FakeMedia
-from plexdo.commands.missing import episode_gaps
-from plexdo.records import loaded_fields, release_date, summary_row
+from plexdo.commands.missing import _wanted, episode_gaps, parse_seasons
+from plexdo.records import (
+    file_paths,
+    loaded_fields,
+    playing_file,
+    release_date,
+    summary_row,
+)
 
 
 class Tag:
@@ -21,15 +30,18 @@ class Tag:
 Item = FakeItem
 
 
-@pytest.mark.parametrize("numbers,expected", [
-    ([1, 2, 3], []),
-    ([1, 2, 4], [3]),
-    ([3, 4, 5], [1, 2]),
-    ([0, 1, 3], [2]),
-    ([1], []),
-    ([], []),
-    ([1, 4, 5, 9], [2, 3, 6, 7, 8]),
-])
+@pytest.mark.parametrize(
+    "numbers,expected",
+    [
+        ([1, 2, 3], []),
+        ([1, 2, 4], [3]),
+        ([3, 4, 5], [1, 2]),
+        ([0, 1, 3], [2]),
+        ([1], []),
+        ([], []),
+        ([1, 4, 5, 9], [2, 3, 6, 7, 8]),
+    ],
+)
 def test_episode_gaps(numbers, expected):
     assert episode_gaps(numbers) == expected
 
@@ -46,15 +58,24 @@ def test_episode_zero_starts_the_run_at_zero():
 
 # --- records -------------------------------------------------------------
 
+
 def test_summary_row_has_exactly_the_documented_columns():
     """These five are what the man page and README promise."""
     row = summary_row(Item(year=1999, rating=8.1, studio="A24"))
-    assert tuple(row) == ("ratingKey", "title", "releaseDate", "rating", "studio")
+    assert tuple(row) == (
+        "ratingKey",
+        "title",
+        "releaseDate",
+        "rating",
+        "studio",
+    )
 
 
 def test_release_date_prefers_the_full_date_over_the_year():
-    assert release_date(Item(originallyAvailableAt="2008-01-20", year=2007)) \
+    assert (
+        release_date(Item(originallyAvailableAt="2008-01-20", year=2007))
         == "2008-01-20"
+    )
 
 
 def test_release_date_falls_back_to_the_year():
@@ -70,8 +91,9 @@ def test_loaded_fields_skips_private_attributes():
 
 
 def test_loaded_fields_reduces_tag_objects_to_their_names():
-    assert loaded_fields(Item(genres=[Tag("Drama"), Tag("Crime")]))["genres"] \
-        == ["Drama", "Crime"]
+    assert loaded_fields(Item(genres=[Tag("Drama"), Tag("Crime")]))[
+        "genres"
+    ] == ["Drama", "Crime"]
 
 
 def test_loaded_fields_renders_dates_as_text():
@@ -81,6 +103,7 @@ def test_loaded_fields_renders_dates_as_text():
 
 def test_loaded_fields_disables_reload_while_reading():
     """Across a library, one reload per item would be one request per item."""
+
     class Exploding(Item):
         """Public attribute access explodes, as a reload would.
 
@@ -92,15 +115,14 @@ def test_loaded_fields_disables_reload_while_reading():
             if name.startswith("_"):
                 raise AttributeError(name)
             raise AssertionError(f"reload triggered for {name}")
+
     item = Exploding()
     item._autoReload = True
     assert loaded_fields(item)["title"] == "A Title"
-    assert item._autoReload is True          # restored afterwards
+    assert item._autoReload is True  # restored afterwards
 
 
 # --- file paths ----------------------------------------------------------
-
-from plexdo.records import file_paths
 
 
 def test_a_single_file_is_reported():
@@ -108,7 +130,12 @@ def test_a_single_file_is_reported():
 
 
 def test_every_part_of_every_version_is_reported():
-    item = Item(media=[FakeMedia("/mnt/cd1.avi", "/mnt/cd2.avi"), FakeMedia("/mnt/hd.mkv")])
+    item = Item(
+        media=[
+            FakeMedia("/mnt/cd1.avi", "/mnt/cd2.avi"),
+            FakeMedia("/mnt/hd.mkv"),
+        ]
+    )
     assert file_paths(item) == ["/mnt/cd1.avi", "/mnt/cd2.avi", "/mnt/hd.mkv"]
 
 
@@ -119,7 +146,9 @@ def test_a_container_with_no_media_yields_nothing():
 
 
 def test_parts_without_a_path_are_skipped():
-    assert file_paths(Item(media=[FakeMedia(None, "/mnt/b.mkv")])) == ["/mnt/b.mkv"]
+    assert file_paths(Item(media=[FakeMedia(None, "/mnt/b.mkv")])) == [
+        "/mnt/b.mkv"
+    ]
 
 
 def test_file_paths_does_not_trigger_a_reload():
@@ -134,10 +163,12 @@ def test_file_paths_does_not_trigger_a_reload():
             if name.startswith("_"):
                 raise AttributeError(name)
             raise AssertionError(f"reload triggered for {name}")
+
     assert file_paths(Exploding()) == []
 
 
 # --- nested media in listing records -------------------------------------
+
 
 def test_media_is_expanded_rather_than_repr_d():
     """A repr like '<Media object at 0x...>' carries nothing."""
@@ -173,23 +204,29 @@ def test_a_self_referential_object_does_not_recurse_forever():
         def __init__(self):
             self.name = "x"
             self.parent = self
-    loaded_fields(Item(loop=Loop()))          # must simply return
+
+    loaded_fields(Item(loop=Loop()))  # must simply return
 
 
 def test_an_object_without_a_dict_falls_back_to_text():
     class Slotted:
         __slots__ = ()
+
     assert isinstance(loaded_fields(Item(thing=Slotted()))["thing"], str)
 
 
 # --- find-missing arguments ----------------------------------------------
 
-from plexdo.commands.missing import _wanted, parse_seasons
 
-
-@pytest.mark.parametrize("text,expected", [
-    ("1", {1}), ("1,3,5", {1, 3, 5}), (" 2 , 4 ", {2, 4}), ("0", {0}),
-])
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("1", {1}),
+        ("1,3,5", {1, 3, 5}),
+        (" 2 , 4 ", {2, 4}),
+        ("0", {0}),
+    ],
+)
 def test_season_lists_are_parsed(text, expected):
     assert parse_seasons(text) == expected
 
@@ -222,8 +259,6 @@ def test_a_named_season_list_selects_only_those():
 
 # --- the file a player has open ------------------------------------------
 
-from plexdo.records import playing_file
-
 
 class SelPart:
     def __init__(self, file, selected=False):
@@ -242,14 +277,23 @@ def test_a_single_version_needs_no_selection():
 
 def test_the_selected_version_wins_over_the_first():
     """A 4K and a 1080p copy: report the one actually being played."""
-    item = Item(media=[SelMedia(SelPart("/mnt/4k.mkv")),
-                       SelMedia(SelPart("/mnt/1080.mkv"), selected=True)])
+    item = Item(
+        media=[
+            SelMedia(SelPart("/mnt/4k.mkv")),
+            SelMedia(SelPart("/mnt/1080.mkv"), selected=True),
+        ]
+    )
     assert playing_file(item) == "/mnt/1080.mkv"
 
 
 def test_the_selected_part_wins_within_a_version():
-    item = Item(media=[SelMedia(SelPart("/mnt/cd1.avi"),
-                                SelPart("/mnt/cd2.avi", selected=True))])
+    item = Item(
+        media=[
+            SelMedia(
+                SelPart("/mnt/cd1.avi"), SelPart("/mnt/cd2.avi", selected=True)
+            )
+        ]
+    )
     assert playing_file(item) == "/mnt/cd2.avi"
 
 
@@ -270,12 +314,11 @@ def test_playing_file_does_not_trigger_a_reload():
             if name.startswith("_"):
                 raise AttributeError(name)
             raise AssertionError(f"reload triggered for {name}")
+
     assert playing_file(Exploding()) == ""
 
 
 # --- reading real plexapi object shapes ----------------------------------
-
-import xml.etree.ElementTree as ET
 
 
 class Lazy:

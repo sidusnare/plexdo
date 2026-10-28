@@ -1,0 +1,9 @@
+{
+  "name": "plexdo-dev-tools",
+  "private": true,
+  "description": "Development tools for plexdo that are not Python: Markdown lint.",
+  "license": "GPL-3.0-or-later",
+  "devDependencies": {
+    "markdownlint-cli2": "0.22.1"
+  }
+}

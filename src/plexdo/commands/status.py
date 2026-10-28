@@ -1,36 +1,48 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Consolidated server status: sessions, users, activity, and identity."""
 
-from typing import Any, Dict, List, Optional
 import argparse
 import sys
+from typing import Any
 
 from plexapi.server import PlexServer
 
 from plexdo.accounts import account_type
-from plexdo.console import clean_text, output, output_format, print_metadata, print_table, table_limit
+from plexdo.console import (
+    clean_text,
+    output,
+    output_format,
+    print_metadata,
+    print_table,
+    table_limit,
+)
 from plexdo.constants import LOG
 from plexdo.convert import format_duration, parse_date
 from plexdo.formats import render
 from plexdo.records import playing_file
 from plexdo.titles import display_title
 
-
 # Activity types Plex uses for library scanning, as opposed to the other
 # background work (metadata refresh, subscriptions, media analysis).
 _SCAN_MARKERS = ("scan", "refresh", "library")
 
 
-def _server_record(plex: PlexServer) -> Dict[str, Any]:
+def _server_record(plex: PlexServer) -> dict[str, Any]:
     """Identity and version details for the server itself."""
     updated = parse_date(getattr(plex, "updatedAt", None))
     return {
         "name": clean_text(getattr(plex, "friendlyName", "") or ""),
         "version": clean_text(getattr(plex, "version", "") or ""),
-        "machineIdentifier": clean_text(getattr(plex, "machineIdentifier", "") or ""),
+        "machineIdentifier": clean_text(
+            getattr(plex, "machineIdentifier", "") or ""
+        ),
         "platform": clean_text(getattr(plex, "platform", "") or ""),
-        "platformVersion": clean_text(getattr(plex, "platformVersion", "") or ""),
+        "platformVersion": clean_text(
+            getattr(plex, "platformVersion", "") or ""
+        ),
         "updatedAt": updated.isoformat(sep=" ") if updated else "",
         "myPlexUsername": clean_text(getattr(plex, "myPlexUsername", "") or ""),
         "myPlexSubscription": bool(getattr(plex, "myPlexSubscription", False)),
@@ -44,33 +56,35 @@ def _format_offset(milliseconds: Any, duration: Any) -> str:
     return f"{elapsed} / {total}"
 
 
-def _session_rows(plex: PlexServer) -> List[Dict[str, Any]]:
+def _session_rows(plex: PlexServer) -> list[dict[str, Any]]:
     """One row per item currently being played."""
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for item in plex.sessions():
         players = getattr(item, "players", []) or []
         player = players[0] if players else None
         usernames = getattr(item, "usernames", []) or []
-        rows.append({
-            # What `wait --session` takes, so a session can be picked by it.
-            "sessionKey": getattr(item, "sessionKey", None),
-            "user": clean_text(usernames[0] if usernames else ""),
-            "library": int(vars(item).get("librarySectionID") or 0),
-            "ratingKey": int(item.ratingKey),
-            "title": display_title(item),
-            "state": clean_text(getattr(player, "state", "") or ""),
-            "player": clean_text(getattr(player, "title", "") or ""),
-            "platform": clean_text(getattr(player, "platform", "") or ""),
-            "address": clean_text(getattr(player, "address", "") or ""),
-            "progress": _format_offset(
-                getattr(item, "viewOffset", 0), getattr(item, "duration", 0)
-            ),
-            "file": playing_file(item),
-        })
+        rows.append(
+            {
+                # What `wait --session` takes, so a session can be picked by it.
+                "sessionKey": getattr(item, "sessionKey", None),
+                "user": clean_text(usernames[0] if usernames else ""),
+                "library": int(vars(item).get("librarySectionID") or 0),
+                "ratingKey": int(item.ratingKey),
+                "title": display_title(item),
+                "state": clean_text(getattr(player, "state", "") or ""),
+                "player": clean_text(getattr(player, "title", "") or ""),
+                "platform": clean_text(getattr(player, "platform", "") or ""),
+                "address": clean_text(getattr(player, "address", "") or ""),
+                "progress": _format_offset(
+                    getattr(item, "viewOffset", 0), getattr(item, "duration", 0)
+                ),
+                "file": playing_file(item),
+            }
+        )
     return rows
 
 
-def _user_rows(plex: PlexServer) -> List[Dict[str, Any]]:
+def _user_rows(plex: PlexServer) -> list[dict[str, Any]]:
     """Shared and managed users visible to the admin token."""
     return [
         {
@@ -84,13 +98,15 @@ def _user_rows(plex: PlexServer) -> List[Dict[str, Any]]:
     ]
 
 
-def _system_account_rows(plex: PlexServer) -> List[Dict[str, Any]]:
+def _system_account_rows(plex: PlexServer) -> list[dict[str, Any]]:
     """Accounts the server itself knows about, which is not the same list."""
     return [
         {
             "id": int(account.id),
             "name": clean_text(account.name or ""),
-            "audioLanguage": clean_text(getattr(account, "defaultAudioLanguage", "") or ""),
+            "audioLanguage": clean_text(
+                getattr(account, "defaultAudioLanguage", "") or ""
+            ),
             "subtitleLanguage": clean_text(
                 getattr(account, "defaultSubtitleLanguage", "") or ""
             ),
@@ -99,7 +115,7 @@ def _system_account_rows(plex: PlexServer) -> List[Dict[str, Any]]:
     ]
 
 
-def _connection_rows(plex: PlexServer) -> List[Dict[str, Any]]:
+def _connection_rows(plex: PlexServer) -> list[dict[str, Any]]:
     """Addresses plex.tv advertises for this server."""
     try:
         resource = plex.myPlexAccount().resource(plex.friendlyName)
@@ -129,7 +145,7 @@ def _is_scan(activity: Any) -> bool:
     return any(marker in kind for marker in _SCAN_MARKERS)
 
 
-def _split_activity_rows(plex: PlexServer, scans: bool) -> List[Dict[str, Any]]:
+def _split_activity_rows(plex: PlexServer, scans: bool) -> list[dict[str, Any]]:
     """In-progress activities, split into scans and everything else."""
     return [
         {
@@ -144,7 +160,7 @@ def _split_activity_rows(plex: PlexServer, scans: bool) -> List[Dict[str, Any]]:
     ]
 
 
-def _butler_rows(plex: PlexServer) -> List[Dict[str, Any]]:
+def _butler_rows(plex: PlexServer) -> list[dict[str, Any]]:
     """Scheduled maintenance tasks and whether each is enabled."""
     try:
         tasks = plex.butlerTasks()
@@ -163,23 +179,29 @@ def _butler_rows(plex: PlexServer) -> List[Dict[str, Any]]:
 
 
 # Section name -> (heading, collector). Order sets the order of the report.
-_SECTIONS: Dict[str, Any] = {
+_SECTIONS: dict[str, Any] = {
     "server": ("Server", _server_record),
     "sessions": ("Active sessions", _session_rows),
     "users": ("Shared users", _user_rows),
     "accounts": ("System accounts", _system_account_rows),
     "connections": ("Reachable addresses", _connection_rows),
-    "scans": ("Library scans in progress", lambda p: _split_activity_rows(p, True)),
-    "activities": ("Other background activity", lambda p: _split_activity_rows(p, False)),
+    "scans": (
+        "Library scans in progress",
+        lambda p: _split_activity_rows(p, True),
+    ),
+    "activities": (
+        "Other background activity",
+        lambda p: _split_activity_rows(p, False),
+    ),
     "tasks": ("Scheduled background tasks", _butler_rows),
 }
 
 SECTION_NAMES = tuple(_SECTIONS)
 
 
-def _collect(plex: PlexServer, names: List[str]) -> Dict[str, Any]:
+def _collect(plex: PlexServer, names: list[str]) -> dict[str, Any]:
     """Gather the requested sections, tolerating a failure in any one."""
-    gathered: Dict[str, Any] = {}
+    gathered: dict[str, Any] = {}
     for name in names:
         _, collector = _SECTIONS[name]
         try:
@@ -191,7 +213,7 @@ def _collect(plex: PlexServer, names: List[str]) -> Dict[str, Any]:
     return gathered
 
 
-def _print_report(gathered: Dict[str, Any], limit: Optional[int]) -> None:
+def _print_report(gathered: dict[str, Any], limit: int | None) -> None:
     """Print the full multi-section report for the table renderer."""
     for name, payload in gathered.items():
         heading, _ = _SECTIONS[name]
@@ -230,15 +252,22 @@ def cmd_status(plex: PlexServer, args: argparse.Namespace) -> None:
 
 def register(
     sub: "argparse._SubParsersAction",
-    parents: "List[argparse.ArgumentParser]",
+    parents: "list[argparse.ArgumentParser]",
 ) -> None:
     """Register the status subparser."""
     parser = sub.add_parser(
-        "status", parents=parents,
-        help="Show server identity, sessions, users, scans, and background tasks.",
+        "status",
+        parents=parents,
+        help=(
+            "Show server identity, sessions, users, scans, and background "
+            "tasks."
+        ),
     )
     parser.add_argument(
-        "--section", choices=list(SECTION_NAMES), default=None, metavar="SECTION",
+        "--section",
+        choices=list(SECTION_NAMES),
+        default=None,
+        metavar="SECTION",
         help=(
             "Show only one section: " + ", ".join(SECTION_NAMES) + ". "
             "Required for --format csv and --format clixml."

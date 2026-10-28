@@ -1,11 +1,13 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Air-date estimation for episodes missing originallyAvailableAt."""
 
-from typing import Any, List, Optional, Tuple
 import datetime
 import statistics
 import sys
+from typing import Any
 
 from plexapi.video import Episode
 
@@ -13,20 +15,23 @@ from plexdo.constants import LOG
 from plexdo.convert import parse_date
 
 
-def episodes_in_same_season(ep: Episode, all_eps: List[Episode]) -> List[Episode]:
+def episodes_in_same_season(
+    ep: Episode, all_eps: list[Episode]
+) -> list[Episode]:
     """Return all episodes in the same season as ep (excluding ep itself)."""
     return [
-        e for e in all_eps
+        e
+        for e in all_eps
         if e.seasonNumber == ep.seasonNumber
         and int(e.ratingKey) != int(ep.ratingKey)
     ]
 
 
 def _collect_neighbors(
-    ep: Episode, season_eps: List[Episode]
-) -> Tuple[List[datetime.datetime], List[datetime.datetime]]:
-    """
-    Return (prev_dates, next_dates) - up to 6 known dates on each side.
+    ep: Episode, season_eps: list[Episode]
+) -> tuple[list[datetime.datetime], list[datetime.datetime]]:
+    """Return (prev_dates, next_dates): up to 6 known dates on each side.
+
     Episodes are ordered by episodeNumber within the season.
     """
     ordered = sorted(
@@ -34,8 +39,8 @@ def _collect_neighbors(
         key=lambda e: e.index,
     )
     ep_index = ep.index or 0
-    prev_dates: List[datetime.datetime] = []
-    next_dates: List[datetime.datetime] = []
+    prev_dates: list[datetime.datetime] = []
+    next_dates: list[datetime.datetime] = []
 
     for e in reversed(ordered):
         if e.index < ep_index:
@@ -56,7 +61,9 @@ def _collect_neighbors(
     return prev_dates, next_dates
 
 
-def _median_interval(dates: List[datetime.datetime]) -> Optional[datetime.timedelta]:
+def _median_interval(
+    dates: list[datetime.datetime],
+) -> datetime.timedelta | None:
     """Compute the median timedelta between adjacent sorted dates."""
     sorted_dates = sorted(dates)
     if len(sorted_dates) < 3:  # need >=3 dates -> >=2 intervals
@@ -71,16 +78,16 @@ def _median_interval(dates: List[datetime.datetime]) -> Optional[datetime.timede
 
 
 def _estimate_date(
-    prev_dates: List[datetime.datetime],
-    next_dates: List[datetime.datetime],
-) -> Optional[datetime.datetime]:
+    prev_dates: list[datetime.datetime],
+    next_dates: list[datetime.datetime],
+) -> datetime.datetime | None:
     """Estimate a missing air date from neighboring known dates."""
     all_known = prev_dates + next_dates
     median_td = _median_interval(all_known)
     if median_td is None:
         return None
 
-    estimates: List[datetime.datetime] = []
+    estimates: list[datetime.datetime] = []
     if prev_dates:
         latest_prev = max(prev_dates)
         estimates.append(latest_prev + median_td)
@@ -116,7 +123,9 @@ def _date_label(item: Any) -> str:
     return f"{title} ({year})" if year else title
 
 
-def prompt_for_date(item: Any, last_used: Optional[datetime.datetime]) -> datetime.datetime:
+def prompt_for_date(
+    item: Any, last_used: datetime.datetime | None
+) -> datetime.datetime:
     """Ask on the terminal for a date Plex does not have, episode or film.
 
     Asks again until a valid YYYY-MM-DD is given. Running out of input, as a
@@ -145,10 +154,10 @@ def prompt_for_date(item: Any, last_used: Optional[datetime.datetime]) -> dateti
 
 def resolve_episode_date(
     ep: Episode,
-    season_peers: List[Episode],
-    last_used: Optional[datetime.datetime],
+    season_peers: list[Episode],
+    last_used: datetime.datetime | None,
 ) -> datetime.datetime:
-    """Return a resolved datetime for an episode, estimating or prompting if needed."""
+    """Return a resolved datetime for an episode, estimating or prompting."""
     dt = parse_date(ep.originallyAvailableAt)
     if dt is not None:
         return dt

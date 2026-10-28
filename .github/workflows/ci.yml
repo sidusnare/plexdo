@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
+
+---
 name: CI
 
 on:
@@ -26,10 +31,16 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      # make check lints with every tool the project requires: ShellCheck
+      # and yamllint from apt, reuse from PyPI (apt's is too old to read
+      # REUSE.toml), and markdownlint-cli2 at the version package.json pins.
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install -e ".[dev]" reuse
+          sudo apt-get update
+          sudo apt-get install -y shellcheck yamllint
+          npm ci
 
       - name: Full check
         run: make check

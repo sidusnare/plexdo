@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Command-line secret scrubbing for --password."""
 
@@ -6,7 +8,7 @@ import argparse
 import ctypes
 import sys
 
-from plexdo.constants import CONFIG_PATH, LOG
+from plexdo.constants import LOG
 
 
 def _overwrite_argv_memory(replacement: str) -> bool:
@@ -54,9 +56,9 @@ def scrub_password_argument(args: argparse.Namespace) -> None:
     LOG.warning(
         "SECURITY: --password was supplied on the command line. It was very "
         "likely recorded in your shell history, and was visible to other "
-        "users via `ps` until this process overwrote it. Prefer storing "
-        "credentials in %s (mode 0600) or using the interactive prompt.",
-        CONFIG_PATH,
+        "users via `ps` until this process overwrote it. Prefer the "
+        "interactive prompt, with --save-password to keep the password in "
+        "the system keyring.",
     )
     if not hidden:
         LOG.warning(

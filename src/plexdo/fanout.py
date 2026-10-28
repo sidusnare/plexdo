@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Creating one playlist for one user, a chosen user, or every user.
 
@@ -14,16 +16,21 @@ reported as a line in the run and the loop carries on; nothing here raises
 past the user it happened to.
 """
 
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 import argparse
+from collections.abc import Callable, Sequence
+from typing import Any
 
 from plexapi.server import PlexServer
 
 from plexdo.accounts import UserAccessError, server_for_user, user_roster
 from plexdo.console import output, output_format, print_table, table_limit
 from plexdo.constants import LOG, MediaItem
-from plexdo.playlists import (create_for_user, finalize_playlist,
-                              preview_rows, require_items)
+from plexdo.playlists import (
+    create_for_user,
+    finalize_playlist,
+    preview_rows,
+    require_items,
+)
 from plexdo.throttle import paced
 
 
@@ -36,7 +43,11 @@ def add_user_target_arguments(parser: argparse.ArgumentParser) -> None:
     """
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
-        "-u", "--user", dest="dest_user_id", default=None, metavar="USER",
+        "-u",
+        "--user",
+        dest="dest_user_id",
+        default=None,
+        metavar="USER",
         help=(
             "Create the playlist for this user rather than for the account "
             "the items came from. User ID (int) or user title (str); use 0 "
@@ -44,7 +55,10 @@ def add_user_target_arguments(parser: argparse.ArgumentParser) -> None:
         ),
     )
     group.add_argument(
-        "-a", "--all-users", dest="all_users", action="store_true",
+        "-a",
+        "--all-users",
+        dest="all_users",
+        action="store_true",
         default=False,
         help=(
             "Create the playlist for every user on the server, the admin "
@@ -55,7 +69,7 @@ def add_user_target_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def report_line(record: Dict[str, Any]) -> str:
+def report_line(record: dict[str, Any]) -> str:
     """Format one per-user outcome as a single line."""
     line = f"  {record['status']:<8} {record['user']}"
     extra = record["detail"] or (
@@ -65,11 +79,11 @@ def report_line(record: Dict[str, Any]) -> str:
 
 
 def run_per_user(
-    targets: Sequence[Tuple[int, str]],
-    preview: Tuple[str, List[MediaItem]],
+    targets: Sequence[tuple[int, str]],
+    preview: tuple[str, list[MediaItem]],
     args: argparse.Namespace,
-    action: Callable[[Tuple[int, str]], Dict[str, Any]],
-) -> List[Dict[str, Any]]:
+    action: Callable[[tuple[int, str]], dict[str, Any]],
+) -> list[dict[str, Any]]:
     """Show the item list once, then run *action* per user, one line each.
 
     The list is identical for every user, so it is printed once here and the
@@ -88,7 +102,7 @@ def run_per_user(
         print_table(preview_rows(items), table_limit(args))
         print()
 
-    results: List[Dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
     for target in paced(list(targets), args, "users"):
         record = action(target)
         results.append(record)
@@ -103,7 +117,7 @@ def run_per_user(
 
 def _targets(
     plex: PlexServer, args: argparse.Namespace
-) -> Optional[List[Tuple[int, str]]]:
+) -> list[tuple[int, str]] | None:
     """The (id, title) users to create for, or None for the default account.
 
     The roster costs one plex.tv round trip, so it is fetched only when -u or
@@ -121,11 +135,11 @@ def _targets(
 
 def _create_for_one(
     plex: PlexServer,
-    target: Tuple[int, str],
+    target: tuple[int, str],
     name: str,
-    items: List[MediaItem],
+    items: list[MediaItem],
     args: argparse.Namespace,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create the playlist for one user, turning a failure into a record."""
     user_id, title = target
     label = f"user {title!r} (id={user_id})"
@@ -135,7 +149,7 @@ def _create_for_one(
         )
     except UserAccessError as exc:
         status, detail = "skipped", exc.summary
-    except Exception as exc:              # pylint: disable=broad-except
+    except Exception as exc:  # pylint: disable=broad-except
         # One user's failure must not end the run over the remaining users.
         LOG.debug("Create failed for %s: %s", label, exc)
         status, detail = "failed", str(exc)
@@ -152,7 +166,7 @@ def deliver_playlist(
     plex: PlexServer,
     default_plex: PlexServer,
     name: str,
-    items: List[MediaItem],
+    items: list[MediaItem],
     args: argparse.Namespace,
 ) -> None:
     """Create the playlist wherever -u, -a, or neither asked for it.
@@ -168,10 +182,11 @@ def deliver_playlist(
         finalize_playlist(default_plex, name, items, args)
         return
 
-    def create(target: Tuple[int, str]) -> Dict[str, Any]:
+    def create(target: tuple[int, str]) -> dict[str, Any]:
         return _create_for_one(plex, target, name, items, args)
 
     results = run_per_user(targets, (name, items), args, create)
     done = sum(1 for r in results if r["status"] in ("created", "replaced"))
-    LOG.info("Playlist '%s': %d of %d user(s) served.",
-             name, done, len(results))
+    LOG.info(
+        "Playlist '%s': %d of %d user(s) served.", name, done, len(results)
+    )

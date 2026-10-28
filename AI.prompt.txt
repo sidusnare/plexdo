@@ -1,12 +1,160 @@
-# AI.prompt.md
+SPDX-FileCopyrightText: 2026 SidusNare
+SPDX-License-Identifier: GPL-3.0-or-later
+SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
+
+REUSE-IgnoreStart
+
+# AI.prompt.txt
 
 This file is the complete prompt that regenerates this project from scratch,
 and the authoritative specification for it. When behaviour changes, update
 this file in the same commit.
 
+It opens with a preamble of requirements for every project of its author's;
+the project-specific instructions after it take precedence where the two
+differ, and each such difference is stated where it arises.
+
 Much of what follows is stated as a constraint with the reason attached. The
 reasons matter: nearly every one records a bug that was shipped and then
 found, and a regeneration that ignores them will reintroduce it.
+
+---
+
+## PREAMBLE
+
+These requirements apply to all code, configuration, data, and documentation
+produced for this project. The key words MUST, MUST NOT, SHOULD, and MAY are
+to be interpreted as described in RFC 2119. Project-specific instructions
+later in this prompt take precedence over this preamble. If any requirement
+cannot be met, state this explicitly and explain why; never silently omit it.
+
+TOOLING
+- If a task needs a host tool that is not installed but is available from
+  the platform's native package manager (e.g., apt on Debian/Ubuntu, dnf on
+  Fedora, pkg on FreeBSD, Homebrew on macOS) at a version that meets the
+  requirement, STOP and ask the user to install it. Name the tool, the
+  package that provides it, and the install command (e.g., sudo apt install
+  shellcheck).
+- SHOULD NOT synthesize a workaround. This includes reimplementing the tool,
+  substituting a different tool, downloading binaries or scripts from other
+  sources, or installing a host tool through a language package manager
+  (pip, npm, cargo, gem) instead of the native package, unless the user
+  explicitly approves.
+- MUST NOT install system packages without the user's approval.
+- Resume only after the user confirms the tool is installed or gives other
+  direction.
+- This applies to host tools, not to project dependencies declared in the
+  project's own manifest (e.g., pyproject.toml, Cargo.toml, package.json).
+
+STYLE, FORMATTING, AND LINTING
+- Code SHOULD follow the Google style guide for its language where one exists.
+  Otherwise, follow the language's dominant community standard (e.g., the
+  Rust Style Guide, the Ruby Style Guide).
+- Code MUST be formatted with the language's standard formatter, configured
+  for Google style where supported.
+- Code and structured data MUST pass the following with zero errors.
+  Modified or generated linter and formatter configuration files
+  MUST be included in the repo. Where a linter default conflicts with the
+  style guide, configure the linter to match the style guide.
+    Python: ruff check and ruff format; pylint score of 9.5/10 or higher.
+    Shell: ShellCheck, with as few warnings as possible.
+    JavaScript/TypeScript: ESLint (include the config used).
+    Rust: cargo clippy -- -D warnings.
+    Ruby: RuboCop.
+    C/C++: clang-tidy; clang-format --style=Google.
+    Java: Checkstyle with google_checks.xml; PMD.
+    Kotlin: ktlint; detekt.
+    Swift: SwiftLint.
+    Go: gofmt; go vet.
+    YAML: yamllint.
+    Markdown: markdownlint.
+    Dockerfile: hadolint.
+- Linter suppressions MUST be as narrow as possible (one line and one rule)
+  and MUST include a comment explaining why the issue cannot be fixed.
+  ShellCheck: if a directive is needed for the first command in a script,
+  place a no-op command (true or :) before it, because a directive before
+  the first command applies to the entire file.
+- If tools are available, run the linters and report the results. If a
+  required linter is missing, follow the TOOLING section. If there is no
+  execution environment at all, state that the code has not been linted.
+  Never claim a linter passes without having run it.
+
+SECRETS AND CONFIGURATION
+- Credentials, tokens, and keys MUST NOT be hard-coded or stored in
+  plaintext.
+- Android: Encrypt credentials and session tokens with an Android
+  Keystore-backed key (e.g., AES-GCM) before persisting them.
+  EncryptedSharedPreferences MUST NOT be used.
+- Apple platforms: Store secrets in the Keychain.
+- GNU/Linux, BSD, and similar systems: Use YAML (.yaml) for configuration
+  and JSON for structured data files.
+- Service daemons should store configuration in /etc/<project name>/ .
+- User space applications SHOULD use config files located per the XDG Base
+  Directory Specification. Secrets MUST use the Secret Service API where
+  available.
+- Configuration files SHOULD include comments explaining each option's
+  meaning, valid values, and default.
+
+VERSIONING
+- The project MUST use Semantic Versioning 2.0.0 (https://semver.org/spec/v2.0.0.html):
+  MAJOR.MINOR.PATCH, with optional pre-release (-alpha.1) and build
+  metadata (+20261027) as defined by the specification.
+- The public API MUST be documented, since SemVer is defined against it.
+  For applications without a programmatic API, the public API includes
+  command-line options, configuration file format and options, structured
+  data file formats, environment variables, and exit codes.
+- Initial development MUST start at 0.1.0. Version 1.0.0 marks the first
+  stable public API.
+- The version MUST be defined in one place (e.g., pyproject.toml,
+  Cargo.toml, package.json) and derived from there wherever else it
+  appears. The SBOM package version MUST match it.
+- When making changes, state which version component they require bumping
+  and why: MAJOR for incompatible API changes, MINOR for backward-compatible
+  additions, PATCH for backward-compatible fixes.
+- Release tags SHOULD use the form vMAJOR.MINOR.PATCH (e.g., v1.4.2). The
+  leading "v" belongs to the tag only, not to the version itself.
+- Where a platform or ecosystem imposes its own version format, map the
+  SemVer version to it and document the mapping. Examples: Python
+  pre-releases normalize per PEP 440 (1.0.0-alpha.1 becomes 1.0.0a1);
+  Android also requires an integer versionCode; Apple's
+  CFBundleShortVersionString does not allow pre-release suffixes.
+- The project MUST maintain CHANGELOG.md following Keep a Changelog 1.1.0
+  (https://keepachangelog.com/en/1.1.0/):
+    - Entries are written for users, not copied from commit messages.
+    - Every change MUST be recorded under an "Unreleased" section at the
+      top, grouped as Added, Changed, Deprecated, Removed, Fixed, or
+      Security.
+    - On release, the Unreleased entries move under a new heading of the
+      form "## [MAJOR.MINOR.PATCH] - YYYY-MM-DD", newest release first.
+    - Breaking changes MUST be clearly marked, and the version bump MUST be
+      consistent with the entries (e.g., anything under Removed, or an
+      incompatible Changed entry, requires a MAJOR bump after 1.0.0).
+    - Version headings SHOULD link to a comparison of the release tags
+      where the repository host supports it.
+- Markdown lint configuration MUST set MD024 (no duplicate headings) to
+  siblings_only: true, since each release repeats the same section names.
+
+LICENSING AND PROVENANCE
+- License the project GPL-3.0-or-later. LICENSE MUST be an exact copy of
+  https://www.gnu.org/licenses/gpl-3.0.txt. If you cannot fetch it, do not
+  reproduce it; instead instruct the user to run:
+    curl -o LICENSE https://www.gnu.org/licenses/gpl-3.0.txt
+- The project MUST be REUSE-compliant and pass `reuse lint`. Every file
+  carries SPDX-FileCopyrightText and SPDX-License-Identifier headers; files
+  that cannot hold comments (e.g., JSON) use a REUSE.toml entry.
+- Every file written wholly or partly by AI MUST include the header:
+    SPDX-FileContributor: <model name and version> (AI-generated)
+- Provide an SPDX 3.0 SBOM listing all dependencies. Record the AI model(s)
+  used to generate the code in the SBOM creation info. If the software
+  includes or depends on AI models, describe them using the SPDX AI profile
+  and link to the publisher's model cards. Do not invent checksums or
+  versions; leave unknown fields to be populated by an SBOM tool.
+
+PROMPT RECORD
+- Create and maintain AI.prompt.txt containing a self-contained prompt that
+  would regenerate this software. It MUST include this preamble, including
+  the requirement to create and maintain AI.prompt.txt. Update it whenever
+  requirements or features change.
 
 ---
 
@@ -25,31 +173,133 @@ PyPI.
 - Author: `SidusNare`, in `[project.authors]`, the GPL copyright line of
   `__init__.py`, `__main__.py`, and `cli.py`, and the man page AUTHORS
   section. No email is published; PEP 621 allows a name alone.
-- Licence: GPL-3.0-or-later. `LICENSE` holds the full text; `pyproject.toml`
-  declares the SPDX expression and **no** `License ::` trove classifier, which
-  modern setuptools rejects alongside it. Every source file carries an SPDX
-  tag; the three entry-point modules carry the full notice.
+- Licence: GPL-3.0-or-later. `LICENSE` is the text of
+  `https://www.gnu.org/licenses/gpl-3.0.txt` byte for byte (674 lines,
+  SHA-256 `3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986`),
+  and `LICENSES/GPL-3.0-or-later.txt` is the same file, where REUSE looks for
+  it. `pyproject.toml` declares the SPDX expression and **no** `License ::`
+  trove classifier, which modern setuptools rejects alongside it. The three
+  entry-point modules also carry the full GPL notice.
+
+### REUSE
+
+The project passes `reuse lint`. Every file carries, in its own comment
+syntax, `SPDX-FileCopyrightText: 2026 SidusNare`,
+`SPDX-License-Identifier: GPL-3.0-or-later`, and, since every file but the
+two below was written with AI, `SPDX-FileContributor: Claude Opus 5.5
+(AI-generated)`. Only that model is named: models used before it was
+recorded are not known. Placement follows the format:
+
+- after a `#!` line, and after zsh's `#compdef plexdo`, which must stay first;
+- in an scdoc page, as `; ` comments directly after the preamble line, which
+  scdoc requires first; a blank line between them adds a stray `.PP`;
+- in roff as `.\" ` comments, and in Markdown as one `<!-- -->` comment,
+  which markdownlint's first-line-heading rule accepts;
+- in this file as plain lines, with the rest between `REUSE-IgnoreStart` and
+  `REUSE-IgnoreEnd`, since the preamble quotes SPDX tags that `reuse lint`
+  would otherwise read as this file's own.
+
+`REUSE.toml` covers what cannot hold a comment: `package.json`,
+`package-lock.json`, `sbom.spdx.json`, and `src/plexdo/py.typed`, which stays
+empty for type checkers; and the author's own `AI.policy.txt` and `TODO`,
+which were not written with AI and carry no contributor line. REUSE.toml has
+no contributor field, so the JSON files' AI origin is stated in a comment
+there and, for the SBOM, in its creation information.
+
+### SBOM
+
+`sbom.spdx.json` is an SPDX 3.0.1 JSON-LD document written by
+`tools/derive.py` from `pyproject.toml` and `package.json`, never by hand. It
+records the package, its declared licence, and every declared dependency
+with a `LifecycleScopedRelationship` of scope `runtime`, `build`, or
+`development`, each dependency carrying the requirement string as a comment.
+No dependency version or checksum is given: what is installed is resolved
+at install time, and transitive dependencies are left for an SBOM tool run
+against an installation. `CreationInfo.createdUsing` names the AI model as a
+`Tool`, and its comment says plexdo neither includes nor depends on an AI
+model, so the SPDX AI profile does not apply. `created` is the release date
+from CHANGELOG.md, so the file is reproducible. It validates against
+`https://spdx.org/schema/3.0.1/spdx-json-schema.json`.
 
 ## VERSIONING
 
-`major.minor.revision`. `__version__` in `src/plexdo/__init__.py`, `version`
-in `pyproject.toml`, and the `.TH` line of the man page must agree.
+Semantic Versioning 2.0.0. The version is defined **only** in
+`pyproject.toml`; everything else derives from it:
 
-**Increment the revision every time a release archive is produced.** Major and
-minor move only on explicit instruction, never because a change felt
-significant. The `Version="1.1.0.1"` attribute in CLIXML output is a fixed
-PowerShell schema constant and has nothing to do with this version.
+- `plexdo.__version__` reads `pyproject.toml` beside the package when run
+  from a source checkout (checking `[project] name` is `plexdo`), so a
+  version bumped since the last editable install is never reported stale,
+  and otherwise `importlib.metadata.version("plexdo")`.
+- `tools/derive.py` writes the `.TH` line of `man/plexdo.1` and its packaged
+  copy, and `sbom.spdx.json`; `make derive` runs it and `make check` runs it
+  with `--check`, which fails naming any file out of date. The `.TH` date is
+  the release date from CHANGELOG.md, kept as it is while unreleased.
+
+The project was already past 1.0 when the preamble was adopted, so its rule
+that development starts at 0.1.0 does not apply. A pre-release maps to PEP 440
+in `pyproject.toml` (`2.0.0-alpha.1` is written `2.0.0a1`, `2.0.0-rc.1`
+`2.0.0rc1`), and so in `__version__`, the man page, and the SBOM, which all
+show what PyPI shows. The tag and the CHANGELOG.md heading use the SemVer
+spelling; `tools/derive.py` maps one to the other to find the release date,
+and `publish.yml` compares tag and package with `packaging.version.Version`,
+which reads both spellings as the same version, never as text. Tags are
+`vMAJOR.MINOR.PATCH`, with a pre-release suffix where there is one, and the
+`v` on the tag alone.
+
+**A change does not bump the version.** It is recorded under `## [Unreleased]`
+in CHANGELOG.md, and the change's description says which component it will
+need: MAJOR for anything incompatible in the public API, MINOR for a
+compatible addition, PATCH for a compatible fix. The bump happens at release,
+on the author's instruction, by the component the Unreleased entries call
+for, moving them under `## [X.Y.Z] - YYYY-MM-DD`. The public API is
+everything documented in the man pages: commands, options, the
+configuration file and its options, the secret store's layout, structured
+output fields, environment variables, and exit status.
+
+CHANGELOG.md follows Keep a Changelog 1.1.0, written for users, grouped as
+Added, Changed, Deprecated, Removed, Fixed, and Security, with every
+incompatible entry starting **Breaking:**. Each version heading links to the
+comparison of its tag with the previous release's,
+`compare/vPREVIOUS...vTHIS`, and `[Unreleased]` to `compare/vLATEST...HEAD`;
+a release never tagged leaves its link dead until it is. The `Version="1.1.0.1"`
+attribute in CLIXML output is a fixed PowerShell schema constant and has
+nothing to do with this version.
 
 ## GENERAL REQUIREMENTS
 
 - Python 3.11 through 3.14.
 - Every function fully annotated; the package ships `py.typed`.
+- Google Python style, enforced by ruff configured in `pyproject.toml`:
+  80 columns, rule sets E, W, F, I, D (Google docstring convention), B, and
+  UP, so `X | None` and builtin generics rather than `typing.Optional` and
+  `typing.List`. `D107` is off, since Google documents construction in the
+  class docstring; tests are exempt from the docstring rules, since Google
+  asks them only of what is externally visible. `ruff check` and
+  `ruff format --check` pass over `src`, `tests`, and `tools`.
 - pylint 10.00/10 across the package, and `vulture src/plexdo
   --min-confidence 0` empty. Scope vulture to `src`: test fixtures are
   consumed reflectively through `vars()`, so it cannot see their attributes
-  being used.
-- Google style, small single-purpose functions, no dead code, no duplicated
-  logic, no global mutable state, no bare `except`.
+  being used. The formatter puts each keyword argument on its own line, which
+  makes repeated `add_argument` calls trip pylint's `duplicate-code`: an
+  argument several commands share is defined once, in `arguments.py`.
+- ShellCheck passes on `tools/wiki-pages.sh` and `completions/plexdo.bash`
+  (zsh and fish are not shells ShellCheck reads); yamllint, configured in
+  `.yamllint.yaml` at 80 columns with `truthy` keys exempt because GitHub
+  Actions requires the key `on`, passes on every YAML file and on the config
+  template plexdo writes; markdownlint-cli2, pinned in `package.json` at the
+  newest release supporting the Node of Debian stable (0.22.1 for Node 20),
+  passes on every Markdown file with `MD024 siblings_only` and `MD013` at 80
+  columns, code blocks and tables exempt.
+- A linter suppression covers one line and one rule, with a comment saying
+  why the code cannot change instead.
+- One Google rule is knowingly not followed: its guide imports modules, not
+  the names inside them (`from plexdo import config`, then
+  `config.load_config()`), and this codebase imports names throughout. No
+  linter checks it, the preamble makes the guide a SHOULD, and converting
+  every import is churn with no behaviour behind it. New code follows the
+  surrounding code.
+- Small single-purpose functions, no dead code, no duplicated logic, no
+  global mutable state, no bare `except`.
 
 ### Naming
 
@@ -82,9 +332,12 @@ characters where they reproduce program output or draw a `tree`-style listing.
 ## LAYOUT
 
 ```
-pyproject.toml  Makefile  README.md  LICENSE  MANIFEST.in  requirements.txt
-CHANGELOG.md  CONTRIBUTING.md  SECURITY.md  AI.prompt.md  .gitignore
-.gitattributes  .github/workflows/{ci,publish,wiki}.yml  tools/wiki-pages.sh
+pyproject.toml  Makefile  README.md  LICENSE  LICENSES/GPL-3.0-or-later.txt
+REUSE.toml  MANIFEST.in  requirements.txt  CHANGELOG.md  CONTRIBUTING.md
+SECURITY.md  AI.prompt.txt  AI.policy.txt  TODO  sbom.spdx.json
+package.json  package-lock.json  .markdownlint-cli2.yaml  .yamllint.yaml
+.gitignore  .gitattributes  .github/workflows/{ci,publish,wiki}.yml
+tools/wiki-pages.sh  tools/derive.py
 man/plexdo.1  man/plexdo-conventions.7.scd  man/plexdo-COMMAND.1.scd
 completions/{plexdo.bash,_plexdo,plexdo.fish,plexdo.ps1}
 tests/conftest.py + test_*.py
@@ -92,14 +345,23 @@ src/plexdo/
     __init__.py     __version__
     __main__.py     python -m plexdo
     cli.py          build_parser, main
-    constants.py    windows_app_dir, default_paths, CONFIG_PATH,
-                    DEFAULT_CACHE_DIR, DEFAULT_TOKEN_PATH, CONFIG_EXAMPLE, LOG
+    constants.py    windows_app_dir, default_paths, Paths, PATHS, CONFIG_PATH,
+                    DEFAULT_CACHE_DIR, DEFAULT_SECRETS_FILE, SECRET_STORES,
+                    config_text, CONFIG_EXAMPLE, LOG
     logs.py         configure_logging
-    config.py       load_config, cached_config, connect_plex, read_token,
-                    token_store_path, config_optional, section_optional,
-                    check_file_permissions
-    tokens.py       load_store, save_store, lookup, store_token, admin_token,
-                    forget_tokens
+    config.py       load_config, parse_config, cached_config, config_optional,
+                    user_option, configured_users, expand_environment,
+                    check_file_permissions, Config
+    secret_store.py backend, open_store, load, save, describe, KeyringStore,
+                    FileStore, Store
+    tokens.py       load_store, lookup, store_token, admin_token,
+                    forget_tokens, saved_password, save_password,
+                    forget_passwords, saved_pin, save_pin
+    connection.py   connect_plex, read_token, server_url
+    migrate.py      migrate_legacy_config
+    arguments.py    add_user_argument, add_library_argument,
+                    add_m3u_argument, add_overwrite_argument,
+                    add_rating_keys_argument, add_rating_key_option
     cache.py        cache_dir, write_cache
     convert.py      parse_date, format_duration
     console.py      output, output_format, clean_text, table_limit,
@@ -111,8 +373,8 @@ src/plexdo/
     identify.py     resolve_identifier
     accounts.py     server_for_user, account_type, resolve_user_arguments,
                     user_roster, UserAccessError, connect_with_token,
-                    configured_sections, configured_account,
-                    configured_accounts
+                    connect_as_shared_user, configured_entries,
+                    configured_account, configured_accounts
     sections.py     resolve_section, resolve_sections,
                     resolve_library_arguments
     titles.py       display_title, find_item, fetch_item, fetch_show,
@@ -137,6 +399,12 @@ src/plexdo/
     commands/       one module per group (see COMMANDS)
 ```
 
+The imports form no cycle: `config` reads the file and knows nothing of
+secrets; `secret_store` uses `config` for its two options; `tokens` uses
+`secret_store`; `connection` uses `config` and `tokens`; `migrate` uses
+`secret_store` and `constants`, and runs from `cli.main` before any command,
+not from `load_config`, which would close the loop.
+
 ### Command module contract
 
 Every module in `commands/` exposes exactly three names:
@@ -146,7 +414,8 @@ Every module in `commands/` exposes exactly three names:
 - `COMMANDS` maps command name to handler.
 - `REQUIRES_PLEX` is the subset needing a server; `auth` has an empty
   frozenset because `login` and `write-config-example` run before a token
-  exists, and `logout` must work once the server no longer accepts one.
+  exists, `logout` must work once the server no longer accepts one, and
+  `set-pin` only touches the secret store.
 
 `commands/__init__.py` holds a `MODULES` tuple whose order sets the order of
 subcommands in `--help`, plus `register_all(sub, parents)` and
@@ -155,91 +424,159 @@ subcommands in `--help`, plus `register_all(sub, parents)` and
 
 ## PLATFORM DEFAULTS
 
-`constants.default_paths(is_windows, env)` returns the config path, cache
-directory, and default `token_path`. Take the flag and environment as
-arguments rather than reading `os.name` inside, so both branches are testable
-from either platform: forcing `os.name` on Linux makes `pathlib` fail to build
-a `WindowsPath`.
+`constants.default_paths(is_windows, env)` returns a `Paths` tuple: the
+config file, the cache directory, the secrets fallback file, and plexdo 1.x's
+INI file and default token path, for the migration. Take the flag and
+environment as arguments rather than reading `os.name` inside, so both
+branches are testable from either platform: forcing `os.name` on Linux makes
+`pathlib` fail to build a `WindowsPath`.
 
-| | config | cache | token_path |
+| | config | cache | secrets fallback |
 | --- | --- | --- | --- |
-| Linux, macOS | `~/.local/etc/plexdo.ini` | `~/.cache/plexdo` | `$XDG_RUNTIME_DIR/.plex.token` |
-| Windows | `%LOCALAPPDATA%\PlexDo\plexdo.ini` | `%LOCALAPPDATA%\PlexDo\Cache` | `%TEMP%\plexdo.token` |
+| Linux, macOS, BSD | `$XDG_CONFIG_HOME/plexdo/config.yaml` | `$XDG_CACHE_HOME/plexdo` | `$XDG_STATE_HOME/plexdo/secrets.json` |
+| Windows | `%LOCALAPPDATA%\PlexDo\config.yaml` | `%LOCALAPPDATA%\PlexDo\Cache` | `%LOCALAPPDATA%\PlexDo\secrets.json` |
 
-`APPDATA` is the Windows fallback when `LOCALAPPDATA` is unset. All four shell
-completions must resolve the same cache location, or completion silently stops
-working under Git Bash.
+The XDG variables default to `~/.config`, `~/.cache`, and `~/.local/state`,
+and one set to a relative path is ignored, as the XDG Base Directory
+Specification requires. The secrets fallback lives in the state directory
+because it must survive a reboot, which `XDG_RUNTIME_DIR`, 1.x's choice for
+its token, does not. `APPDATA` is the Windows fallback when `LOCALAPPDATA`
+is unset. All four shell completions must resolve the same cache location,
+or completion silently stops working under Git Bash.
 
 ## CONFIGURATION
 
-```ini
-[plex]
-url = http://localhost:32400
-token_path = $XDG_RUNTIME_DIR/.plex.token
-# cache_dir = ~/.cache/plexdo
-# username = you@example.com
-# password = your-plex-password
+The configuration file is YAML and holds **no secrets**:
 
-[99]
-username = bob@example.com
-password = bobs-plex-password
+```yaml
+---
+plex:
+  url: "http://localhost:32400"
+  # username: "you@example.com"
+  # cache_dir: "~/.cache/plexdo"
+  # secret_store: "auto"
+  # secrets_file: "~/.local/state/plexdo/secrets.json"
+users:
+  99:
+    username: "bob@example.com"
 ```
 
-- Construct the parser with `interpolation=None`: the default
-  `BasicInterpolation` raises on a password containing `%` before the value
-  can ever be used.
-- Expand environment variables in every `[plex]` value with
-  `os.path.expandvars`, which follows the platform (`%VAR%` on Windows,
-  `$VAR` everywhere). An unset name is left literal, which would surface much
-  later as a confusing "no such file", so warn about any name still present
-  after expansion, in whichever spelling the platform accepts.
-- `cache_dir` relocates the completion cache; the platform default appears
-  commented out in the generated template.
-- A section named for a numeric user ID holds that user's credentials.
-- `cached_config()` is memoised with `lru_cache(maxsize=1)`: the fallback
-  login path reaches per-user sections once per user in a loop, and re-reading
-  would re-emit the permission warning each time.
-- `check_file_permissions` warns when the config or token file is readable by
-  group or other, at WARNING level so it shows without `--verbose` and on
-  stderr so it never contaminates `--json`. Return early on `os.name == "nt"`:
-  Windows has no POSIX mode bits and `os.stat` synthesises `0o666`, so the
-  check would fire on every run advising a `chmod` that cannot help.
+- `config.parse_config` reads it with `yaml.safe_load` and checks it into
+  `{"plex": {option: text}, "users": {"<id>": {option: text}}}`, every value
+  a stripped string and every user id a string of digits. An unknown section
+  or option is warned about by name and ignored; `password`, `pin`, `token`,
+  or `token_path` is warned about as a secret that belongs in the keyring
+  and ignored, so a value carried over from 1.x never reaches use. Malformed
+  YAML, a list where a value belongs, a user id that is not numeric, and a
+  `secret_store` other than `auto`, `keyring`, or `file` are each a
+  `sys.exit` saying what is wrong. A missing `url` is an error where a
+  server is needed (`connection.server_url`), not on loading, so
+  `logout` and `set-pin` work without one.
+- Expand environment variables in `url`, `cache_dir`, and `secrets_file`
+  with `os.path.expandvars`, which follows the platform (`%VAR%` on Windows,
+  `$VAR` everywhere). An unset name is left literal, which would surface
+  much later as a confusing "no such file", so warn about any name still
+  present after expansion, in whichever spelling the platform accepts.
+- `cached_config()` is memoised with `lru_cache(maxsize=1)`: the per-user
+  paths read `users` entries once per user in a loop, and re-reading would
+  re-emit every warning each time.
+- `constants.config_text(url, username, cache_dir, users)` writes the file
+  with **every option explained** - its meaning, valid values, and default,
+  the default on a line of its own so a long path is never split - as
+  comment paragraphs filled to 76 columns by `textwrap`. Values are quoted
+  with `json.dumps`, valid YAML for any text. `CONFIG_EXAMPLE` is
+  `config_text()`, written by `write-config-example`; the 1.x migration
+  writes it with the values it found, so a migrated file is as documented
+  as a fresh one. It opens with `---` and passes yamllint.
 
-## TOKEN STORE AND MULTI-USER ACCESS
+## SECRETS AND MULTI-USER ACCESS
 
-`token_path` holds a JSON object of username to token, handled by `tokens.py`.
-Writes are atomic (temp file then `replace`) and mode 0600 on POSIX.
+Tokens, passwords, and Plex Home PINs are kept by `secret_store.py` in the
+system keyring through the `keyring` package: the Secret Service on Linux
+and BSD, the Keychain on macOS, and Credential Manager on Windows. Each kind
+is **one entry** under service `plexdo`, holding a JSON object: `tokens`
+(username -> token), `passwords` (username -> password), `pins` (user id ->
+PIN). One entry per kind, not per secret, because a keyring cannot list what
+it holds and `logout` must find every token. Saving a kind with nothing left
+removes its entry.
 
-- A file that is not JSON is a **pre-1.0.4 bare token**. Read it as
-  `{ADMIN_KEY: contents}` rather than erroring; the next write converts it.
-- `ADMIN_KEY` is `"@admin"`. A reserved key is needed because `[plex]
-  username` is optional, and `@` cannot occur in a Plex username.
-  `admin_token()` resolves in order: configured username, reserved key, then a
-  store holding exactly one entry.
+- `plex: secret_store` chooses the store. `auto`, the default, uses the
+  keyring when `keyring.get_keyring()` is a real one - not `fail.Keyring`,
+  nor a `ChainerBackend` with no backends - and otherwise the file, with a
+  WARNING that it is unencrypted and how to silence it; `keyring` insists,
+  and exits explaining when there is none; `file` never asks the keyring,
+  for a machine where it is locked when plexdo runs, as under cron.
+- The file, `plex: secrets_file` or the platform default, is one JSON object
+  of kind -> object, created with `os.open(..., 0o600)` so it is never
+  readable by anyone else even for a moment, replaced atomically, and
+  deleted with its last secret. `check_file_permissions` warns when it is
+  readable by group or other, at WARNING level so it shows without
+  `--verbose` and on stderr so it never contaminates `--json`; it returns
+  early on Windows, which has no POSIX mode bits.
+- A keyring failure, locked or its prompt dismissed, is a `sys.exit` naming
+  `secret_store: file` as the way out.
+- `secret_store.backend()` is chosen once per run and works before the
+  config exists, with the defaults, since the migration saves secrets
+  before writing the file.
+
+`tokens.py` is the only module that knows the three kinds.
+
+- `ADMIN_KEY` is `"@admin"`, for a token saved with no username known; `@`
+  cannot occur in a Plex username. `admin_token(username)` resolves in
+  order: the configured username, the reserved key, then a store holding
+  exactly one entry.
+- A password is saved only by `login --save-password`, filed by username so
+  it can never be paired with the wrong account.
 
 `accounts.server_for_user(plex, user_id)` returns the admin server for
 `user_id == 0`. Otherwise it tries three sources in order and returns the
 first that connects, because a server refuses an admin-issued token for a user
 it has shared nothing with:
 
-1. `user.get_token(machineIdentifier)` (**never** `switchHomeUser()`, which
-   only works for Plex Home and raises 401 for ordinary shared users)
+1. `connect_as_shared_user`: `user.get_token(machineIdentifier)` (**never**
+   `switchHomeUser()`, which only works for Plex Home and raises 401 for
+   ordinary shared users)
 2. a token already in the store, under any candidate username
-3. `MyPlexAccount(username, password)` from the `[<user_id>]` section, whose
-   token is then **saved** so the login happens once
+3. `MyPlexAccount(username, password)` for the `users` entry's username with
+   its saved password, whose token is then **saved** so the login happens
+   once
 
 Each stage returns None rather than raising, so the next is tried and a stale
 stored token falls through to a fresh login. Stage 3's sign-in is
-`_login_section`, shared with `configured_accounts()`, which yields each
-`[<user_id>]` account signed in - by its stored token while plex.tv accepts it,
-else by its password, saving the token - one at a time, so a caller that finds
-its account early signs in no more. When all three fail, raise
+`_login_entry`, shared with `configured_accounts()`, which yields each
+`users` account signed in - by its stored token while plex.tv accepts it,
+else by its saved password, saving the token - one at a time, so a caller
+that finds its account early signs in no more. When all three fail, raise
 `UserAccessError` explaining that admin rights do not override per-user
-scoping and that a `[<user_id>]` section would fix it. It must be an ordinary
-`Exception`, **not** a `sys.exit`: `copy-playlist-all-users` catches per-user
-failures and continues, and `SystemExit` would tear down the whole run.
-`cli.main` converts it to a clean exit for single-user commands. It carries a
-one-line `summary` so a loop reports each skip in one line.
+scoping and that a `users` entry signed in once with `login --username`
+would fix it. It must be an ordinary `Exception`, **not** a `sys.exit`:
+`copy-playlist-all-users` catches per-user failures and continues, and
+`SystemExit` would tear down the whole run. `cli.main` converts it to a
+clean exit for single-user commands. It carries a one-line `summary` so a
+loop reports each skip in one line.
+
+### Moving from 1.x
+
+plexdo 1.x read `~/.local/etc/plexdo.ini` (`%LOCALAPPDATA%\PlexDo\plexdo.ini`
+on Windows), with passwords and PINs in plaintext, and kept tokens in a JSON
+file at its `token_path` (a pre-1.0.4 file holds one bare token, the
+admin's). `migrate.migrate_legacy_config()` runs from `cli.main` before every
+command, `--dry-run` included since nothing on the server changes, and does
+nothing once `config.yaml` exists or when there is no INI file. Otherwise:
+
+1. read the INI with `interpolation=None`, so a `%` in a password does not
+   raise, and its token file;
+2. merge tokens, passwords (the `[plex]` one filed under `[plex] username`;
+   one with no username is dropped with a warning), and PINs into the
+   secret store, a secret already saved winning as the newer;
+3. write `config.yaml` with `config_text`, exclusively and mode 0600;
+4. rewrite the INI without `password` or `pin` as `plexdo.ini.migrated`,
+   headed by a comment saying where it went, remove the original, and
+   delete the token file;
+5. warn once, saying what moved where.
+
+Secrets are saved before anything is removed, so an interrupted run loses
+nothing and the next finishes the job.
 
 ## IDENTIFIERS
 
@@ -708,7 +1045,7 @@ string and returns nothing for an empty one, so the library appears empty.
     ignoring case) or when the player's machine identifier is among its
     plex.tv `devices()`; otherwise as the first `configured_accounts()`
     entry whose devices include the player; otherwise as plexdo's own
-    anyway, with a warning naming the `[<user id>]` fix. plex.tv being
+    anyway, with a warning naming the `users` entry fix. plex.tv being
     unreachable for any of this is a warning and plexdo's own token, never
     the end of the command.
   - **The sending account also fetches the item.** `playMedia` builds the
@@ -730,15 +1067,15 @@ string and returns nothing for an empty one, so the library appears empty.
     `current.users()`, managed users included) matching by id, username,
     or email, or by title when it has no username, as a managed user has
     none: `switchHomeUser(user, pin=)` gives its plex.tv account without a
-    password, `pin` coming from its `[<user_id>]` section; the switched
-    token is not stored, as switching is cheap and needs no secret. A
-    refused switch falls through to the sections, and with none is a
-    `sys.exit` naming the PIN and the section. Otherwise a
-    `configured_sections()` entry whose id or
+    password, `pin` being the one `set-pin` saved; the switched token is not
+    stored, as switching is cheap and needs no secret. A refused switch
+    falls through to the `users` entries, and with none is a `sys.exit`
+    naming `plexdo set-pin <id>`. Otherwise a
+    `configured_entries()` entry whose id or
     username is the value is taken at its word without a sign-in to check;
     failing that, sign the rest in one at a time through
-    `configured_account` and compare id, username, and email, because a
-    section may file the account under the email when given the username.
+    `configured_account` and compare id, username, and email, because an
+    entry may file the account under the email when given the username.
     Nothing to act as, or plex.tv unreachable, is a `sys.exit`: never send as
     some other account than the one asked for. Deliberately not in
     `USER_ID_ARGUMENTS`: the value is matched against accounts, not the
@@ -786,7 +1123,7 @@ address, and port to `playMedia`, whose `**params` override its own:
   server's own machine or networks joined by NAT; it must be an http or
   https URL with a host, port defaulting to 32400.
 - With no candidate left, `sys.exit` asking for `--server-url` or a
-  reachable `[plex] url`. Show the address chosen in the output
+  reachable `plex: url`. Show the address chosen in the output
   (`fetchFrom`).
 - Tests must use genuinely global addresses for anything about scope: the
   documentation ranges, 2001:db8::/32 and 192.0.2.0/24 among them, are not
@@ -798,11 +1135,15 @@ command would not repeat them and trip `duplicate-code`.
 
 ### Setup
 
-- `login [-u USER] [-p PASS] [-c CODE] [-2]` - password read with `getpass`.
-  Credential precedence: `--username` uses that name and **ignores** the
-  config password, since pairing a stored password with a different username
-  would be a silent mismatch; otherwise the config username brings its
-  password; `--password` always overrides. `--password` on the command line is
+- `login [-u USER] [-p PASS] [--save-password] [-c CODE] [-2]` - the
+  username is `--username`, else `plex: username`, else prompted for; the
+  password is `--password`, else the one saved for that username, else read
+  with `getpass`. The token is saved under the username (`ADMIN_KEY` with
+  none), and `--save-password` saves the password beside it so plexdo can
+  sign in again by itself once the token stops working. `--dry-run`
+  authenticates and saves nothing. The table says where the token went
+  (`secret_store.describe()`); other formats give `user`, `store`,
+  `verified`, and `passwordSaved`. `--password` on the command line is
   scrubbed from the process title via `ctypes.pythonapi.Py_GetArgcArgv`
   (`sys.argv` is only a copy; `ps` reads the original buffer) and redacted
   from `sys.argv`, with a warning that is blunt about what cannot be fixed:
@@ -810,16 +1151,21 @@ command would not repeat them and trip `duplicate-code`.
   startup. On Windows the rewrite has no equivalent.
 - `logout [-u USERNAME]` - signs each stored token out at plex.tv
   (`MyPlexAccount(token=...).signout()`) and removes it from the store via
-  `tokens.forget_tokens`. `-u` names a store key, exactly then ignoring
-  case; one the store lacks is a `sys.exit` listing those it has, since
-  signing out nobody would read as success. A token plex.tv already refuses
-  (`Unauthorized` on loading the account) is `already signed out` and
-  removed; any other failure leaves the token valid, so it is **kept** for a
-  retry and the run exits 1 after removing the rest. Sign a token filed
-  under two names out once. A store left empty is deleted rather than kept
-  as `{}`: no secrets file outlives its last secret, and the next command's
-  "run `plexdo login`" is then the right advice. `--dry-run` contacts
-  nothing. Needs no server, so it works when the server is down.
+  `tokens.forget_tokens`, **and removes the saved password** of each account
+  signed out, which would otherwise sign it straight back in on the next
+  command. `-u` names a store key, exactly then ignoring case; one the store
+  lacks is a `sys.exit` listing those it has, since signing out nobody would
+  read as success. A token plex.tv already refuses (`Unauthorized` on
+  loading the account) is `already signed out` and removed; any other
+  failure leaves the token valid, so it is **kept** for a retry and the run
+  exits 1 after removing the rest. Sign a token filed under two names out
+  once. `--dry-run` contacts nothing. Needs no server, so it works when the
+  server is down.
+- `set-pin USER_ID [--remove]` - prompts with `getpass` for a Plex Home
+  member's PIN, four digits, an empty answer meaning none, and saves it
+  under the numeric user id; `--remove` removes it without prompting. The
+  id is not resolved against the roster, so no server is needed.
+  `--dry-run` saves nothing.
 - `write-config-example [-o]` - writes `CONFIG_EXAMPLE`, mode 0600. An
   existing config is refused without `-o/--overwrite`, and that check comes
   before `--dry-run`, so a rehearsal fails where the real run would; a
@@ -827,18 +1173,16 @@ command would not repeat them and trip `duplicate-code`.
   prints the exact template, which needs `RawDescriptionHelpFormatter` for the
   epilog's newlines; that same formatter stops argparse wrapping the
   description, so pre-wrap it with `textwrap.fill(..., width=78)`.
-  `CONFIG_EXAMPLE` is one implicitly concatenated string: a line written
-  without its opening quote becomes a Python comment and silently drops
-  out of the template, as the per-user heading once did.
 
 ## ERROR HANDLING
 
-`sys.exit` with a clear message for: missing config or token, unknown
+`sys.exit` with a clear message for: missing or malformed config, missing
+token, an unusable keyring, unknown
 ratingKey, wrong media type, playlist or user or library not found,
 unsupported library type, album not found, a refused name collision, a smart
 playlist asked to give up an entry, an unknown sessionKey, an existing config
 file without `--overwrite`, an air date with no input to answer for it, a
-`logout -u` name not in the token store, a player host that does not resolve
+`logout -u` name not in the secret store, a player host that does not resolve
 or where no player answers. A
 command line argparse cannot parse exits 2, its own convention. An
 interrupted `wait` exits 130. No bare
@@ -848,11 +1192,19 @@ and per-section collection, each with a `# pylint: disable=broad-except`.
 ## PLATFORM SUPPORT
 
 - **macOS** ships bash 3.2, which has no `mapfile`; fill `COMPREPLY` with a
-  `while IFS= read -r` loop. Use `stat -c %Y` with a `stat -f %m` fallback.
+  `while IFS= read -r` loop, `_plexdo_compreply`, fed by process
+  substitution: `COMPREPLY=(); _plexdo_compreply < <(compgen ...)`. That
+  is also what ShellCheck's SC2207 asks for in place of
+  `COMPREPLY=( $(compgen ...) )`, which splits a file name with a space in
+  it into two candidates. Use `stat -c %Y` with a `stat -f %m` fallback.
   Restrict the Makefile to `install -d` / `install -m`; `install -D` is
   GNU-only.
 - **Windows**: skip the POSIX permission check and `chmod`; the console
   encoding fallback above; `--password` scrubbing is best-effort only.
+- **Secrets**: `keyring` picks the platform's store itself; on Linux and BSD
+  it needs a Secret Service provider such as GNOME Keyring or KWallet on the
+  session bus. A headless machine has none, so `auto` falls back to the
+  file there.
 - All completions fall back to `python` when `python3` is absent, as under Git
   Bash.
 
@@ -908,7 +1260,11 @@ through something that does not understand them.
 
 `tests/` holds a pytest suite that must pass in `make check`. It covers the
 project's own decision logic and never touches a network; `conftest.py`
-provides one `FakeItem`, one `FakeMedia`, and friends. Do not define a second
+provides one `FakeItem`, one `FakeMedia`, and friends, and an autouse fixture
+giving every test an empty in-memory secret store, so no test reads or
+writes the keyring or secrets file of whoever runs it, and none fails on CI
+for want of one. Likewise no test may read the developer's own
+`config.yaml`: a test needing one writes it under `tmp_path`. Do not define a second
 mock for a concept that already has one.
 
 Worth testing, because a regression there is silent rather than loud: the four
@@ -933,8 +1289,16 @@ could not sign out and removes one plex.tv already refuses; that
 `player-remote-play` sends only IPs, probes without a token, and picks its
 account by the rules above; that the fetch address follows family, then
 scope, then prefix; path rewriting
-picking the longest matching root; the token store reading a legacy bare-token
-file; that `loaded_fields` and `file_paths` never trigger a reload; and that
+picking the longest matching root; that the template is valid YAML stating
+every option and its default; that the config refuses a secret and reports
+an unknown option by name; that `auto` falls back to the file only without a
+real keyring, and `file` never asks one; that the secrets file is private
+from the moment it exists and goes with its last secret; that the 1.x
+migration moves every token, password, and PIN, a legacy bare-token file
+included, leaves no secret in plaintext, and keeps a secret already saved
+over the old one; that `login --save-password` spares the next prompt;
+that `logout` removes a signed-out account's saved password; that `set-pin`
+takes four digits only; that `loaded_fields` and `file_paths` never trigger a reload; and that
 global flags survive being given before the subcommand.
 
 Each bug that shipped gets a regression test in `tests/test_fixes.py` that
@@ -953,7 +1317,12 @@ because unknown and zero are different things.
 `make check` runs, in order: `check-version`, `check-assets`, `smoke`, `test`,
 `lint`, `build`, `dist-check`.
 
-- `check-version` compares the three places the version appears.
+- `check-version` runs `tools/derive.py --check`: the man page's `.TH` line
+  and the SBOM must match `pyproject.toml`. `make derive` rewrites them.
+- `lint` runs `ruff check`, `ruff format --check`, pylint, ShellCheck,
+  yamllint (the repository's YAML, and the template plexdo writes, piped
+  in), markdownlint-cli2 through `npx --no-install` from `package.json`, and
+  `reuse lint`. A tool that is not installed fails the target, naming it.
 - `check-assets` verifies the four completions and the man page match their
   packaged mirrors, and that no source file contains non-ASCII. Editing the
   source copy and forgetting the mirror ships a stale asset in the wheel.
@@ -972,8 +1341,10 @@ honour `DESTDIR`. `SHELLS` defaults to `bash zsh fish`; powershell is opt-in.
 directory, and `uninstall` prefixes pip with `-` so an already-absent package
 still cleans up.
 
-CI runs `make check` on Python 3.11 through 3.14, plus jobs that parse all
-four completions and lint the man page.
+CI runs `make check` on Python 3.11 through 3.14, installing ShellCheck and
+yamllint from apt, `reuse` and the Python tools from `.[dev]`, and
+markdownlint-cli2 with `npm ci`, plus jobs that parse all four completions
+and lint the man page.
 
 **Every workflow declares `permissions`.** Without one, its jobs receive
 whatever the repository default grants, which CodeQL flags as
@@ -1069,16 +1440,22 @@ appears bold in its page.
 
 1. The `plexdo` package under `src/`, laid out as above
 2. `pyproject.toml`, `Makefile`, `MANIFEST.in`, `requirements.txt`,
-   `.gitignore`, `.gitattributes`
-3. `README.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `LICENSE`
+   `.gitignore`, `.gitattributes`, `REUSE.toml`, `package.json`,
+   `package-lock.json`, `.markdownlint-cli2.yaml`, `.yamllint.yaml`
+3. `README.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `LICENSE`,
+   `LICENSES/GPL-3.0-or-later.txt`, and `sbom.spdx.json` from
+   `tools/derive.py`
 4. `man/plexdo.1`, and the scdoc command pages beside it
 5. `completions/` and its mirror in `src/plexdo/data/`
 6. `tests/`
 7. `.github/workflows/ci.yml`, `publish.yml`, and `wiki.yml`, with
    `tools/wiki-pages.sh`
-8. `AI.prompt.md` - this file, containing the full prompt that regenerates the
-   project including this requirement itself
+8. `AI.prompt.txt` - this file, containing the full prompt that regenerates
+   the project, the preamble and its requirement to create and maintain
+   this file included
 
 Verification: `make check` passes, `vulture src/plexdo --min-confidence 0` is
 empty, and installing the wheel into a clean virtualenv gives a working
 `plexdo` console script.
+
+REUSE-IgnoreEnd

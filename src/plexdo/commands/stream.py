@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Media streaming to stdout."""
 
@@ -10,6 +12,7 @@ import textwrap
 import requests
 from plexapi.server import PlexServer
 
+from plexdo.arguments import add_library_argument
 from plexdo.console import output_format
 from plexdo.constants import LOG
 from plexdo.titles import display_title, fetch_item
@@ -91,11 +94,12 @@ def cmd_read(plex: PlexServer, args: argparse.Namespace) -> None:
 
 def register(
     sub: "argparse._SubParsersAction",
-    parents: "List[argparse.ArgumentParser]",
+    parents: "list[argparse.ArgumentParser]",
 ) -> None:
     """Register the read subparser."""
     parser = sub.add_parser(
-        "read", parents=parents,
+        "read",
+        parents=parents,
         help=(
             "Stream a media file to stdout. Pipe into a player: "
             "plexdo read <lib> <key> | mpv -"
@@ -118,17 +122,16 @@ def register(
             "  plexdo read 3 12345 | mpv --vo=drm -\n"
             "\n"
             "Run it from a virtual terminal rather than a terminal emulator,\n"
-            "and make sure your user can reach the DRM device (usually via the\n"
+            "and make sure your user can reach the DRM device (usually "
+            "via the\n"
             "video group)."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+    add_library_argument(parser)
     parser.add_argument(
-        "library_id", metavar="LIBRARY",
-        help="Library ID (int) or library title (str). Obtain both with list-libraries.",
-    )
-    parser.add_argument(
-        "rating_key", type=int,
+        "rating_key",
+        type=int,
         help="Item ratingKey (int). Obtain with list-titles or list-show.",
     )
 

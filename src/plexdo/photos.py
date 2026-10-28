@@ -1,9 +1,11 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Photo album traversal and library item collection."""
 
-from typing import Any, List, Optional
 import sys
+from typing import Any
 
 from plexapi.photo import Photo
 
@@ -13,13 +15,12 @@ from plexdo.records import file_paths
 from plexdo.throttle import paced
 from plexdo.titles import non_special_episodes
 
-
 _LIBRARY_ITEM_TYPES = ("show", "movie", "photo")
 
 
 def collect_photos(
-    section: Any, album: Optional[str] = None, args: Any = None
-) -> List[Photo]:
+    section: Any, album: str | None = None, args: Any = None
+) -> list[Photo]:
     """Return photos from a photo library section, optionally filtered by album.
 
     Walks section.all() (albums) then album.photos() - the same pattern used
@@ -29,7 +30,7 @@ def collect_photos(
     If *album* is given, only photos from the matching album are returned
     (case-insensitive title match).  Fails fast if the name is not found.
     """
-    photos: List[Photo] = []
+    photos: list[Photo] = []
     for palbum in paced(list(section.all()), args, "albums"):
         album_title = clean_text(getattr(palbum, "title", "") or "")
         if album is not None and album_title.lower() != album.lower():
@@ -45,8 +46,8 @@ def collect_photos(
 
 
 def collect_library_items(
-    section: Any, album: Optional[str] = None, args: Any = None
-) -> List[MediaItem]:
+    section: Any, album: str | None = None, args: Any = None
+) -> list[MediaItem]:
     """Expand a library section into a flat list of playable items.
 
     TV show libraries are walked show -> season (>0) -> episode.
@@ -54,7 +55,7 @@ def collect_library_items(
     Photo libraries return photos, optionally filtered to a single album.
     """
     if section.type == "show":
-        items: List[MediaItem] = []
+        items: list[MediaItem] = []
         for show in section.all():
             items.extend(non_special_episodes(show))
         return items
@@ -68,7 +69,7 @@ def collect_library_items(
     )
 
 
-def photo_file_path(photo: Photo) -> Optional[str]:
+def photo_file_path(photo: Photo) -> str | None:
     """Return the server filesystem path for a photo, or None if unavailable."""
     paths = file_paths(photo)
     return paths[0] if paths else None

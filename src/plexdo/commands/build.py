@@ -1,29 +1,46 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Playlist building commands."""
 
-from typing import Iterator, List, Optional, Sequence, Set, Tuple
 import argparse
 import datetime
 import sys
+from collections.abc import Iterator, Sequence
 
 from plexapi.playlist import Playlist
 from plexapi.server import PlexServer
 from plexapi.video import Episode, Movie, Show
 
 from plexdo.accounts import server_for_user
-from plexdo.airdates import episodes_in_same_season, prompt_for_date, resolve_episode_date
+from plexdo.airdates import (
+    episodes_in_same_season,
+    prompt_for_date,
+    resolve_episode_date,
+)
+from plexdo.arguments import (
+    add_m3u_argument,
+    add_overwrite_argument,
+    add_rating_keys_argument,
+    add_user_argument,
+)
 from plexdo.constants import LOG, MediaItem
-from plexdo.fanout import add_user_target_arguments, deliver_playlist
 from plexdo.convert import parse_date
+from plexdo.fanout import add_user_target_arguments, deliver_playlist
 from plexdo.m3u import write_m3u
 from plexdo.paths import add_prefix_argument, mapper_for
 from plexdo.playlists import resolve_playlist
 from plexdo.throttle import paced
-from plexdo.titles import fetch_item, fetch_show, non_special_episodes, shuffle_list
+from plexdo.titles import (
+    fetch_item,
+    fetch_show,
+    non_special_episodes,
+    shuffle_list,
+)
 
 
-def _round_robin(episode_lists: List[List[Episode]]) -> Iterator[Episode]:
+def _round_robin(episode_lists: list[list[Episode]]) -> Iterator[Episode]:
     """Yield episodes in round-robin order across multiple lists."""
     queues = [list(eps) for eps in episode_lists if eps]
     while queues:
@@ -40,7 +57,7 @@ def _round_robin(episode_lists: List[List[Episode]]) -> Iterator[Episode]:
 def cmd_build_interleaved(plex: PlexServer, args: argparse.Namespace) -> None:
     """Build a round-robin interleaved playlist from multiple shows."""
     rating_keys = [int(k) for k in args.rating_keys]
-    episode_lists: List[List[Episode]] = []
+    episode_lists: list[list[Episode]] = []
 
     for rk in rating_keys:
         show = fetch_show(plex, rk)
@@ -48,7 +65,7 @@ def cmd_build_interleaved(plex: PlexServer, args: argparse.Namespace) -> None:
         LOG.info("Show '%s': %d episodes", show.title, len(eps))
         episode_lists.append(eps)
 
-    items: List[MediaItem] = list(_round_robin(episode_lists))
+    items: list[MediaItem] = list(_round_robin(episode_lists))
     deliver_playlist(plex, plex, args.name, items, args)
 
     if args.m3u:
@@ -56,28 +73,32 @@ def cmd_build_interleaved(plex: PlexServer, args: argparse.Namespace) -> None:
 
 
 def _chronological_sort_key(
-    item_date: Tuple[MediaItem, datetime.datetime]
+    item_date: tuple[MediaItem, datetime.datetime],
 ) -> datetime.datetime:
     return item_date[1]
 
 
 def _build_chronological_items(
     plex: PlexServer,
-    rating_keys: List[int],
-) -> List[Tuple[MediaItem, datetime.datetime]]:
+    rating_keys: list[int],
+) -> list[tuple[MediaItem, datetime.datetime]]:
     """Build (item, resolved_datetime) pairs for all given shows/movies."""
-    dated_items: List[Tuple[MediaItem, datetime.datetime]] = []
-    last_used_date: Optional[datetime.datetime] = None
+    dated_items: list[tuple[MediaItem, datetime.datetime]] = []
+    last_used_date: datetime.datetime | None = None
 
     for rk in rating_keys:
         media_item = fetch_item(plex, rk)
-        LOG.debug("Processing ratingKey=%d type=%s", rk, type(media_item).__name__)
+        LOG.debug(
+            "Processing ratingKey=%d type=%s", rk, type(media_item).__name__
+        )
 
         if isinstance(media_item, Show):
             all_eps = non_special_episodes(media_item)
             for ep in all_eps:
                 season_peers = episodes_in_same_season(ep, all_eps)
-                resolved = resolve_episode_date(ep, season_peers, last_used_date)
+                resolved = resolve_episode_date(
+                    ep, season_peers, last_used_date
+                )
                 last_used_date = resolved
                 dated_items.append((ep, resolved))
 
@@ -103,7 +124,7 @@ def cmd_build_chronological(plex: PlexServer, args: argparse.Namespace) -> None:
     dated_items = _build_chronological_items(plex, rating_keys)
 
     dated_items.sort(key=_chronological_sort_key)
-    items: List[MediaItem] = [item for item, _ in dated_items]
+    items: list[MediaItem] = [item for item, _ in dated_items]
 
     deliver_playlist(plex, plex, args.name, items, args)
 
@@ -116,8 +137,8 @@ def cmd_build_randomize(plex: PlexServer, args: argparse.Namespace) -> None:
     user_plex = server_for_user(plex, args.user_id)
     src: Playlist = resolve_playlist(user_plex, args.source)
 
-    all_items: List[MediaItem] = list(src.items())
-    randomized: List[MediaItem] = shuffle_list(all_items)
+    all_items: list[MediaItem] = list(src.items())
+    randomized: list[MediaItem] = shuffle_list(all_items)
 
     LOG.info("Randomized %d items", len(randomized))
     deliver_playlist(plex, user_plex, args.dest, randomized, args)
@@ -130,7 +151,7 @@ def _collect_sources(
     user_plex: PlexServer,
     names: Sequence[str],
     args: argparse.Namespace,
-) -> List[Tuple[str, List[MediaItem]]]:
+) -> list[tuple[str, list[MediaItem]]]:
     """Resolve each named playlist and read its items, in the order given.
 
     One listing request per playlist, so the walk is paced like any other
@@ -138,9 +159,9 @@ def _collect_sources(
     silence: a typo that resolved to the wrong playlist looks exactly like a
     playlist that happens to be empty.
     """
-    sources: List[Tuple[str, List[MediaItem]]] = []
+    sources: list[tuple[str, list[MediaItem]]] = []
     for name in paced(names, args, "playlists"):
-        part: List[MediaItem] = list(resolve_playlist(user_plex, name).items())
+        part: list[MediaItem] = list(resolve_playlist(user_plex, name).items())
         if part:
             LOG.info("Playlist '%s': %d item(s)", name, len(part))
         else:
@@ -150,8 +171,8 @@ def _collect_sources(
 
 
 def _concatenate(
-    sources: Sequence[Tuple[str, List[MediaItem]]], unique: bool
-) -> List[MediaItem]:
+    sources: Sequence[tuple[str, list[MediaItem]]], unique: bool
+) -> list[MediaItem]:
     """Join the sources end to end, preserving the order within each.
 
     With *unique*, an item already added is skipped rather than repeated; a
@@ -159,8 +180,8 @@ def _concatenate(
     playlists becomes one entry. Without it the result is a faithful
     concatenation, duplicates and all, which is what Plex itself allows.
     """
-    items: List[MediaItem] = []
-    seen: Set[int] = set()
+    items: list[MediaItem] = []
+    seen: set[int] = set()
     for _, part in sources:
         for item in part:
             key = int(item.ratingKey)
@@ -184,7 +205,9 @@ def cmd_build_concatenated(plex: PlexServer, args: argparse.Namespace) -> None:
     total = sum(len(part) for _, part in sources)
     if args.unique and len(items) < total:
         LOG.info("--unique: skipped %d repeated item(s).", total - len(items))
-    LOG.info("Concatenated %d playlist(s) into %d item(s)", len(sources), len(items))
+    LOG.info(
+        "Concatenated %d playlist(s) into %d item(s)", len(sources), len(items)
+    )
 
     deliver_playlist(plex, user_plex, args.name, items, args)
 
@@ -194,75 +217,69 @@ def cmd_build_concatenated(plex: PlexServer, args: argparse.Namespace) -> None:
 
 def register(
     sub: "argparse._SubParsersAction",
-    parents: "List[argparse.ArgumentParser]",
+    parents: "list[argparse.ArgumentParser]",
 ) -> None:
     """Register the playlist building subparsers."""
     p_bi = sub.add_parser(
-        "build-interleaved", parents=parents,
+        "build-interleaved",
+        parents=parents,
         help="Round-robin interleaved playlist from multiple shows.",
     )
     p_bi.add_argument("name", help="Name for the new playlist (str).")
-    p_bi.add_argument(
-        "rating_keys", nargs="+", type=int, metavar="ratingKey",
-        help="One or more Show ratingKeys (int). Obtain with list-titles.",
+    add_rating_keys_argument(
+        p_bi,
+        "One or more Show ratingKeys (int). Obtain with list-titles.",
     )
-    p_bi.add_argument(
-        "-o", "--overwrite", action="store_true", default=False,
-        help="Replace an existing playlist of the same name instead of failing.",
-    )
-    p_bi.add_argument(
-        "--m3u", metavar="PATH",
-        help="Also export an M3U file at PATH using Plex server filesystem paths.",
-    )
+    add_overwrite_argument(p_bi)
+    add_m3u_argument(p_bi)
     add_prefix_argument(p_bi)
     add_user_target_arguments(p_bi)
 
     p_bc = sub.add_parser(
-        "build-chronological", parents=parents,
+        "build-chronological",
+        parents=parents,
         help="Date-sorted playlist from shows and/or movies.",
     )
     p_bc.add_argument("name", help="Name for the new playlist (str).")
-    p_bc.add_argument(
-        "rating_keys", nargs="+", type=int, metavar="ratingKey",
-        help="One or more Show/Movie ratingKeys (int). Obtain with list-titles.",
+    add_rating_keys_argument(
+        p_bc,
+        ("One or more Show/Movie ratingKeys (int). Obtain with list-titles."),
     )
-    p_bc.add_argument(
-        "-o", "--overwrite", action="store_true", default=False,
-        help="Replace an existing playlist of the same name instead of failing.",
-    )
-    p_bc.add_argument(
-        "--m3u", metavar="PATH",
-        help="Also export an M3U file at PATH using Plex server filesystem paths.",
-    )
+    add_overwrite_argument(p_bc)
+    add_m3u_argument(p_bc)
     add_prefix_argument(p_bc)
     add_user_target_arguments(p_bc)
 
     p_br = sub.add_parser(
-        "build-randomize", parents=parents,
+        "build-randomize",
+        parents=parents,
         help="Randomize a source playlist into a new destination playlist.",
     )
-    p_br.add_argument("user_id", metavar="USER", help="User ID (int) or user title (str); use 0 for the admin account. Obtain both with list-users.")
-    p_br.add_argument("source", help="Playlist name (str) or ratingKey (int). Obtain either with list-playlists.")
+    add_user_argument(p_br)
+    p_br.add_argument(
+        "source",
+        help=(
+            "Playlist name (str) or ratingKey (int). Obtain either with "
+            "list-playlists."
+        ),
+    )
     p_br.add_argument("dest", help="Destination playlist title (str).")
-    p_br.add_argument(
-        "-o", "--overwrite", action="store_true", default=False,
-        help="Replace an existing playlist of the same name instead of failing.",
-    )
-    p_br.add_argument(
-        "--m3u", metavar="PATH",
-        help="Also export an M3U file at PATH using Plex server filesystem paths.",
-    )
+    add_overwrite_argument(p_br)
+    add_m3u_argument(p_br)
     add_prefix_argument(p_br)
     add_user_target_arguments(p_br)
 
     p_bn = sub.add_parser(
-        "build-concatenated", parents=parents,
+        "build-concatenated",
+        parents=parents,
         help="Join several playlists end to end into one new playlist.",
     )
-    p_bn.add_argument("user_id", metavar="USER", help="User ID (int) or user title (str); use 0 for the admin account. Obtain both with list-users.")
+    add_user_argument(p_bn)
     p_bn.add_argument("name", help="Name for the new playlist (str).")
     p_bn.add_argument(
-        "playlists", nargs="+", metavar="PLAYLIST",
+        "playlists",
+        nargs="+",
+        metavar="PLAYLIST",
         help=(
             "The playlists to join, in the order they should appear. "
             "Playlist name (str) or ratingKey (int). Obtain either with "
@@ -270,20 +287,16 @@ def register(
         ),
     )
     p_bn.add_argument(
-        "--unique", action="store_true", default=False,
+        "--unique",
+        action="store_true",
+        default=False,
         help=(
             "Skip an item an earlier playlist already contributed, so a "
             "title appearing in two of them is listed once."
         ),
     )
-    p_bn.add_argument(
-        "-o", "--overwrite", action="store_true", default=False,
-        help="Replace an existing playlist of the same name instead of failing.",
-    )
-    p_bn.add_argument(
-        "--m3u", metavar="PATH",
-        help="Also export an M3U file at PATH using Plex server filesystem paths.",
-    )
+    add_overwrite_argument(p_bn)
+    add_m3u_argument(p_bn)
     add_prefix_argument(p_bn)
     add_user_target_arguments(p_bn)
 

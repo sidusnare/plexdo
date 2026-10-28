@@ -1,84 +1,53 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
-"""The on-disk token store: a JSON object of username -> Plex token.
+"""Saved credentials: plex.tv tokens, passwords, and Plex Home PINs.
 
-Earlier versions wrote a single bare token to this path. A file that is not
-JSON is therefore read as one legacy admin token and rewritten on the next
-save, so upgrading needs no manual step.
+All of them are kept in the secret store (plexdo.secret_store), never in
+the configuration file. Tokens are filed by the username they were saved
+under; a password is saved only when login is asked to, so plexdo can sign
+in again by itself once a token stops working; a PIN is filed by user id.
 """
 
-from pathlib import Path
-from typing import Dict, Iterable, Optional
-import json
-import os
+from collections.abc import Iterable
 
+from plexdo import secret_store
 from plexdo.constants import LOG
-
 
 # Key holding the admin token when no admin username is configured. The "@"
 # prefix cannot occur in a Plex username, so it can never collide with one.
 ADMIN_KEY = "@admin"
 
-TokenStore = Dict[str, str]
+TokenStore = dict[str, str]
 
 
-def load_store(path: Path) -> TokenStore:
-    """Read the token store, tolerating an absent, empty, or legacy file."""
-    if not path.exists():
-        return {}
-    try:
-        raw = path.read_text(encoding="utf-8").strip()
-    except OSError as exc:
-        LOG.warning("Could not read token file %s: %s", path, exc)
-        return {}
-    if not raw:
-        return {}
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError:
-        # Pre-1.0.4 files held one bare token and nothing else.
-        LOG.debug("Reading %s as a legacy single-token file", path)
-        return {ADMIN_KEY: raw}
-    if not isinstance(data, dict):
-        LOG.warning("Token file %s is not a JSON object; ignoring it", path)
-        return {}
-    return {str(key): str(value) for key, value in data.items() if value}
+def load_store() -> TokenStore:
+    """Every saved token, as username -> token."""
+    return secret_store.load("tokens")
 
 
-def save_store(path: Path, store: TokenStore) -> None:
-    """Write the token store atomically, owner-readable only."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(
-        json.dumps(store, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
-    if os.name != "nt":
-        tmp.chmod(0o600)
-    tmp.replace(path)
-    LOG.debug("Token store written to %s (%d entries)", path, len(store))
-
-
-def lookup(path: Path, username: str) -> Optional[str]:
+def lookup(username: str) -> str | None:
     """Return the stored token for a username, or None."""
-    return load_store(path).get(username)
+    return load_store().get(username)
 
 
-def store_token(path: Path, username: str, token: str) -> None:
+def store_token(username: str, token: str) -> None:
     """Add or replace one username's token, preserving the others."""
-    store = load_store(path)
+    store = load_store()
     store[username] = token
-    save_store(path, store)
+    secret_store.save("tokens", store)
     LOG.debug("Stored token for %r", username)
 
 
-def admin_token(path: Path, username: Optional[str]) -> Optional[str]:
+def admin_token(username: str | None) -> str | None:
     """Return the admin token.
 
     Tries the configured admin username, then the reserved key, and finally a
     store holding exactly one entry - which is what a fresh `login` with no
     configured username leaves behind.
     """
-    store = load_store(path)
+    store = load_store()
     if username and username in store:
         return store[username]
     if ADMIN_KEY in store:
@@ -88,19 +57,52 @@ def admin_token(path: Path, username: Optional[str]) -> Optional[str]:
     return None
 
 
-def forget_tokens(path: Path, usernames: Iterable[str]) -> int:
-    """Remove usernames' tokens, returning how many entries are left.
+def forget_tokens(usernames: Iterable[str]) -> int:
+    """Remove usernames' tokens, returning how many are left.
 
-    A store left empty is deleted rather than kept as an empty object, so
-    no secrets file outlives its last secret and the next command says to
-    run `login`, which is the advice that then applies.
+    The entry goes once the last token does, so no secret outlives it and
+    the next command says to run `login`, which is the advice that then
+    applies.
     """
-    store = load_store(path)
+    store = load_store()
     for username in usernames:
         store.pop(username, None)
-    if store:
-        save_store(path, store)
-    elif path.exists():
-        path.unlink()
-        LOG.debug("Token store %s is empty; removed it", path)
+    secret_store.save("tokens", store)
     return len(store)
+
+
+def saved_password(username: str) -> str | None:
+    """The password saved for a username, or None."""
+    return secret_store.load("passwords").get(username)
+
+
+def save_password(username: str, password: str) -> None:
+    """Save one username's password, preserving the others."""
+    passwords = secret_store.load("passwords")
+    passwords[username] = password
+    secret_store.save("passwords", passwords)
+    LOG.debug("Saved the password for %r", username)
+
+
+def forget_passwords(usernames: Iterable[str]) -> int:
+    """Remove usernames' saved passwords, returning how many were removed."""
+    passwords = secret_store.load("passwords")
+    removed = [name for name in usernames if passwords.pop(name, None)]
+    if removed:
+        secret_store.save("passwords", passwords)
+    return len(removed)
+
+
+def saved_pin(user_id: int) -> str | None:
+    """The Plex Home PIN saved for a user id, or None."""
+    return secret_store.load("pins").get(str(user_id))
+
+
+def save_pin(user_id: int, pin: str | None) -> None:
+    """Save a user id's PIN, or remove it when pin is None."""
+    pins = secret_store.load("pins")
+    if pin is None:
+        pins.pop(str(user_id), None)
+    else:
+        pins[str(user_id)] = pin
+    secret_store.save("pins", pins)

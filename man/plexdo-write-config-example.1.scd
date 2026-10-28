@@ -1,4 +1,7 @@
 plexdo-write-config-example(1) "plexdo" "User Commands"
+; SPDX-FileCopyrightText: 2026 SidusNare
+; SPDX-License-Identifier: GPL-3.0-or-later
+; SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 # NAME
 
@@ -12,36 +15,41 @@ plexdo-write-config-example - write a commented configuration template
 
 Writes a commented template of the configuration file to the platform's
 configuration path, creating its directory as needed:
-_~/.local/etc/plexdo.ini_ on Linux and macOS, and
-_%LOCALAPPDATA%\\PlexDo\\plexdo.ini_ on Windows. On POSIX systems the file is
-given mode 0600, since it may come to hold a password.
+_$XDG_CONFIG_HOME/plexdo/config.yaml_, by default
+_~/.config/plexdo/config.yaml_, on Linux, BSD, and macOS, and
+_%LOCALAPPDATA%\\PlexDo\\config.yaml_ on Windows. The file is YAML, and
+holds no secret; on POSIX systems it is given mode 0600 all the same.
 
 An existing configuration file is never replaced unasked: without *-o* the
 command refuses, and writes nothing.
 
-The template sets:
+Every option is explained in the file itself: its meaning, the values it
+takes, and its default. The template sets:
 
-*[plex] url*
+*plex: url*
 	The server's address, *http://localhost:32400* to begin with.
 
-*[plex] token_path*
-	Where *plexdo-login*(1) saves tokens: *$XDG_RUNTIME_DIR/.plex.token* on
-	POSIX systems, *%TEMP%\\plexdo.token* on Windows, with a note on the
-	trade-offs of each.
+and shows commented out, each with its default, ready to enable:
 
-and shows commented out, ready to enable:
+*plex: username*
+	The account *plexdo-login*(1) signs in as, and whose token every
+	command uses.
 
-*cache_dir*
+*plex: cache_dir*
 	Where the shell completion cache lives, with this platform's default
 	filled in.
 
-*username*, *password*
-	The account *plexdo login* signs in as, so it needs no prompting.
+*plex: secret_store*, *plex: secrets_file*
+	Where tokens, saved passwords, and PINs are kept: the system keyring,
+	or a private file where there is none.
 
-*[99]*
-	An example section for a user's own credentials, used when the server
-	refuses the admin account's token for that user. The section is named
-	for the user's numeric ID.
+*users*
+	An example entry for another account, keyed by its numeric user ID,
+	used when the server refuses the admin account's token for that user,
+	and by *plexdo-player-remote-play*(1).
+
+Passwords, tokens, and PINs never go in the file: see *plexdo-login*(1)
+and *plexdo-set-pin*(1).
 
 *plexdo write-config-example --help* prints the exact template that would be
 written, without writing anything. The settings themselves are described
@@ -92,7 +100,7 @@ under *FILES* in *plexdo-conventions*(7).
 One line on standard output when the file is written:
 
 ```
-Config example written to: /home/fred/.local/etc/plexdo.ini
+Config example written to: /home/fred/.config/plexdo/config.yaml
 ```
 
 # EXIT STATUS
@@ -107,7 +115,7 @@ Set up *plexdo* for the first time:
 
 ```
 plexdo write-config-example
-${EDITOR:-vi} ~/.local/etc/plexdo.ini
+${EDITOR:-vi} ~/.config/plexdo/config.yaml
 plexdo login
 plexdo list-libraries
 ```
@@ -127,7 +135,7 @@ plexdo write-config-example --dry-run
 Start again from the template, keeping the old configuration aside:
 
 ```
-cp ~/.local/etc/plexdo.ini ~/.local/etc/plexdo.ini.bak
+cp ~/.config/plexdo/config.yaml ~/.config/plexdo/config.yaml.bak
 plexdo write-config-example --overwrite
 ```
 

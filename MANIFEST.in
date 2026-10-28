@@ -1,11 +1,19 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
+
 include Makefile
 recursive-include man *.1 *.scd
 include README.md
 include LICENSE
+recursive-include LICENSES *.txt
+include REUSE.toml sbom.spdx.json
+include package.json package-lock.json
+include .markdownlint-cli2.yaml .yamllint.yaml
 include requirements.txt
-include AI.prompt.md
+include AI.prompt.txt AI.policy.txt
 recursive-include completions *
-include tools/wiki-pages.sh
+include tools/wiki-pages.sh tools/derive.py
 recursive-include src/plexdo/data *
 recursive-include tests *.py
 include CHANGELOG.md CONTRIBUTING.md SECURITY.md

@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Output serialisers."""
 
@@ -38,7 +40,7 @@ def test_csv_uses_newline_not_crlf():
 
 @pytest.mark.parametrize("value", ["NO", "yes", "1.10", "0755", "null", "~"])
 def test_yaml_keeps_ambiguous_strings_as_strings(value):
-    """Plain style would let YAML reinterpret these as bools, floats, or null."""
+    """Plain style would let YAML read these as bools, floats, or null."""
     yaml = pytest.importorskip("yaml")
     assert yaml.safe_load(render([{"v": value}], "yaml")) == [{"v": value}]
 

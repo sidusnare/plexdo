@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
+#
+#
+# markdownlint-cli2 configuration, following Google's Markdown style guide.
+---
+config:
+  # Each CHANGELOG release repeats the same Added/Changed/Fixed headings, so
+  # only headings that are siblings under one parent must differ.
+  MD024:
+    siblings_only: true
+  # Google's guide: 80 columns, except where a line cannot be broken, as in
+  # a code block or a table row.
+  MD013:
+    line_length: 80
+    code_blocks: false
+    tables: false
+globs:
+  - "**/*.md"
+ignores:
+  - "node_modules/**"
+  - "build/**"
+  - "dist/**"

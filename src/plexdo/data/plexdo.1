@@ -1,7 +1,10 @@
+.\" SPDX-FileCopyrightText: 2026 SidusNare
+.\" SPDX-License-Identifier: GPL-3.0-or-later
+.\" SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 .\" Man page for plexdo (plexdo).
-.\" Regenerate or edit alongside AI.prompt.md; the .TH version must match
-.\" __version__ in src/plexdo/__init__.py.
-.TH PLEXDO 1 "2026-10-22" "plexdo 1.1.29" "User Commands"
+.\" Edit alongside AI.prompt.txt. The version and date on the .TH line are
+.\" written by tools/derive.py from pyproject.toml; do not edit them here.
+.TH PLEXDO 1 "2026-10-28" "plexdo 2.0.0rc1" "User Commands"
 .
 .SH NAME
 plexdo \- command\-line interface for Plex Media Server
@@ -468,20 +471,31 @@ gives the address outright instead.
 .
 .SS Setup
 .TP
-.BI login " " [ \-u " USER" "] [" \-p " PASS" "] [" \-c " CODE" "] [" \-2 ]
-Authenticate against plex.tv and save the token.
+.BI login " " [ \-u " USER" "] [" \-p " PASS" "] [" \-\-save\-password "] [" \-c " CODE" "] [" \-2 ]
+Authenticate against plex.tv and save the token in the system keyring.
+.B \-\-save\-password
+saves the password beside it, so plexdo can sign in again by itself once the
+token stops working.
 .B \-\-password
 is insecure: it is recorded in shell history and is briefly visible to
 .BR ps (1).
-Prefer the configuration file or the interactive prompt.
+Prefer the interactive prompt.
 .TP
 .BI logout " " [ \-u " USER" ]
-Sign every session in the token store out of plex.tv, invalidating its
-token, and remove it from the store; with
+Sign every saved session out of plex.tv, invalidating its token, and remove
+it, with any password saved for the account; with
 .BR \-u ,
-only the one saved under that name, which must be in the store. A token
-plex.tv already refuses is removed too; one that could not be signed out is
-kept, and the exit status is 1. A store left empty is deleted.
+only the one saved under that name, which must be there. A token plex.tv
+already refuses is removed too; one that could not be signed out is kept, and
+the exit status is 1.
+.TP
+.BI set\-pin " USER_ID " [ \-\-remove ]
+Prompt for a Plex Home member\(aqs four\-digit PIN and save it in the system
+keyring, for
+.B player\-remote\-play \-\-player\-user
+to switch into the member;
+.B \-\-remove
+removes it.
 .TP
 .BI write\-config\-example " " [ \-o ]
 Write a template configuration file. An existing one is refused unless
@@ -495,48 +509,77 @@ prints the exact template that would be written.
 .
 .SH CONFIGURATION
 Read from
-.IR ~/.local/etc/plexdo.ini .
+.IR $XDG_CONFIG_HOME/plexdo/config.yaml ,
+by default
+.IR ~/.config/plexdo/config.yaml .
+It is YAML, and holds no secret:
 .PP
 .EX
-[plex]
-url = http://localhost:32400
-token_path = $XDG_RUNTIME_DIR/.plex.token
-username = you@example.com
-password = your\-plex\-password
-
-[99]
-username = bob@example.com
-password = bobs\-plex\-password
+\-\-\-
+plex:
+  url: "http://localhost:32400"
+  username: "you@example.com"
+users:
+  99:
+    username: "bob@example.com"
 .EE
 .PP
-Values may contain environment variables as
+Under
+.BR plex :
+.B url
+is the server;
+.B username
+the account
+.B plexdo login
+signs in as and whose token every command uses;
+.B cache_dir
+moves the completion cache, and the shell completions honour it too;
+.B secret_store
+and
+.B secrets_file
+say where secrets are kept, under SECRETS below.
+.B plexdo write\-config\-example
+writes the file with every option explained. Values may contain environment
+variables as
 .B $VAR
 or
 .BR ${VAR} ,
 and
 .B ~
-for your home directory. A name that is not set is left as literal text and
-warned about. Interpolation is disabled, so a password may contain
-.B %
-freely.
+for your home directory; a name that is not set is left as literal text and
+warned about. An unknown option is warned about by name and ignored, and so is
+a password, PIN, or token, which belongs in the keyring.
 .PP
-.B cache_dir
-in the
-.B [plex]
-section moves the completion cache; it defaults to the platform location shown
-under FILES, and the shell completions honour the same setting.
+An entry under
+.B users
+is another account plexdo may act as, keyed by its numeric user ID. It is used
+only when the server refuses the admin\-issued token for that user, which
+happens when nothing has been shared with them, and by
+.BR player\-remote\-play .
+Sign each in once with
+.BR "plexdo login \-\-username" .
 .PP
-A section named for a numeric user ID holds that user\(aqs credentials. They are
-used only when the server refuses the admin\-issued token for that user, which
-happens when nothing has been shared with them.
-.PP
-Both this file and the token file are checked at startup and a warning is
-printed if either is readable by group or other. On Windows the check is
-skipped, as access there is governed by ACLs.
+A plexdo 1.x
+.I ~/.local/etc/plexdo.ini
+is moved across by the first run of any command that finds it and no
+.IR config.yaml :
+its options into
+.IR config.yaml ,
+and its passwords and PINs, and the tokens of its token file, into the
+keyring. It is then renamed
+.I plexdo.ini.migrated
+with its secrets removed, and the token file is deleted.
 .
-.SH TOKEN STORE
-.I token_path
-holds a JSON object mapping username to token:
+.SH SECRETS
+Tokens, passwords saved by
+.BR "login \-\-save\-password" ,
+and PINs saved by
+.B set\-pin
+are kept in the system keyring: the Secret Service, such as GNOME Keyring or
+KWallet, on Linux and BSD; the Keychain on macOS; Credential Manager on
+Windows. Each kind is one entry under the service name
+.BR plexdo ,
+holding a JSON object; tokens are filed by username:
 .PP
 .EX
 {
@@ -546,18 +589,29 @@ holds a JSON object mapping username to token:
 .EE
 .PP
 .B @admin
-is the reserved key used when no
-.B [plex] username
-is configured;
+is the reserved key used for a token saved with no username known;
 .B @
-cannot occur in a Plex username, so it never collides. The file is written
-atomically with mode 0600. A file from an earlier version holding a single
-bare token is read as the admin token and converted on the next write.
+cannot occur in a Plex username, so it never collides.
+.PP
+Where there is no keyring, as on a headless machine, secrets go in the file
+.B plex: secrets_file
+names, by default
+.IR $XDG_STATE_HOME/plexdo/secrets.json ,
+created readable by its owner alone, with a warning that it is not encrypted.
+.B plex: secret_store
+set to
+.B file
+uses that file always, for a machine whose keyring is locked when plexdo runs,
+as under cron, and silences the warning; set to
+.BR keyring ,
+the keyring is insisted on.
 .PP
 When a command meets a 401 for a user, three sources are tried in turn: the
-server\-scoped token the admin can mint, a token already in the store, and a
-fresh login with that user\(aqs configured credentials. A token obtained by the
-last is saved, so the login happens once rather than on every run.
+server\-scoped token the admin can mint, a token already saved, and a fresh
+login with a password saved for that user\(aqs
+.B users
+entry. A token obtained by the last is saved, so the login happens once rather
+than on every run.
 .B plexdo logout
 signs the tokens out and removes them.
 .
@@ -605,46 +659,46 @@ does not run.
 .
 .SH ENVIRONMENT
 .TP
-.B XDG_RUNTIME_DIR
-Referenced by the default POSIX \fItoken_path\fR. It is a private, user\-only tmpfs
-on most Linux systems, which suits a secret, but it is cleared at logout: you
-will need to run \fBplexdo login\fR again after a reboot. Point
-\fItoken_path\fR somewhere persistent to avoid that.
+.B XDG_CONFIG_HOME
+The parent of the configuration directory on Linux, BSD, and macOS, when an
+absolute path; otherwise
+.IR ~/.config .
+.TP
+.B XDG_STATE_HOME
+The parent of the secrets file\(aqs directory, when an absolute path; otherwise
+.IR ~/.local/state .
 .TP
 .B XDG_CACHE_HOME
-Overrides the location of the completion cache on Linux and macOS.
+The parent of the completion cache, when an absolute path; otherwise
+.IR ~/.cache .
 .TP
 .B LOCALAPPDATA
 On Windows, the parent of the configuration and cache directories.
 .B APPDATA
 is used when it is unset.
 .TP
-.B TEMP
-Referenced by the default Windows \fItoken_path\fR.
-.TP
 .B NO_COLOR
 Not used; output is never coloured.
 .
 .SH FILES
-Paths follow the platform. On Linux and macOS:
+Paths follow the platform. On Linux, BSD, and macOS, by default:
 .TP
-.I ~/.local/etc/plexdo.ini
+.I ~/.config/plexdo/config.yaml
 Configuration.
 .TP
-.I $XDG_RUNTIME_DIR/.plex.token
-Default token store, mode 0600.
+.I ~/.local/state/plexdo/secrets.json
+Secrets, only where the system keyring is not used; mode 0600.
 .TP
 .I ~/.cache/plexdo/
 Completion cache.
 .PP
 On Windows:
 .TP
-.I %LOCALAPPDATA%\ePlexDo\eplexdo.ini
+.I %LOCALAPPDATA%\ePlexDo\econfig.yaml
 Configuration.
 .TP
-.I %TEMP%\eplexdo.token
-Default token store. Note that this directory is not protected by file
-permissions and Windows may clear it.
+.I %LOCALAPPDATA%\ePlexDo\esecrets.json
+Secrets, only where Credential Manager is not used.
 .TP
 .I %LOCALAPPDATA%\ePlexDo\eCache
 Completion cache.
@@ -719,10 +773,7 @@ On Windows,
 .B \-\-password
 scrubbing is best effort: the technique that hides the value from
 .BR ps (1)
-has no Windows equivalent, so it stays visible in the process list. Protecting
-the token file is also your responsibility there, as
-.BR chmod (1)
-cannot restrict it.
+has no Windows equivalent, so it stays visible in the process list.
 .
 .SH SEE ALSO
 .BR jq (1),

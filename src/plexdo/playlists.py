@@ -1,10 +1,12 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Playlist resolution, creation, and copy naming rules."""
 
-from typing import Any, Dict, List, Optional, Tuple
 import argparse
 import sys
+from typing import Any
 
 from plexapi.exceptions import NotFound
 from plexapi.playlist import Playlist
@@ -41,7 +43,7 @@ def resolve_playlist(user_plex: PlexServer, identifier: str) -> Playlist:
         sys.exit(f"Playlist not found: {identifier!r}")
 
 
-def preview_rows(items: List[MediaItem]) -> List[Dict[str, Any]]:
+def preview_rows(items: list[MediaItem]) -> list[dict[str, Any]]:
     """Build the numbered preview of the items a playlist will hold."""
     return [
         {
@@ -53,7 +55,7 @@ def preview_rows(items: List[MediaItem]) -> List[Dict[str, Any]]:
     ]
 
 
-def existing_playlist(plex: PlexServer, name: str) -> Optional[Playlist]:
+def existing_playlist(plex: PlexServer, name: str) -> Playlist | None:
     """Return a playlist with exactly this title, or None."""
     for playlist in plex.playlists():
         if clean_text(playlist.title) == clean_text(name):
@@ -61,7 +63,7 @@ def existing_playlist(plex: PlexServer, name: str) -> Optional[Playlist]:
     return None
 
 
-def require_items(items: List[MediaItem]) -> None:
+def require_items(items: list[MediaItem]) -> None:
     """Refuse an empty playlist.
 
     Asked once by whichever caller assembled the list, which is the same
@@ -72,7 +74,7 @@ def require_items(items: List[MediaItem]) -> None:
 
 
 def _refuses_replacement(
-    duplicate: Optional[Playlist], args: argparse.Namespace
+    duplicate: Playlist | None, args: argparse.Namespace
 ) -> bool:
     """True when the name is taken and --overwrite was not given.
 
@@ -86,8 +88,8 @@ def _refuses_replacement(
 def _write_playlist(
     plex: PlexServer,
     name: str,
-    items: List[MediaItem],
-    duplicate: Optional[Playlist],
+    items: list[MediaItem],
+    duplicate: Playlist | None,
     args: argparse.Namespace,
 ) -> str:
     """Replace or create the playlist, honouring --dry-run.
@@ -116,7 +118,7 @@ def _write_playlist(
 def finalize_playlist(
     plex: PlexServer,
     name: str,
-    items: List[MediaItem],
+    items: list[MediaItem],
     args: argparse.Namespace,
     preview: bool = True,
 ) -> str:
@@ -151,9 +153,9 @@ def finalize_playlist(
 def create_for_user(
     user_plex: PlexServer,
     name: str,
-    items: List[MediaItem],
+    items: list[MediaItem],
     args: argparse.Namespace,
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
     """Create the playlist for one user, reporting instead of exiting.
 
     Returns (status, detail); status is "created", "replaced", or "skipped".
@@ -172,9 +174,8 @@ def create_for_user(
 
 def _resolve_dest_name(
     user_plex: PlexServer, desired_name: str, force_overwrite: bool = False
-) -> Optional[Tuple[str, bool]]:
-    """
-    Return (final_name, delete_first), or None if the copy should be skipped.
+) -> tuple[str, bool] | None:
+    """Return (final_name, delete_first), or None if the copy should be skipped.
 
     With force_overwrite (--overwrite), the desired name is always used and
     is replaced if it already exists; the ' admin copy' fallback is skipped.
@@ -197,14 +198,14 @@ def _resolve_dest_name(
 
 
 def copy_playlist_to(
-    src_items: List[MediaItem],
+    src_items: list[MediaItem],
     user_plex: PlexServer,
     desired_name: str,
     args: argparse.Namespace,
     *,
     target_label: str = "target",
     preview: bool = True,
-) -> Tuple[str, str, str]:
+) -> tuple[str, str, str]:
     """Copy items to user_plex under the resolved name.
 
     Returns (status, final_name, detail); status is "created", "replaced", or
@@ -220,8 +221,11 @@ def copy_playlist_to(
         )
         # Reported by the caller as a result row, so this is detail rather
         # than a warning; stderr stays for things the caller cannot show.
-        LOG.info("Skipping %s: %s. Nothing was created or deleted.",
-                 target_label, detail)
+        LOG.info(
+            "Skipping %s: %s. Nothing was created or deleted.",
+            target_label,
+            detail,
+        )
         return "skipped", desired_name, detail
 
     final_name, replacing = resolved

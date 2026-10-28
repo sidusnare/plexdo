@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 SidusNare
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
+#
 # Bash completion for plexdo - with cached ID / name completion.
 #
 # Requires: bash 4.0+, python3 (already required by plexdo itself)
@@ -163,7 +167,7 @@ _plexdo_complete_user_id() {
     # Commands accept an ID or a title, so both are insertable; each ID
     # carries its title as an annotation so it is clear which account it is.
     _plexdo_compreply_pairs < <(
-        case "0" in "$cur"*) printf '0\tadmin account\n' ;; esac
+        if [[ 0 == "$cur"* ]]; then printf '0\tadmin account\n'; fi
         _plexdo_json_pairs "$cache" "id" "title"
         _plexdo_json_candidates "$cache" "title"
     )
@@ -269,7 +273,8 @@ _plexdo_commands() {
 list-show show-metadata search read rescan status wait player-remote-play find-missing build-interleaved build-chronological build-randomize \
 build-concatenated \
 copy-playlist-all-users copy-playlist-to-user export-playlist remove-playlist \
-append-playlist clean-playlist export-titles copy-watched login logout write-config-example"
+append-playlist clean-playlist export-titles copy-watched login logout set-pin \
+write-config-example"
 }
 
 _plexdo_global_flags() {
@@ -345,7 +350,7 @@ _plexdo_complete() {
 
     # --m3u PATH -> file path
     if [[ "$prev" == "--m3u" ]]; then
-        COMPREPLY=( $(compgen -f -- "$cur") )
+        COMPREPLY=(); _plexdo_compreply < <(compgen -f -- "$cur")
         return
     fi
 
@@ -360,32 +365,36 @@ _plexdo_complete() {
     if [[ "$cur" == --* ]]; then
         case "$cmd" in
             list-playlist|list-show)
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --m3u --prefix -p" -- "$cur") ) ;;
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --m3u --prefix -p" -- "$cur") ;;
             build-interleaved|build-chronological|build-randomize)
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --m3u --prefix -p -o --overwrite --user -u --all-users -a" -- "$cur") ) ;;
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --m3u --prefix -p -o --overwrite --user -u --all-users -a" -- "$cur") ;;
             build-concatenated)
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --m3u --prefix -p -o --overwrite --unique --user -u --all-users -a" -- "$cur") ) ;;
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --m3u --prefix -p -o --overwrite --unique --user -u --all-users -a" -- "$cur") ;;
             export-playlist|export-titles)
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --prefix -p" -- "$cur") ) ;;
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --prefix -p" -- "$cur") ;;
             clean-playlist)
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --include-partial" -- "$cur") ) ;;
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --include-partial" -- "$cur") ;;
             write-config-example)
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --overwrite -o" -- "$cur") ) ;;
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --overwrite -o" -- "$cur") ;;
             wait)
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) -s --session -r --rating-key -a --all -i --interval --fast-interval --no-credits --offset --paused --now" -- "$cur") ) ;;
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) -s --session -r --rating-key -a --all -i --interval --fast-interval --no-credits --offset --paused --now" -- "$cur") ;;
             player-remote-play)
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --port --player-user --server-url" -- "$cur") ) ;;
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --port --player-user --server-url" -- "$cur") ;;
+            login)
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --username -u --password -p --save-password --code -c --two-factor -2" -- "$cur") ;;
             logout)
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --username -u" -- "$cur") ) ;;
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --username -u" -- "$cur") ;;
+            set-pin)
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --remove" -- "$cur") ;;
             *)
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags)" -- "$cur") ) ;;
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags)" -- "$cur") ;;
         esac
         return
     fi
 
     # No sub-command typed yet
     if [[ -z "$cmd" ]]; then
-        COMPREPLY=( $(compgen -W "$(_plexdo_commands)" -- "$cur") )
+        COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_commands)" -- "$cur")
         return
     fi
 
@@ -399,7 +408,7 @@ _plexdo_complete() {
         # [-o]
         write-config-example)
             if [[ "$cur" == -* ]]; then
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --overwrite -o" -- "$cur") )
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --overwrite -o" -- "$cur")
             else
                 COMPREPLY=()
             fi ;;
@@ -410,7 +419,7 @@ _plexdo_complete() {
                 lib_id="$(_plexdo_nth_positional "$cmd" 0)"
                 _plexdo_complete_album "$lib_id"
             elif [[ "$cur" == --* ]]; then
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --album" -- "$cur") )
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --album" -- "$cur")
             else
                 case $pos in
                     0) _plexdo_complete_library_id ;;
@@ -444,9 +453,9 @@ _plexdo_complete() {
         # [--section SECTION]
         status)
             if [[ "$prev" == "--section" ]]; then
-                COMPREPLY=( $(compgen -W "server sessions users accounts connections scans activities tasks" -- "$cur") )
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "server sessions users accounts connections scans activities tasks" -- "$cur")
             elif [[ "$cur" == -* ]]; then
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --section" -- "$cur") )
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --section" -- "$cur")
             else
                 COMPREPLY=()
             fi ;;
@@ -456,7 +465,7 @@ _plexdo_complete() {
             if [[ "$prev" == "-l" || "$prev" == "--library" ]]; then
                 _plexdo_complete_library_id
             elif [[ "$cur" == -* ]]; then
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --library -l --all -A --season -s --include-specials" -- "$cur") )
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --library -l --all -A --season -s --include-specials" -- "$cur")
             else
                 case $pos in
                     0) _plexdo_complete_rating_key ;;
@@ -467,7 +476,7 @@ _plexdo_complete() {
         # [library_id] [-s/--status] [-n/--now]
         rescan)
             if [[ "$cur" == --* || "$cur" == -* ]]; then
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --status -s --now -n" -- "$cur") )
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --status -s --now -n" -- "$cur")
             else
                 case $pos in
                     0) _plexdo_complete_library_id ;;
@@ -475,17 +484,24 @@ _plexdo_complete() {
                 esac
             fi ;;
 
-        # [-u USER] [-c CODE] [-2]
+        # [-u USER] [-p PASS] [--save-password] [-c CODE] [-2]
         login)
             if [[ "$cur" == -* ]]; then
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --username -u --password -p --code -c --two-factor -2" -- "$cur") )
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --username -u --password -p --save-password --code -c --two-factor -2" -- "$cur")
             else
                 COMPREPLY=()
             fi ;;
 
-        # [-u USER]; the token file's names are not cached
+        # [-u USER]; the saved sessions' names are not cached
         logout)
             COMPREPLY=() ;;
+
+        # <user_id> [--remove]
+        set-pin)
+            case $pos in
+                0) _plexdo_complete_user_id ;;
+                *) COMPREPLY=() ;;
+            esac ;;
 
         # <user_a> <user_b> [-1] [-l ID] [-t KEY] [--unwatch]
         copy-watched)
@@ -494,7 +510,7 @@ _plexdo_complete() {
             elif [[ "$prev" == "--title" || "$prev" == "-t" ]]; then
                 _plexdo_complete_rating_key
             elif [[ "$cur" == -* ]]; then
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --one-way -1 --library -l --title -t --unwatch" -- "$cur") )
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --one-way -1 --library -l --title -t --unwatch" -- "$cur")
             else
                 case $pos in
                     0|1) _plexdo_complete_user_id ;;
@@ -513,7 +529,7 @@ _plexdo_complete() {
         # <name> <ratingKey...> [--m3u] [-o] [-u USER | -a]
         build-interleaved|build-chronological)
             if [[ "$cur" == -* ]]; then
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --m3u --overwrite -o --prefix -p --user -u --all-users -a" -- "$cur") )
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --m3u --overwrite -o --prefix -p --user -u --all-users -a" -- "$cur")
                 return
             fi
             case $pos in
@@ -524,7 +540,7 @@ _plexdo_complete() {
         # <user_id> <source> <dest> [--m3u] [-o] [-u USER | -a]
         build-randomize)
             if [[ "$cur" == -* ]]; then
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --m3u --overwrite -o --prefix -p --user -u --all-users -a" -- "$cur") )
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --m3u --overwrite -o --prefix -p --user -u --all-users -a" -- "$cur")
                 return
             fi
             case $pos in
@@ -537,7 +553,7 @@ _plexdo_complete() {
         # <user_id> <name> <playlist...> [--unique] [--m3u] [-o] [-u USER | -a]
         build-concatenated)
             if [[ "$cur" == -* ]]; then
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --unique --m3u --overwrite -o --prefix -p --user -u --all-users -a" -- "$cur") )
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --unique --m3u --overwrite -o --prefix -p --user -u --all-users -a" -- "$cur")
                 return
             fi
             case $pos in
@@ -550,7 +566,7 @@ _plexdo_complete() {
         # <source_user_id> <source_playlist> [-o]
         copy-playlist-all-users)
             if [[ "$cur" == -* ]]; then
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --overwrite -o" -- "$cur") )
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --overwrite -o" -- "$cur")
             else
                 case $pos in
                     0) _plexdo_complete_user_id ;;
@@ -563,7 +579,7 @@ _plexdo_complete() {
         # <source_user_id> <source_playlist> <user_id> <dest> [-o]
         copy-playlist-to-user)
             if [[ "$cur" == -* ]]; then
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --overwrite -o" -- "$cur") )
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --overwrite -o" -- "$cur")
                 return
             fi
             case $pos in
@@ -590,14 +606,14 @@ _plexdo_complete() {
             case "$prev" in
                 -r|--rating-key) _plexdo_complete_rating_key ;;
                 -s|--session|-i|--interval|--fast-interval|--offset|--paused) COMPREPLY=() ;;
-                *) COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) -s --session -r --rating-key -a --all -i --interval --fast-interval --no-credits --offset --paused --now" -- "$cur") ) ;;
+                *) COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) -s --session -r --rating-key -a --all -i --interval --fast-interval --no-credits --offset --paused --now" -- "$cur") ;;
             esac ;;
 
         # <host> <ratingKey> [--port PORT] [--player-user USER] [--server-url URL]
         player-remote-play)
             case "$prev" in --port|--player-user|--server-url) COMPREPLY=(); return ;; esac
             case $pos in
-                0) COMPREPLY=( $(compgen -A hostname -- "$cur") ) ;;
+                0) COMPREPLY=(); _plexdo_compreply < <(compgen -A hostname -- "$cur") ;;
                 1) _plexdo_complete_rating_key ;;
                 *) COMPREPLY=() ;;
             esac ;;
@@ -617,7 +633,7 @@ _plexdo_complete() {
                 0) _plexdo_complete_user_id ;;
                 1) uid="$(_plexdo_nth_positional "$cmd" 0)"
                    _plexdo_complete_playlist_id_or_name "$uid" ;;
-                2) COMPREPLY=( $(compgen -f -- "$cur") ) ;;
+                2) COMPREPLY=(); _plexdo_compreply < <(compgen -f -- "$cur") ;;
                 *) COMPREPLY=() ;;
             esac ;;
 
@@ -633,11 +649,11 @@ _plexdo_complete() {
         # <user_id> <query> [--media-type TYPE] [--library-id ID]
         search)
             if [[ "$prev" == "--media-type" ]]; then
-                COMPREPLY=( $(compgen -W "movie show episode track photo album artist" -- "$cur") )
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "movie show episode track photo album artist" -- "$cur")
             elif [[ "$prev" == "--library-id" ]]; then
                 _plexdo_complete_library_id
             elif [[ "$cur" == --* ]]; then
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --media-type --library-id" -- "$cur") )
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --media-type --library-id" -- "$cur")
             else
                 case $pos in
                     0) _plexdo_complete_user_id ;;
@@ -648,22 +664,22 @@ _plexdo_complete() {
         # <library_id> <path> [--sort alpha|date|random] [--album ALBUM]
         export-titles)
             if [[ "$prev" == "--sort" ]]; then
-                COMPREPLY=( $(compgen -W "alpha date random" -- "$cur") )
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "alpha date random" -- "$cur")
             elif [[ "$prev" == "--album" ]]; then
                 lib_id="$(_plexdo_nth_positional "$cmd" 0)"
                 _plexdo_complete_album "$lib_id"
             elif [[ "$cur" == --* ]]; then
-                COMPREPLY=( $(compgen -W "$(_plexdo_global_flags) --sort --album" -- "$cur") )
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --sort --album" -- "$cur")
             else
                 case $pos in
                     0) _plexdo_complete_library_id ;;
-                    1) COMPREPLY=( $(compgen -f -- "$cur") ) ;;
+                    1) COMPREPLY=(); _plexdo_compreply < <(compgen -f -- "$cur") ;;
                     *) COMPREPLY=() ;;
                 esac
             fi ;;
 
         *)
-            COMPREPLY=( $(compgen -W "$(_plexdo_commands)" -- "$cur") ) ;;
+            COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_commands)" -- "$cur") ;;
     esac
 }
 

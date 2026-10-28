@@ -1,10 +1,14 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
+
 [build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "plexdo"
-version = "1.1.29"
+version = "2.0.0rc1"
 description = "A command-line interface for Plex Media Server: playlists, exports, watched-state sync, and library management."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -33,10 +37,12 @@ classifiers = [
 dependencies = [
     "PlexAPI>=4.15.10",
     "requests>=2.31",
+    "keyring>=24.0",
+    "PyYAML>=6.0",
 ]
 
 [project.optional-dependencies]
-dev = ["pylint>=3.0", "build>=1.0", "twine>=5.0", "pytest>=8.0", "PyYAML>=6.0", "vulture>=2.11"]
+dev = ["pylint>=3.0", "ruff>=0.15", "build>=1.0", "twine>=5.0", "pytest>=8.0", "vulture>=2.11"]
 
 [project.urls]
 Homepage = "https://github.com/sidusnare/plexdo"
@@ -57,6 +63,34 @@ plexdo = ["py.typed", "data/plexdo.bash", "data/_plexdo", "data/plexdo.fish",
 testpaths = ["tests"]
 pythonpath = ["src", "tests"]
 addopts = "-q"
+
+# Google Python Style Guide: 80 columns, 4-space indents, Google-style
+# docstrings, imports grouped standard library, third party, then local.
+[tool.ruff]
+line-length = 80
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "D", "B", "UP"]
+# Google documents a class's construction in the class docstring rather than
+# in one on __init__, so pydocstyle's demand for the latter is turned off.
+ignore = ["D107"]
+
+# Google's guide asks docstrings only of what is externally visible, and
+# a test is not: its name says what it checks.
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D100", "D101", "D102", "D103", "D105", "D107"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-first-party = ["plexdo"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
 
 [tool.pylint.main]
 py-version = "3.11"

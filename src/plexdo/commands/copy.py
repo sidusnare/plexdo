@@ -1,10 +1,12 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Playlist copying commands."""
 
-from typing import Any, Dict, List, Tuple
 import argparse
 import sys
+from typing import Any
 
 from plexapi.playlist import Playlist
 from plexapi.server import PlexServer
@@ -18,18 +20,22 @@ from plexdo.playlists import copy_playlist_to, resolve_playlist
 
 def _copy_to_one_user(
     plex: PlexServer,
-    target: Tuple[int, str],
-    src_items: List[MediaItem],
+    target: tuple[int, str],
+    src_items: list[MediaItem],
     args: argparse.Namespace,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Copy to a single user, converting any failure into a result record."""
     user_id, title = target
     label = f"user {title!r} (id={user_id})"
     try:
         user_plex = server_for_user(plex, user_id)
         status, final_name, detail = copy_playlist_to(
-            src_items, user_plex, args.source_playlist, args,
-            target_label=label, preview=False,
+            src_items,
+            user_plex,
+            args.source_playlist,
+            args,
+            target_label=label,
+            preview=False,
         )
     except UserAccessError as exc:
         status, final_name, detail = "skipped", "", exc.summary
@@ -46,20 +52,25 @@ def _copy_to_one_user(
     }
 
 
-def cmd_copy_playlist_all_users(plex: PlexServer, args: argparse.Namespace) -> None:
+def cmd_copy_playlist_all_users(
+    plex: PlexServer, args: argparse.Namespace
+) -> None:
     """Copy a playlist from any user to all managed users."""
     src_plex = server_for_user(plex, args.source_user_id)
     src: Playlist = resolve_playlist(src_plex, args.source_playlist)
-    src_items: List[MediaItem] = list(src.items())
+    src_items: list[MediaItem] = list(src.items())
     if not src_items:
         sys.exit(f"Source playlist {src.title!r} is empty - nothing to copy.")
 
-    def copy_to(target: Tuple[int, str]) -> Dict[str, Any]:
+    def copy_to(target: tuple[int, str]) -> dict[str, Any]:
         """One user's outcome, source user included so it reports its skip."""
         if target[0] == args.source_user_id:
             return {
-                "user": target[1], "id": target[0],
-                "status": "skipped", "playlist": "", "detail": "source user",
+                "user": target[1],
+                "id": target[0],
+                "status": "skipped",
+                "playlist": "",
+                "detail": "source user",
             }
         return _copy_to_one_user(plex, target, src_items, args)
 
@@ -72,24 +83,33 @@ def cmd_copy_playlist_all_users(plex: PlexServer, args: argparse.Namespace) -> N
     run_per_user(targets, (src.title, src_items), args, copy_to)
 
 
-def cmd_copy_playlist_to_user(plex: PlexServer, args: argparse.Namespace) -> None:
+def cmd_copy_playlist_to_user(
+    plex: PlexServer, args: argparse.Namespace
+) -> None:
     """Copy a playlist from any user to a specific user."""
     src_plex = server_for_user(plex, args.source_user_id)
     src: Playlist = resolve_playlist(src_plex, args.source_playlist)
 
-    src_items: List[MediaItem] = list(src.items())
+    src_items: list[MediaItem] = list(src.items())
     user_plex = server_for_user(plex, args.user_id)
     # A machine-readable format gets the outcome record alone: printing the
     # item list too would make two documents on one stream, which nothing
     # parsing it expects. copy-playlist-all-users does the same.
     table_mode = output_format(args) == "table"
     status, final_name, detail = copy_playlist_to(
-        src_items, user_plex, args.dest, args,
-        target_label=f"user id={args.user_id}", preview=table_mode,
+        src_items,
+        user_plex,
+        args.dest,
+        args,
+        target_label=f"user id={args.user_id}",
+        preview=table_mode,
     )
     record = {
-        "user": str(args.user_id), "id": args.user_id,
-        "status": status, "playlist": final_name, "detail": detail,
+        "user": str(args.user_id),
+        "id": args.user_id,
+        "status": status,
+        "playlist": final_name,
+        "detail": detail,
     }
     if table_mode:
         print(report_line(record))
@@ -109,7 +129,7 @@ _OVERWRITE_HELP = (
 
 def register(
     sub: "argparse._SubParsersAction",
-    parents: "List[argparse.ArgumentParser]",
+    parents: "list[argparse.ArgumentParser]",
 ) -> None:
     """Register the playlist copying subparsers."""
     playlist_help = (
@@ -122,18 +142,23 @@ def register(
     )
 
     p_all = sub.add_parser(
-        "copy-playlist-all-users", parents=parents,
+        "copy-playlist-all-users",
+        parents=parents,
         help="Copy a playlist from any user to all managed users.",
     )
     p_all.add_argument("source_user_id", metavar="USER", help=_SRC_UID_HELP)
     p_all.add_argument("source_playlist", help="Source. " + playlist_help)
     p_all.add_argument(
-        "-o", "--overwrite", action="store_true", default=False,
+        "-o",
+        "--overwrite",
+        action="store_true",
+        default=False,
         help=_OVERWRITE_HELP,
     )
 
     p_one = sub.add_parser(
-        "copy-playlist-to-user", parents=parents,
+        "copy-playlist-to-user",
+        parents=parents,
         help="Copy a playlist from any user to a specific user.",
     )
     p_one.add_argument("source_user_id", metavar="USER", help=_SRC_UID_HELP)
@@ -141,7 +166,10 @@ def register(
     p_one.add_argument("user_id", metavar="USER", help="Target " + uid_help)
     p_one.add_argument("dest", help="Destination playlist title (str).")
     p_one.add_argument(
-        "-o", "--overwrite", action="store_true", default=False,
+        "-o",
+        "--overwrite",
+        action="store_true",
+        default=False,
         help=_OVERWRITE_HELP,
     )
 

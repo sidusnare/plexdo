@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Command registry.
 
@@ -18,11 +20,26 @@ Adding a command means adding a module here - ``cli`` needs no edit.
 """
 
 import argparse
-from typing import Any, Callable, Dict, FrozenSet, List, Tuple
+from collections.abc import Callable
+from typing import Any
 
-from plexdo.commands import (auth, build, copy, libraries, metadata, missing,
-                             playlists, remote, rescan, search, status, stream,
-                             users, wait, watched)
+from plexdo.commands import (
+    auth,
+    build,
+    copy,
+    libraries,
+    metadata,
+    missing,
+    playlists,
+    remote,
+    rescan,
+    search,
+    status,
+    stream,
+    users,
+    wait,
+    watched,
+)
 
 # Order determines the order subcommands appear in --help.
 MODULES = (
@@ -48,16 +65,16 @@ Handler = Callable[[Any, argparse.Namespace], None]
 
 def register_all(
     sub: "argparse._SubParsersAction",  # pylint: disable=protected-access
-    parents: List[argparse.ArgumentParser],
+    parents: list[argparse.ArgumentParser],
 ) -> None:
     """Register every command module's subparsers."""
     for module in MODULES:
         module.register(sub, parents)
 
 
-def build_registry() -> Tuple[Dict[str, Handler], FrozenSet[str]]:
+def build_registry() -> tuple[dict[str, Handler], frozenset[str]]:
     """Return the merged command map and the set needing a Plex connection."""
-    handlers: Dict[str, Handler] = {}
+    handlers: dict[str, Handler] = {}
     needs_plex: set = set()
     for module in MODULES:
         handlers.update(module.COMMANDS)

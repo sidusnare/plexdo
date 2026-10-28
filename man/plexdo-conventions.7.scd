@@ -1,4 +1,7 @@
 plexdo-conventions(7) "plexdo" "Miscellaneous Information Manual"
+; SPDX-FileCopyrightText: 2026 SidusNare
+; SPDX-License-Identifier: GPL-3.0-or-later
+; SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 # NAME
 
@@ -81,10 +84,12 @@ Plex scopes every token to what its user can see, and being the server
 admin does not override that. A user with no libraries shared to them
 cannot be acted on at all. A command acting for one user stops with an
 explanation; a command looping over users reports the user as skipped and
-carries on. If such a user does have access under their own login, a
-config section named for their user ID holding their *username* and
-*password* is used automatically, and the token it yields is saved so the
-login happens once. See *FILES*.
+carries on. If such a user does have access under their own login, give
+them an entry under *users* in the configuration, keyed by their user ID
+and holding their *username*, and sign them in once with *plexdo login*
+*--username*; their saved token is then used automatically. With
+*--save-password* as well, plexdo signs them in again by itself once that
+token stops working. See *FILES*.
 
 ## Libraries
 
@@ -198,41 +203,66 @@ command page says which of its loops are paced.
 
 # FILES
 
-_~/.local/etc/plexdo.ini_, or _%LOCALAPPDATA%\\PlexDo\\plexdo.ini_ on Windows
-	The configuration: the server URL in *[plex] url*, where the token
-	store lives in *[plex] token_path*, and optionally *cache_dir*,
-	*username*, and *password*. A section named for a numeric user ID
-	holds that user's own *username* and *password*, or, for a
-	PIN-protected member of the Plex Home, its *pin*, which
-	*plexdo-player-remote-play*(1) uses to switch into it. Environment
-	variables are expanded in every *[plex]* value. A warning is printed
-	when the file is readable by group or other. *plexdo
-	write-config-example* writes a commented template.
+_$XDG_CONFIG_HOME/plexdo/config.yaml_
+	By default _~/.config/plexdo/config.yaml_, and
+	_%LOCALAPPDATA%\\PlexDo\\config.yaml_ on Windows.
+	The configuration, in YAML. It holds no secret. Under *plex*: *url*,
+	the server, which every command reaching the server needs; *username*,
+	the account *plexdo login* signs in as and whose token every command
+	uses; *cache_dir*, where the completion cache goes; *secret_store*
+	and *secrets_file*, where secrets go (see the next entry). Under
+	*users*, an entry per other account plexdo may act as, keyed by user
+	ID, holding its *username*. Environment variables are expanded in
+	*url*, *cache_dir*, and *secrets_file*. An unknown option is warned
+	about by name and ignored, and so is a password, PIN, or token, which
+	belongs in the secret store. *plexdo write-config-example* writes the
+	file with every option explained.
 
-_$XDG_RUNTIME_DIR/.plex.token_, or _%TEMP%\\plexdo.token_ on Windows
-	The default token store: a JSON object mapping each username to its
-	token, written by *plexdo login* with mode 0600, and emptied by
-	*plexdo logout*.
+The system keyring
+	Where secrets are kept: the Secret Service, such as GNOME Keyring or
+	KWallet, on Linux and BSD; the Keychain on macOS; Credential Manager
+	on Windows. Under the service name *plexdo* there are three entries,
+	each a JSON object: *tokens*, each saved token by the username it was
+	saved under; *passwords*, each password saved by *plexdo login*
+	*--save-password*; and *pins*, each Plex Home PIN saved by *plexdo*
+	*set-pin*, by user ID. An entry goes when its last secret does.
 
-_~/.cache/plexdo/_, or _%LOCALAPPDATA%\\PlexDo\\Cache\\_ on Windows
+_$XDG_STATE_HOME/plexdo/secrets.json_
+	By default _~/.local/state/plexdo/secrets.json_, and
+	_%LOCALAPPDATA%\\PlexDo\\secrets.json_ on Windows.
+	The same three entries, in one JSON object, where there is no
+	keyring, or *plex: secret_store* is *file*. Created readable by its
+	owner alone, warned about if that changes, and deleted with its last
+	secret. It is not encrypted. With *secret_store* left at *auto*, using
+	it prints a warning; *plex: secrets_file* moves it.
+
+_$XDG_CACHE_HOME/plexdo/_
+	By default _~/.cache/plexdo/_, and _%LOCALAPPDATA%\\PlexDo\\Cache\\_
+	on Windows.
 	The shell completion cache, written as a side effect of listing:
 	_libraries.json_, _users.json_, _titles.LIBRARY.json_, and
-	_playlists.USER.json_, keyed by numeric ID. *[plex] cache_dir* moves
+	_playlists.USER.json_, keyed by numeric ID. *plex: cache_dir* moves
 	it.
+
+_~/.local/etc/plexdo.ini_, _plexdo.ini.migrated_
+	The configuration of plexdo 1.x. The first run of any command that
+	finds it, and no _config.yaml_, moves it across: its options into
+	_config.yaml_, and every password, PIN, and token, from its token
+	file too, into the secret store. The INI file is then renamed
+	_plexdo.ini.migrated_ with its secrets removed, and the token file is
+	deleted, so no secret is left in plaintext.
 
 # ENVIRONMENT
 
-*XDG_RUNTIME_DIR*
-	Referenced by the default POSIX token path: a private tmpfs on most
-	Linux systems, cleared at logout, so *plexdo login* is needed again
-	after a reboot.
+*XDG_CONFIG_HOME*, *XDG_STATE_HOME*, *XDG_CACHE_HOME*
+	Where the configuration, the secrets file, and the completion cache
+	live, when set to an absolute path, as the XDG Base Directory
+	Specification has it; otherwise _~/.config_, _~/.local/state_, and
+	_~/.cache_.
 
 *LOCALAPPDATA*, *APPDATA*
-	On Windows, where the configuration and cache live; *APPDATA* is used
-	when *LOCALAPPDATA* is unset.
-
-*TEMP*
-	On Windows, referenced by the default token path.
+	On Windows, where the configuration, secrets file, and cache live;
+	*APPDATA* is used when *LOCALAPPDATA* is unset.
 
 # SEE ALSO
 
@@ -248,5 +278,5 @@ _~/.cache/plexdo/_, or _%LOCALAPPDATA%\\PlexDo\\Cache\\_ on Windows
 *plexdo-build-interleaved*(1), *plexdo-build-chronological*(1),
 *plexdo-build-randomize*(1), *plexdo-build-concatenated*(1),
 *plexdo-copy-playlist-all-users*(1), *plexdo-copy-playlist-to-user*(1),
-*plexdo-copy-watched*(1), *plexdo-login*(1), *plexdo-logout*(1), and
-*plexdo-write-config-example*(1).
+*plexdo-copy-watched*(1), *plexdo-login*(1), *plexdo-logout*(1),
+*plexdo-set-pin*(1), and *plexdo-write-config-example*(1).

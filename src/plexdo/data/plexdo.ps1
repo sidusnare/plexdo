@@ -1,4 +1,7 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
+#
 #
 # PowerShell completion for plexdo.
 #
@@ -54,6 +57,7 @@ $script:PlexdoCommands = [ordered]@{
     'copy-watched'            = 'Synchronise watched state between two users'
     'login'                   = 'Authenticate with plex.tv and save a token'
     'logout'                  = 'Sign out of plex.tv and remove the saved tokens'
+    'set-pin'                 = 'Save or remove a Plex Home PIN in the keyring'
     'write-config-example'    = 'Write a template config file'
 }
 
@@ -346,8 +350,9 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
                 '^find-missing$'                    { $flags['--library'] = 'Library to look in'; $flags['--all'] = 'Check every show'; $flags['--season'] = 'Season number, or several comma separated'; $flags['--include-specials'] = 'Also check season 0' }
                 '^clean-playlist$'                  { $flags['--include-partial'] = 'Also remove part-played items' }
                 '^copy-watched$'                    { $flags['--one-way'] = 'Only write to the second user'; $flags['--library'] = 'Restrict to one library'; $flags['--title'] = 'Restrict to one item'; $flags['--unwatch'] = 'Propagate the unwatched state instead' }
-                '^login$'                           { $flags['--username'] = 'Plex username or email'; $flags['--password'] = 'Plex password (INSECURE)'; $flags['--code'] = 'Two-factor code'; $flags['--two-factor'] = 'Prompt for a two-factor code' }
-                '^logout$'                          { $flags['--username'] = 'Sign out only this name from the token file' }
+                '^login$'                           { $flags['--username'] = 'Plex username or email'; $flags['--password'] = 'Plex password (INSECURE)'; $flags['--save-password'] = 'Also save the password in the system keyring'; $flags['--code'] = 'Two-factor code'; $flags['--two-factor'] = 'Prompt for a two-factor code' }
+                '^logout$'                          { $flags['--username'] = 'Sign out only this saved name' }
+                '^set-pin$'                         { $flags['--remove'] = 'Remove the saved PIN instead of prompting' }
             }
             $results = $flags.GetEnumerator() | ForEach-Object { New-PlexdoResult $_.Key $_.Value }
         } else {
@@ -364,6 +369,7 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
                 'show-metadata'  { if ($index -eq 0) { $results = Get-PlexdoRatingKeys } }
                 'list-playlists' { if ($index -eq 0) { $results = Get-PlexdoUsers } }
                 'search'         { if ($index -eq 0) { $results = Get-PlexdoUsers } }
+                'set-pin'        { if ($index -eq 0) { $results = Get-PlexdoUsers } }
                 'list-playlist'  { if ($index -eq 0) { $results = Get-PlexdoUsers }
                                    elseif ($index -eq 1) { $results = Get-PlexdoPlaylists $user -IncludeKeys } }
                 'export-playlist'   { if ($index -eq 0) { $results = Get-PlexdoUsers }

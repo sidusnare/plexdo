@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
+
+---
 name: Publish
 
 # Publishes to PyPI through Trusted Publishing (OIDC), so no API token is
@@ -46,7 +51,7 @@ jobs:
           pip install -e ".[dev]"
 
       # Everything that gates a normal pull request also gates a release:
-      # version consistency across the three places it appears, packaged
+      # the man page and SBOM matching pyproject's version, packaged
       # assets matching their sources, the smoke test, the suite, pylint,
       # the build itself, and twine's metadata check.
       - name: Full check
@@ -55,17 +60,24 @@ jobs:
       # A release tagged v1.2.3 must contain version 1.2.3. Without this the
       # wheel would upload under whatever version the source happened to
       # carry, and PyPI would accept it: uploads are immutable, so the
-      # mistake could not be taken back.
+      # mistake could not be taken back. Compared as versions, not text: a
+      # tag is SemVer, v2.0.0-rc.1, and pyproject's PEP 440, 2.0.0rc1.
       - name: Tag matches package version
         if: github.event_name == 'release'
+        shell: python
         run: |
-          tag="${GITHUB_REF_NAME#v}"
-          version="$(python -c 'import plexdo; print(plexdo.__version__)')"
-          if [ "$tag" != "$version" ]; then
-            echo "::error::tag $GITHUB_REF_NAME does not match version $version"
-            exit 1
-          fi
-          echo "tag $GITHUB_REF_NAME matches version $version"
+          import os
+          import sys
+
+          from packaging.version import Version
+
+          import plexdo
+
+          tag = os.environ["GITHUB_REF_NAME"]
+          if Version(tag.removeprefix("v")) != Version(plexdo.__version__):
+              print(f"::error::tag {tag} does not match {plexdo.__version__}")
+              sys.exit(1)
+          print(f"tag {tag} matches version {plexdo.__version__}")
 
       # Exactly one job may upload a given artifact name: since v4 they are
       # immutable, so a second upload of "dist" would fail rather than merge.

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
+#
 # plexdo - a command-line interface for Plex Media Server.
 # Copyright (C) 2026 SidusNare
 #
@@ -13,24 +17,23 @@
 #
 # You should have received a copy of the GNU General Public License along
 # with this program. If not, see <https://www.gnu.org/licenses/>.
-#
-# SPDX-License-Identifier: GPL-3.0-or-later
 
 """Top-level argument parsing and command dispatch."""
 
 import argparse
 import sys
-from typing import List, Optional
 
 from plexdo import __version__
 from plexdo.accounts import UserAccessError, resolve_user_arguments
-from plexdo.sections import resolve_library_arguments
 from plexdo.commands import build_registry, register_all
+from plexdo.config import cached_config
+from plexdo.connection import connect_plex
 from plexdo.formats import OUTPUT_FORMATS
-from plexdo.throttle import DEFAULT_THROTTLE, THROTTLE_THRESHOLD
-from plexdo.config import cached_config, connect_plex
 from plexdo.logs import configure_logging
+from plexdo.migrate import migrate_legacy_config
+from plexdo.sections import resolve_library_arguments
 from plexdo.security import scrub_password_argument
+from plexdo.throttle import DEFAULT_THROTTLE, THROTTLE_THRESHOLD
 
 
 def _add_global_flags(
@@ -47,8 +50,12 @@ def _add_global_flags(
     """
     default = argparse.SUPPRESS if suppress else False
     parser.add_argument(
-        "-f", "--format", dest="format", choices=list(OUTPUT_FORMATS),
-        default=argparse.SUPPRESS if suppress else "table", metavar="FORMAT",
+        "-f",
+        "--format",
+        dest="format",
+        choices=list(OUTPUT_FORMATS),
+        default=argparse.SUPPRESS if suppress else "table",
+        metavar="FORMAT",
         help=(
             "Output format: " + ", ".join(OUTPUT_FORMATS) + ". "
             "Default is an aligned table."
@@ -57,11 +64,18 @@ def _add_global_flags(
     # A convenience alias writing to the same destination as --format, so
     # there is only ever one attribute for a command to consult.
     parser.add_argument(
-        "--json", dest="format", action="store_const", const="json",
-        default=argparse.SUPPRESS, help="Shorthand for --format json.",
+        "--json",
+        dest="format",
+        action="store_const",
+        const="json",
+        default=argparse.SUPPRESS,
+        help="Shorthand for --format json.",
     )
     parser.add_argument(
-        "-W", "--wide", action="store_true", default=default,
+        "-W",
+        "--wide",
+        action="store_true",
+        default=default,
         help=(
             "Do not shrink table columns to the terminal width. By default "
             "the widest column is truncated so a row fits on one line; "
@@ -69,7 +83,9 @@ def _add_global_flags(
         ),
     )
     parser.add_argument(
-        "--throttle", type=float, metavar="SECONDS",
+        "--throttle",
+        type=float,
+        metavar="SECONDS",
         default=argparse.SUPPRESS if suppress else DEFAULT_THROTTLE,
         help=(
             "Seconds to wait between requests in operations that query once "
@@ -78,20 +94,30 @@ def _add_global_flags(
         ),
     )
     parser.add_argument(
-        "-V", "--version", action="version",
+        "-V",
+        "--version",
+        action="version",
         version=f"plexdo {__version__}",
         help="Show the installed version and exit.",
     )
     parser.add_argument(
-        "-v", "--verbose", action="store_true", default=default,
+        "-v",
+        "--verbose",
+        action="store_true",
+        default=default,
         help="Print high-level progress to stderr.",
     )
     parser.add_argument(
-        "--debug", action="store_true", default=default,
+        "--debug",
+        action="store_true",
+        default=default,
         help="Print detailed internal logs to stderr.",
     )
     parser.add_argument(
-        "--dry-run", action="store_true", default=default, dest="dry_run",
+        "--dry-run",
+        action="store_true",
+        default=default,
+        dest="dry_run",
         help="Show what would happen without mutating Plex.",
     )
 
@@ -108,7 +134,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="plexdo",
         description=(
-            f"Interact with a Plex Media Server via plexapi.  (version {__version__})"
+            f"Interact with a Plex Media Server via plexapi.  (version "
+            f"{__version__})"
         ),
         epilog=(
             "Global flags (-f/--format, --json, -v/--verbose, --debug, "
@@ -118,13 +145,13 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     _add_global_flags(parser)
-    parents: List[argparse.ArgumentParser] = [_global_flags_parent()]
+    parents: list[argparse.ArgumentParser] = [_global_flags_parent()]
     sub = parser.add_subparsers(dest="command", metavar="<command>")
     register_all(sub, parents)
     return parser
 
 
-def main(argv: Optional[List[str]] = None) -> None:
+def main(argv: list[str] | None = None) -> None:
     """Entry point for the ``plexdo`` console script."""
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -135,6 +162,9 @@ def main(argv: Optional[List[str]] = None) -> None:
 
     configure_logging(args.verbose, args.debug)
     scrub_password_argument(args)
+    # Before any command reads the configuration or a secret, so the first
+    # run after an upgrade from 1.x finds both where they now belong.
+    migrate_legacy_config()
 
     handlers, needs_plex = build_registry()
     handler = handlers.get(args.command)

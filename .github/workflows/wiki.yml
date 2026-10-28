@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
+
+---
 name: Wiki
 
 # Publishes one GitHub wiki page per man/*.scd page: tools/wiki-pages.sh
@@ -121,8 +126,9 @@ jobs:
           fi
           git diff --cached --stat
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          bot="github-actions[bot]"
+          git config user.name "$bot"
+          git config user.email "41898282+$bot@users.noreply.github.com"
           git commit --quiet \
             -m "Update manual pages from ${GITHUB_SHA::7}" \
             -m "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"

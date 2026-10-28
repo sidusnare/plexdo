@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Resolving a user or library by numeric ID or by title."""
 
@@ -39,7 +41,9 @@ def test_id_wins_when_a_value_is_both_an_id_and_another_entrys_title(caplog):
 
 
 def test_numeric_value_that_is_only_a_title_resolves_by_title():
-    assert resolve_identifier([(1, "Movies"), (9, "3")], "3", "library", "x") == 9
+    assert (
+        resolve_identifier([(1, "Movies"), (9, "3")], "3", "library", "x") == 9
+    )
 
 
 def test_unknown_numeric_id_passes_through_for_the_caller_to_report():

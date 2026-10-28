@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Sleeping until a session's current play is over.
 
@@ -20,23 +22,31 @@ point and fast from then on, so the end is noticed within about a second
 rather than within a whole slow interval.
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Tuple
 import argparse
 import random
 import sys
 import time
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field
+from typing import (
+    Any,
+    NamedTuple,
+)
 
 from plexapi.exceptions import PlexApiException
 from plexapi.server import PlexServer
 from requests import RequestException
 
-from plexdo.console import (STREAMABLE_FORMATS, clean_text, output_format,
-                            stream_record)
+from plexdo.arguments import add_rating_key_option
+from plexdo.console import (
+    STREAMABLE_FORMATS,
+    clean_text,
+    output_format,
+    stream_record,
+)
 from plexdo.constants import LOG
 from plexdo.convert import format_duration
 from plexdo.titles import display_title, fetch_item, find_item
-
 
 # Within this much playback of the point being waited for - or past it -
 # polling switches to the fast interval.
@@ -56,7 +66,7 @@ _FINAL_STATES = ("reached", "stopped", "left paused")
 
 # A play is a session on a video: autoplay keeps the session and changes the
 # video, which is a new play with an end point of its own.
-_PlayId = Tuple[Any, int]
+_PlayId = tuple[Any, int]
 
 
 class Target(NamedTuple):
@@ -64,9 +74,9 @@ class Target(NamedTuple):
 
     rating_key: int
     title: str
-    duration: Optional[int]     # ms
-    credits: Optional[int]      # ms; None when absent or --no-credits
-    position: Optional[int]     # ms; None when the video has no length
+    duration: int | None  # ms
+    credits: int | None  # ms; None when absent or --no-credits
+    position: int | None  # ms; None when the video has no length
 
 
 @dataclass
@@ -78,22 +88,22 @@ class Follow:
     then on only that user's sessions count.
     """
 
-    user: Optional[str]
-    session_key: Optional[int]
+    user: str | None
+    session_key: int | None
     seen: bool
     # When each play was first seen paused, for --paused.
-    pauses: Dict[_PlayId, float] = field(default_factory=dict)
+    pauses: dict[_PlayId, float] = field(default_factory=dict)
 
 
 class Observation(NamedTuple):
     """What one poll found for one play."""
 
-    state: str                  # playing, paused, buffering, not started,
-                                # nothing playing, or one of _FINAL_STATES
-    session: Any                # the session described, or None
-    position: Optional[int]     # ms, while the play is on
-    paused_for: Optional[float]  # seconds seen paused, while paused
-    target: Optional[Target]    # the play's end point; None when idle
+    state: str  # playing, paused, buffering, not started,
+    # nothing playing, or one of _FINAL_STATES
+    session: Any  # the session described, or None
+    position: int | None  # ms, while the play is on
+    paused_for: float | None  # seconds seen paused, while paused
+    target: Target | None  # the play's end point; None when idle
 
 
 class Clock(NamedTuple):
@@ -109,7 +119,8 @@ _SYSTEM_CLOCK = Clock(time.monotonic, time.sleep, random.uniform)
 
 # --- where a play ends -----------------------------------------------------
 
-def _credits_markers(item: Any) -> List[Tuple[int, bool]]:
+
+def _credits_markers(item: Any) -> list[tuple[int, bool]]:
     """(start ms, final) for every credits marker the item carries.
 
     Read from the XML plexapi already holds in ``_data``, as records does for
@@ -120,14 +131,16 @@ def _credits_markers(item: Any) -> List[Tuple[int, bool]]:
     if data is None:
         return []
     return [
-        (int(marker.get("startTimeOffset") or 0),
-         marker.get("final") in ("1", "true"))
+        (
+            int(marker.get("startTimeOffset") or 0),
+            marker.get("final") in ("1", "true"),
+        )
         for marker in data.findall("Marker")
         if marker.get("type") == "credits"
     ]
 
 
-def _credits_start(markers: Sequence[Tuple[int, bool]]) -> Optional[int]:
+def _credits_start(markers: Sequence[tuple[int, bool]]) -> int | None:
     """Where the end credits start: the final marker, else the last one.
 
     A film with a mid-credits scene carries two credits markers, and Plex
@@ -141,8 +154,8 @@ def _credits_start(markers: Sequence[Tuple[int, bool]]) -> Optional[int]:
 
 
 def _target_position(
-    duration: Optional[int], credits_at: Optional[int], offset: int
-) -> Optional[int]:
+    duration: int | None, credits_at: int | None, offset: int
+) -> int | None:
     """The playback position, in ms, at which the wait is over.
 
     A negative offset moves the point that many seconds earlier. A positive
@@ -158,8 +171,9 @@ def _target_position(
 def _make_target(item: Any, args: argparse.Namespace) -> Target:
     """Work out the ending point for a video, from its item or its session."""
     duration = vars(item).get("duration") or None
-    credits_at = (None if args.no_credits
-                  else _credits_start(_credits_markers(item)))
+    credits_at = (
+        None if args.no_credits else _credits_start(_credits_markers(item))
+    )
     return Target(
         rating_key=int(item.ratingKey),
         title=display_title(item),
@@ -170,7 +184,9 @@ def _make_target(item: Any, args: argparse.Namespace) -> Target:
 
 
 def _target_for(
-    plex: PlexServer, session: Any, targets: Dict[int, Target],
+    plex: PlexServer,
+    session: Any,
+    targets: dict[int, Target],
     args: argparse.Namespace,
 ) -> Target:
     """A session's end point, fetching each video's markers only once.
@@ -187,6 +203,7 @@ def _target_for(
 
 
 # --- judging a play --------------------------------------------------------
+
 
 def _user_of(session: Any) -> str:
     """The name of the user a session belongs to."""
@@ -206,8 +223,8 @@ def _play_id(session: Any) -> _PlayId:
 
 
 def _paused_for(
-    pauses: Dict[_PlayId, float], play: _PlayId, paused: bool, now: float
-) -> Optional[float]:
+    pauses: dict[_PlayId, float], play: _PlayId, paused: bool, now: float
+) -> float | None:
     """Seconds this play has been seen paused without a break, or None.
 
     Plex does not say when a pause began, so the count starts at the first
@@ -220,7 +237,10 @@ def _paused_for(
 
 
 def _assess(
-    session: Any, target: Target, pauses: Dict[_PlayId, float], now: float,
+    session: Any,
+    target: Target,
+    pauses: dict[_PlayId, float],
+    now: float,
     args: argparse.Namespace,
 ) -> Observation:
     """Judge one session on the video it is playing."""
@@ -229,8 +249,11 @@ def _assess(
     paused_for = _paused_for(pauses, _play_id(session), state == "paused", now)
     if target.position is not None and position >= target.position:
         state = "reached"
-    elif (args.paused is not None and paused_for is not None
-          and round(paused_for, 3) >= args.paused):
+    elif (
+        args.paused is not None
+        and paused_for is not None
+        and round(paused_for, 3) >= args.paused
+    ):
         # Rounded to the millisecond: a sleep timed to land on the deadline
         # must count as having reached it, float arithmetic notwithstanding.
         state = "left paused"
@@ -239,7 +262,8 @@ def _assess(
 
 # --- polling cadence -------------------------------------------------------
 
-def _in_fast_window(position: Optional[int], target: Optional[int]) -> bool:
+
+def _in_fast_window(position: int | None, target: int | None) -> bool:
     """True within _FAST_WINDOW_MS of the target, or past it."""
     if position is None or target is None:
         return False
@@ -248,7 +272,7 @@ def _in_fast_window(position: Optional[int], target: Optional[int]) -> bool:
 
 def _next_delay(
     fast: bool,
-    until_next: Optional[float],
+    until_next: float | None,
     args: argparse.Namespace,
     uniform: Callable[[float, float], float],
 ) -> float:
@@ -264,16 +288,21 @@ def _next_delay(
     return delay
 
 
-def _wake_points(observation: Observation, args: argparse.Namespace) -> List[float]:
+def _wake_points(
+    observation: Observation, args: argparse.Namespace
+) -> list[float]:
     """Seconds from now when a play next needs a look.
 
     That is where its fast window starts, and where an allowed pause runs
     out; either can come sooner than the next slow poll.
     """
-    points: List[float] = []
+    points: list[float] = []
     target = observation.target
-    if (observation.position is not None and target is not None
-            and target.position is not None):
+    if (
+        observation.position is not None
+        and target is not None
+        and target.position is not None
+    ):
         points.append(
             (target.position - _FAST_WINDOW_MS - observation.position) / 1000
         )
@@ -283,7 +312,8 @@ def _wake_points(observation: Observation, args: argparse.Namespace) -> List[flo
 
 
 def _delay_after(
-    observations: Sequence[Observation], args: argparse.Namespace,
+    observations: Sequence[Observation],
+    args: argparse.Namespace,
     uniform: Callable[[float, float], float],
 ) -> float:
     """The pause before the poll that follows these observations.
@@ -302,7 +332,8 @@ def _delay_after(
 
 # --- reading the sessions --------------------------------------------------
 
-def _poll(plex: PlexServer) -> Optional[List[Any]]:
+
+def _poll(plex: PlexServer) -> list[Any] | None:
     """The active sessions, or None when the server could not be read."""
     try:
         return list(plex.sessions())
@@ -313,7 +344,7 @@ def _poll(plex: PlexServer) -> Optional[List[Any]]:
 
 def _read_sessions(
     plex: PlexServer, args: argparse.Namespace, clock: Clock
-) -> List[Any]:
+) -> list[Any]:
     """The active sessions, retrying a failed read a slow interval later.
 
     Gives up with an error after _MAX_FAILED_POLLS failures in a row.
@@ -332,17 +363,20 @@ def _read_sessions(
 
 # --- reporting -------------------------------------------------------------
 
-def _seconds(milliseconds: Optional[int]) -> Optional[int]:
+
+def _seconds(milliseconds: int | None) -> int | None:
     """Milliseconds as whole seconds, keeping None as None."""
     return None if milliseconds is None else milliseconds // 1000
 
 
-def _clock_text(seconds: Optional[int]) -> str:
+def _clock_text(seconds: int | None) -> str:
     """Seconds as H:MM:SS or M:SS."""
     return format_duration(None if seconds is None else seconds * 1000)
 
 
-def _remaining(observation: Observation, args: argparse.Namespace) -> Optional[int]:
+def _remaining(
+    observation: Observation, args: argparse.Namespace
+) -> int | None:
     """Estimated seconds until the play is over, offset sleep included.
 
     A paused play under --paused ends when its pause runs out if nothing
@@ -354,14 +388,18 @@ def _remaining(observation: Observation, args: argparse.Namespace) -> Optional[i
     if args.paused is not None and observation.paused_for is not None:
         return max(0, int(args.paused - observation.paused_for)) + tail
     target = observation.target
-    if observation.position is None or target is None or target.position is None:
+    if (
+        observation.position is None
+        or target is None
+        or target.position is None
+    ):
         return None
     return max(0, (target.position - observation.position) // 1000) + tail
 
 
 def _record(
     observation: Observation, args: argparse.Namespace, elapsed: float
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """One play's progress. Every record carries every key, for CSV's sake."""
     session, target = observation.session, observation.target
     return {
@@ -374,14 +412,17 @@ def _record(
         "position": _seconds(observation.position),
         "duration": _seconds(target.duration) if target else None,
         "target": _seconds(target.position) if target else None,
-        "pausedFor": (None if observation.paused_for is None
-                      else int(observation.paused_for)),
+        "pausedFor": (
+            None
+            if observation.paused_for is None
+            else int(observation.paused_for)
+        ),
         "elapsed": int(elapsed),
         "remaining": _remaining(observation, args),
     }
 
 
-def _progress_text(record: Dict[str, Any]) -> str:
+def _progress_text(record: dict[str, Any]) -> str:
     """The playback column: position and length, or why there is none."""
     position, state = record["position"], record["state"]
     if position is None:
@@ -396,7 +437,7 @@ def _progress_text(record: Dict[str, Any]) -> str:
     return f"{text} {state}"
 
 
-def _remaining_text(record: Dict[str, Any]) -> str:
+def _remaining_text(record: dict[str, Any]) -> str:
     """The estimate column."""
     if record["state"] in _FINAL_STATES:
         return "done"
@@ -405,19 +446,23 @@ def _remaining_text(record: Dict[str, Any]) -> str:
     return f"~{_clock_text(record['remaining'])} left"
 
 
-def _progress_line(record: Dict[str, Any]) -> str:
+def _progress_line(record: dict[str, Any]) -> str:
     """One play as a line: user, playing, waited for, progress, times."""
-    return " | ".join([
-        record["user"] or "(nobody)",
-        f"playing: {record['playing'] or '(nothing)'}",
-        f"waiting for: {record['waitingFor'] or '(anything new)'}",
-        _progress_text(record),
-        f"waited {_clock_text(record['elapsed'])}",
-        _remaining_text(record),
-    ])
+    return " | ".join(
+        [
+            record["user"] or "(nobody)",
+            f"playing: {record['playing'] or '(nothing)'}",
+            f"waiting for: {record['waitingFor'] or '(anything new)'}",
+            _progress_text(record),
+            f"waited {_clock_text(record['elapsed'])}",
+            _remaining_text(record),
+        ]
+    )
 
 
-def _report(record: Dict[str, Any], args: argparse.Namespace, first: bool) -> None:
+def _report(
+    record: dict[str, Any], args: argparse.Namespace, first: bool
+) -> None:
     """Emit one record in the selected format; *first* heads a CSV stream."""
     if output_format(args) == "table":
         print(_progress_line(record), flush=True)
@@ -447,18 +492,24 @@ def _ending_clauses(args: argparse.Namespace) -> str:
     return text
 
 
-def _describe_wait(target: Target, follow: Follow, args: argparse.Namespace) -> str:
+def _describe_wait(
+    target: Target, follow: Follow, args: argparse.Namespace
+) -> str:
     """The opening line naming the video and where the wait will end."""
     who = f" ({follow.user})" if follow.user else ""
     if target.position is None:
         point = "to stop"
     elif target.credits is not None:
-        point = f"to reach the credits at {_clock_text(_seconds(target.credits))}"
+        point = (
+            f"to reach the credits at {_clock_text(_seconds(target.credits))}"
+        )
     else:
         point = f"to reach the end at {_clock_text(_seconds(target.duration))}"
     if args.offset < 0 and target.position is not None:
-        point += (f", ending {-args.offset}s early at "
-                  f"{_clock_text(_seconds(target.position))}")
+        point += (
+            f", ending {-args.offset}s early at "
+            f"{_clock_text(_seconds(target.position))}"
+        )
     return f'Waiting for "{target.title}"{who} {point}{_ending_clauses(args)}.'
 
 
@@ -467,11 +518,14 @@ def _describe_all(args: argparse.Namespace) -> str:
     point = "its end" if args.no_credits else "its credits, or its end"
     if args.offset < 0:
         point += f", less {-args.offset}s"
-    return (f"Waiting for every play to reach {point}{_ending_clauses(args)}; "
-            "then checking once more for anything new.")
+    return (
+        f"Waiting for every play to reach {point}{_ending_clauses(args)}; "
+        "then checking once more for anything new."
+    )
 
 
 # --- following one play ----------------------------------------------------
+
 
 def _choose_session(sessions: Sequence[Any], args: argparse.Namespace) -> Any:
     """The session the wait starts from, or None.
@@ -484,9 +538,13 @@ def _choose_session(sessions: Sequence[Any], args: argparse.Namespace) -> Any:
         for session in sessions:
             if getattr(session, "sessionKey", None) == args.session_key:
                 return session
-        active = ", ".join(
-            f"{getattr(s, 'sessionKey', '?')} ({_user_of(s)})" for s in sessions
-        ) or "none"
+        active = (
+            ", ".join(
+                f"{getattr(s, 'sessionKey', '?')} ({_user_of(s)})"
+                for s in sessions
+            )
+            or "none"
+        )
         sys.exit(
             f"No active session has sessionKey {args.session_key}. Active "
             f"sessions: {active}. See status --section sessions."
@@ -500,14 +558,17 @@ def _choose_session(sessions: Sequence[Any], args: argparse.Namespace) -> Any:
 
 def _start(
     plex: PlexServer, args: argparse.Namespace
-) -> Optional[Tuple[Target, Follow]]:
+) -> tuple[Target, Follow] | None:
     """What to wait for and whom to follow, or None when nothing is playing."""
     chosen = _choose_session(list(plex.sessions()), args)
     if chosen is None and args.rating_key is None:
         return None
 
-    rating_key = (args.rating_key if args.rating_key is not None
-                  else int(chosen.ratingKey))
+    rating_key = (
+        args.rating_key
+        if args.rating_key is not None
+        else int(chosen.ratingKey)
+    )
     playing_it = chosen is not None and int(chosen.ratingKey) == rating_key
     # --session pins the user even before the video starts; otherwise the
     # user is bound only once somebody is actually seen playing it.
@@ -517,7 +578,9 @@ def _start(
         session_key=getattr(chosen, "sessionKey", None) if bound else None,
         seen=playing_it,
     )
-    return _make_target(fetch_item(plex, rating_key, markers=True), args), follow
+    return _make_target(
+        fetch_item(plex, rating_key, markers=True), args
+    ), follow
 
 
 def _locate(sessions: Sequence[Any], follow: Follow, rating_key: int) -> Any:
@@ -528,7 +591,8 @@ def _locate(sessions: Sequence[Any], follow: Follow, rating_key: int) -> Any:
     again gives the same play a new sessionKey.
     """
     matches = [
-        session for session in sessions
+        session
+        for session in sessions
         if int(session.ratingKey) == rating_key
         and (follow.user is None or _user_of(session) == follow.user)
     ]
@@ -546,14 +610,19 @@ def _context(sessions: Sequence[Any], follow: Follow) -> Any:
 
 
 def _observe(
-    sessions: Sequence[Any], target: Target, follow: Follow, now: float,
+    sessions: Sequence[Any],
+    target: Target,
+    follow: Follow,
+    now: float,
     args: argparse.Namespace,
 ) -> Observation:
     """Classify one poll, binding *follow* to the session once it is seen."""
     located = _locate(sessions, follow, target.rating_key)
     if located is None:
         state = "stopped" if follow.seen else "not started"
-        return Observation(state, _context(sessions, follow), None, None, target)
+        return Observation(
+            state, _context(sessions, follow), None, None, target
+        )
 
     follow.user = _user_of(located)
     follow.session_key = getattr(located, "sessionKey", None)
@@ -592,7 +661,10 @@ def _conclude(
 ) -> bool:
     """Say how the play ended; False when --now gave up on it instead."""
     if observation.state == "not started":
-        _say(f'"{target.title}" is not playing; not waiting for it (--now).', args)
+        _say(
+            f'"{target.title}" is not playing; not waiting for it (--now).',
+            args,
+        )
         return False
     how = {
         "reached": "reached its end point",
@@ -607,8 +679,10 @@ def _wait_one(plex: PlexServer, args: argparse.Namespace, clock: Clock) -> bool:
     """Wait for one play; False when there was nothing to wait for."""
     started = _start(plex, args)
     if started is None:
-        print("Nothing is playing, so there is nothing to wait for.",
-              file=sys.stderr)
+        print(
+            "Nothing is playing, so there is nothing to wait for.",
+            file=sys.stderr,
+        )
         return False
     target, follow = started
     _say(_describe_wait(target, follow, args), args)
@@ -618,14 +692,16 @@ def _wait_one(plex: PlexServer, args: argparse.Namespace, clock: Clock) -> bool:
 
 # --- waiting for everything ------------------------------------------------
 
+
 def _gone(
-    previous: Dict[_PlayId, Observation], current: Sequence[Observation]
-) -> List[Observation]:
+    previous: dict[_PlayId, Observation], current: Sequence[Observation]
+) -> list[Observation]:
     """Plays seen last poll that are gone now, each reported once as stopped."""
     present = {_play_id(o.session) for o in current}
     return [
         Observation("stopped", seen.session, None, None, seen.target)
-        for play, seen in previous.items() if play not in present
+        for play, seen in previous.items()
+        if play not in present
     ]
 
 
@@ -637,9 +713,9 @@ def _wait_all(plex: PlexServer, args: argparse.Namespace, clock: Clock) -> None:
     for. Nothing left to wait for twice running ends it.
     """
     started = clock.now()
-    targets: Dict[int, Target] = {}
-    pauses: Dict[_PlayId, float] = {}
-    previous: Dict[_PlayId, Observation] = {}
+    targets: dict[int, Target] = {}
+    pauses: dict[_PlayId, float] = {}
+    previous: dict[_PlayId, Observation] = {}
     confirming = False
     first = True
     while True:
@@ -655,7 +731,8 @@ def _wait_all(plex: PlexServer, args: argparse.Namespace, clock: Clock) -> None:
             del pauses[play]
 
         for observation in shown or [
-                Observation("nothing playing", None, None, None, None)]:
+            Observation("nothing playing", None, None, None, None)
+        ]:
             _report(_record(observation, args, now - started), args, first)
             first = False
 
@@ -666,12 +743,15 @@ def _wait_all(plex: PlexServer, args: argparse.Namespace, clock: Clock) -> None:
         if confirming:
             return
         confirming = True
-        _say("Nothing left to wait for; checking once more for anything new.",
-             args)
+        _say(
+            "Nothing left to wait for; checking once more for anything new.",
+            args,
+        )
         clock.sleep(_next_delay(False, None, args, clock.uniform))
 
 
 # --- the command -----------------------------------------------------------
+
 
 def _check_arguments(args: argparse.Namespace) -> None:
     """Refuse combinations that cannot mean anything."""
@@ -687,7 +767,9 @@ def _check_arguments(args: argparse.Namespace) -> None:
             "--now only applies with --rating-key: without one, the video "
             "waited for is the one already playing."
         )
-    if args.all and (args.session_key is not None or args.rating_key is not None):
+    if args.all and (
+        args.session_key is not None or args.rating_key is not None
+    ):
         sys.exit(
             "--all waits for every session, so it takes neither --session "
             "nor --rating-key."
@@ -715,24 +797,26 @@ def cmd_wait(plex: PlexServer, args: argparse.Namespace) -> None:
 
 
 def _seconds_argument(text: str) -> float:
-    """argparse type for an interval: a number of seconds above zero."""
+    """An argparse type for an interval: a number of seconds above zero."""
     try:
         value = float(text)
     except ValueError:
         raise argparse.ArgumentTypeError(
-            f"not a number of seconds: {text!r}") from None
+            f"not a number of seconds: {text!r}"
+        ) from None
     if value <= 0:
         raise argparse.ArgumentTypeError(f"must be above 0 seconds, got {text}")
     return value
 
 
 def _paused_argument(text: str) -> int:
-    """argparse type for --paused: whole seconds, zero or more."""
+    """An argparse type for --paused: whole seconds, zero or more."""
     try:
         value = int(text)
     except ValueError:
         raise argparse.ArgumentTypeError(
-            f"not a whole number of seconds: {text!r}") from None
+            f"not a whole number of seconds: {text!r}"
+        ) from None
     if value < 0:
         raise argparse.ArgumentTypeError(f"cannot be negative, got {text}")
     return value
@@ -740,11 +824,12 @@ def _paused_argument(text: str) -> int:
 
 def register(
     sub: "argparse._SubParsersAction",
-    parents: "List[argparse.ArgumentParser]",
+    parents: "list[argparse.ArgumentParser]",
 ) -> None:
     """Register the wait subparser."""
     parser = sub.add_parser(
-        "wait", parents=parents,
+        "wait",
+        parents=parents,
         help="Sleep until a session's current play is over.",
         description=(
             "Sleep until a session's current play is over: the start of its "
@@ -755,24 +840,32 @@ def register(
         ),
     )
     parser.add_argument(
-        "-s", "--session", dest="session_key", type=int, default=None,
+        "-s",
+        "--session",
+        dest="session_key",
+        type=int,
+        default=None,
         metavar="KEY",
         help=(
             "Follow the session with this sessionKey instead of the first "
             "one listed. Obtain it with status --section sessions."
         ),
     )
-    parser.add_argument(
-        "-r", "--rating-key", dest="rating_key", type=int, default=None,
-        metavar="KEY",
-        help=(
+    add_rating_key_option(
+        parser,
+        "-r",
+        "--rating-key",
+        help_text=(
             "Wait for this video rather than whatever is playing. Without "
             "--session, whichever session plays it is followed. If it is not "
             "playing, the wait lasts until it starts (see --now)."
         ),
     )
     parser.add_argument(
-        "-a", "--all", action="store_true", default=False,
+        "-a",
+        "--all",
+        action="store_true",
+        default=False,
         help=(
             "Wait for every play by every user, each judged as one play "
             "would be. Ends only when two polls an interval apart both find "
@@ -781,13 +874,18 @@ def register(
         ),
     )
     parser.add_argument(
-        "-i", "--interval", type=_seconds_argument, default=10.0,
+        "-i",
+        "--interval",
+        type=_seconds_argument,
+        default=10.0,
         metavar="SECONDS",
         help="Seconds between polls, varied by up to 20%% either way "
-             "(default: 10).",
+        "(default: 10).",
     )
     parser.add_argument(
-        "--fast-interval", type=_seconds_argument, default=1.0,
+        "--fast-interval",
+        type=_seconds_argument,
+        default=1.0,
         metavar="SECONDS",
         help=(
             "Seconds between polls from 30 seconds before the end point on, "
@@ -795,11 +893,16 @@ def register(
         ),
     )
     parser.add_argument(
-        "--no-credits", action="store_true", default=False,
+        "--no-credits",
+        action="store_true",
+        default=False,
         help="Ignore the end credits marker and wait for the video to end.",
     )
     parser.add_argument(
-        "--offset", type=int, default=0, metavar="SECONDS",
+        "--offset",
+        type=int,
+        default=0,
+        metavar="SECONDS",
         help=(
             "Signed seconds. Negative ends the wait that long before the "
             "credits marker, or the end; positive sleeps that long once the "
@@ -807,7 +910,10 @@ def register(
         ),
     )
     parser.add_argument(
-        "--paused", type=_paused_argument, default=None, metavar="SECONDS",
+        "--paused",
+        type=_paused_argument,
+        default=None,
+        metavar="SECONDS",
         help=(
             "Count a play as over once its player has sat paused this many "
             "seconds, counted from the first poll that sees the pause; 0 "
@@ -815,7 +921,9 @@ def register(
         ),
     )
     parser.add_argument(
-        "--now", action="store_true", default=False,
+        "--now",
+        action="store_true",
+        default=False,
         help=(
             "With --rating-key: if that video is not playing, exit 0 at once "
             "instead of waiting for it to start."

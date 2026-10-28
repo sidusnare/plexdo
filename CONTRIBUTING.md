@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 SidusNare
+SPDX-License-Identifier: GPL-3.0-or-later
+SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
+-->
+
 # Contributing
 
 ## Getting set up
@@ -5,8 +11,12 @@
 ```bash
 git clone https://github.com/sidusnare/plexdo.git
 cd plexdo
-make develop      # editable install with the dev extras
+make develop      # editable install with the dev extras, ruff included
+npm ci            # markdownlint-cli2, at the version package.json pins
 ```
+
+`make check` also needs ShellCheck, yamllint, and reuse; on Debian and Ubuntu
+they come from `sudo apt install shellcheck yamllint reuse`.
 
 ## Before opening a pull request
 
@@ -18,16 +28,20 @@ That runs, in order:
 
 | step | what it enforces |
 | --- | --- |
-| `check-version` | the version agrees across `__init__.py`, `pyproject.toml`, and the man page |
+| `check-version` | the man page's version and the SBOM match `pyproject.toml`, the one place the version is defined |
 | `check-assets` | packaged completions and man page match their sources; all source is ASCII |
 | `smoke` | the package imports, the parser builds, every command module is registered |
 | `test` | the test suite |
-| `lint` | pylint scores 10.00/10 |
+| `lint` | ruff check and ruff format, pylint at 10.00/10, ShellCheck, yamllint, markdownlint-cli2, and `reuse lint` |
 | `build` + `dist-check` | the sdist and wheel build and pass `twine check` |
 
 ## House rules
 
-- Every function is annotated, and pylint must stay at 10.00/10.
+- Google Python style: every function is annotated, `ruff format` decides the
+  layout, and pylint must stay at 10.00/10. A linter suppression covers one
+  line and one rule, with a comment saying why the code cannot change.
+- Every file carries its SPDX copyright, licence, and, if written with AI,
+  `SPDX-FileContributor` header, so `reuse lint` passes.
 - A leading underscore means module-private. If another module imports it, it
   is package API and must not have one.
 - Source files are plain ASCII. Write `-`, not an em dash. The box-drawing
@@ -35,15 +49,19 @@ That runs, in order:
 - Adding a command means adding a module under `src/plexdo/commands/` that
   exposes `register(sub, parents)`, `COMMANDS`, and `REQUIRES_PLEX`, then
   listing it in `MODULES`. `cli.py` should not need changing.
-- Bump the revision (the third version field) for each release, in all three
-  places `check-version` inspects.
+- Record every change for users under `## [Unreleased]` in `CHANGELOG.md`,
+  and say which version component it will need: MAJOR for anything
+  incompatible, MINOR for an addition, PATCH for a fix. Mark an incompatible
+  entry **Breaking:**.
 
 ## Releasing
 
-1. Bump the revision in `src/plexdo/__init__.py`, `pyproject.toml`, and the
-   `.TH` line of `man/plexdo.1`; `make check-version` verifies all three.
-2. Add a `CHANGELOG.md` entry.
-3. `make check`.
+1. Set `version` in `pyproject.toml`, bumped by the component the Unreleased
+   entries call for, under Semantic Versioning.
+2. Move the Unreleased entries under `## [X.Y.Z] - YYYY-MM-DD`, and add the
+   heading's comparison link.
+3. `make derive`, which writes the version and date into the man page and
+   regenerates `sbom.spdx.json`, then `make check`.
 4. Tag and publish a GitHub release as `vX.Y.Z`. The workflow triggers on the
    release being published, not on the tag being pushed, so pushing a tag
    alone does nothing.

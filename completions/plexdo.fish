@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
+#
 # fish completion for plexdo
 #
 # Installation:
@@ -206,7 +210,7 @@ set -l plexdo_cmds list-libraries list-titles list-library list-show export-titl
     list-users list-playlists list-playlist export-playlist remove-playlist \
     append-playlist clean-playlist show-metadata read rescan status wait player-remote-play find-missing build-interleaved \
     build-chronological build-randomize build-concatenated copy-playlist-all-users \
-    copy-playlist-to-user copy-watched login logout write-config-example
+    copy-playlist-to-user copy-watched login logout set-pin write-config-example
 
 # No bare filename completion anywhere; each rule opts in explicitly.
 complete -c plexdo -f
@@ -246,6 +250,7 @@ for prog in plexdo
     complete -c $prog -n __plexdo_no_subcommand -a copy-watched -d 'Synchronise watched state between two users'
     complete -c $prog -n __plexdo_no_subcommand -a login -d 'Authenticate with plex.tv and save a token'
     complete -c $prog -n __plexdo_no_subcommand -a logout -d 'Sign out of plex.tv and remove the saved tokens'
+    complete -c $prog -n __plexdo_no_subcommand -a set-pin -d 'Save or remove a Plex Home PIN in the keyring'
     complete -c $prog -n __plexdo_no_subcommand -a write-config-example -d 'Write a template config file'
 
     # Global flags: valid before or after the command name.
@@ -277,7 +282,7 @@ for prog in plexdo
     complete -c $prog -n "__fish_seen_subcommand_from build-interleaved build-chronological; and not __plexdo_at 0" \
         -a '(__plexdo_rating_keys)' -d 'item'
 
-    complete -c $prog -n "__fish_seen_subcommand_from search list-playlists list-playlist export-playlist remove-playlist append-playlist clean-playlist build-randomize build-concatenated copy-playlist-all-users copy-playlist-to-user copy-watched; and __plexdo_at 0" \
+    complete -c $prog -n "__fish_seen_subcommand_from search list-playlists list-playlist export-playlist remove-playlist append-playlist clean-playlist build-randomize build-concatenated copy-playlist-all-users copy-playlist-to-user copy-watched set-pin; and __plexdo_at 0" \
         -a '(__plexdo_users)' -d 'user'
     complete -c $prog -n "__fish_seen_subcommand_from copy-watched; and __plexdo_at 1" \
         -a '(__plexdo_users)' -d 'user'
@@ -344,7 +349,9 @@ for prog in plexdo
     complete -c $prog -l unwatch -n '__fish_seen_subcommand_from copy-watched' -d 'Propagate the unwatched state instead'
     complete -c $prog -x -s u -l username -n '__fish_seen_subcommand_from login' -d 'Plex username or email'
     complete -c $prog -x -s p -l password -n '__fish_seen_subcommand_from login' -d 'Plex password (INSECURE: visible in ps)'
+    complete -c $prog -l save-password -n '__fish_seen_subcommand_from login' -d 'Also save the password in the system keyring'
     complete -c $prog -x -s c -l code -n '__fish_seen_subcommand_from login' -d 'Two-factor authentication code'
     complete -c $prog -s 2 -l two-factor -n '__fish_seen_subcommand_from login' -d 'Prompt for a two-factor code'
-    complete -c $prog -x -s u -l username -n '__fish_seen_subcommand_from logout' -d 'Sign out only this name from the token file'
+    complete -c $prog -x -s u -l username -n '__fish_seen_subcommand_from logout' -d 'Sign out only this saved name'
+    complete -c $prog -l remove -n '__fish_seen_subcommand_from set-pin' -d 'Remove the saved PIN instead of prompting'
 end

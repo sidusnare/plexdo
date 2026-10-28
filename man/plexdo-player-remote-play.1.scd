@@ -1,4 +1,7 @@
 plexdo-player-remote-play(1) "plexdo" "User Commands"
+; SPDX-FileCopyrightText: 2026 SidusNare
+; SPDX-License-Identifier: GPL-3.0-or-later
+; SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 # NAME
 
@@ -61,9 +64,9 @@ sent as it. Without it, the command is sent as:
   the server's admin;
 - otherwise *plexdo*'s own account when the player is one of that
   account's devices on plex.tv;
-- otherwise the first account in the configuration's per-user sections,
-  *[<user id>]* with *username* and *password*, that the player is one of
-  the devices of;
+- otherwise the first account among the configuration's *users*
+  entries, each signed in once with *plexdo login --username*, that the
+  player is one of the devices of;
 - otherwise *plexdo*'s own account anyway, with a warning: some players
   accept it regardless, and if this one does not, the error says what to
   add to the configuration.
@@ -79,21 +82,21 @@ the last two ignoring case. It names, in this order:
   so it is named by its id or the name it is shown by. *plexdo* switches
   into the member through plex.tv, as the user switcher in a Plex app
   does, which needs no password, only the member's PIN when it has one,
-  given as *pin* in a section named for its user id;
-- an account from a per-user section: one whose section id or *username*
-  is the value is taken at its word; failing that, the sections are
-  signed in one at a time and compared by id, username, and email, since
-  a section may file an account under its email when the value is its
-  username. A Home member plex.tv refuses to switch into, for want of its
-  PIN for instance, is looked for here too.
+  saved with *plexdo-set-pin*(1);
+- an account from a *users* entry: one whose user id or *username* is the
+  value is taken at its word; failing that, the entries are signed in one
+  at a time and compared by id, username, and email, since an entry may
+  file an account under its email when the value is its username. A Home
+  member plex.tv refuses to switch into, for want of its PIN for
+  instance, is looked for here too.
 
 An account *plexdo* cannot act as is an error: the command is never sent as
 some other account in its place.
 
-An account from the configuration signs in with a token saved for it
-earlier when plex.tv still accepts that, and otherwise with its password,
-saving the new token so that happens once; *plexdo-logout*(1) signs such
-tokens out again.
+An account from the configuration signs in with the token saved for it
+when plex.tv still accepts that, and otherwise with a password saved by
+*plexdo login --save-password*, saving the new token so that happens
+once; *plexdo-logout*(1) signs such tokens out again.
 
 The item is then fetched through the server as the account sending the
 command, a Home member's included. This matters: the player plays with the
@@ -116,7 +119,7 @@ or across IPv6 sites joined by router ACLs, has several addresses, and the
 one *plexdo* itself uses may be the wrong one for the player.
 
 So every address the server has is a candidate: *plexdo*'s configured
-*[plex] url*, and each direct address plex.tv lists for the server, on the
+*plex: url*, and each direct address plex.tv lists for the server, on the
 local network or the public one. They are ranked against the address the
 player answered at:
 
@@ -171,7 +174,7 @@ _ratingKey_
 	The account signed in to the player, to send the command as: a plex.tv
 	user id, as *plexdo-list-users*(1) shows it, a username, or an email
 	address, or a managed user's name. It must be *plexdo*'s own account, a
-	member of its Plex Home, or have a per-user section in the
+	member of its Plex Home, or have a *users* entry in the
 	configuration. See *Which account sends it*.
 
 *--server-url* _URL_
@@ -222,9 +225,9 @@ _ratingKey_
   ranked, and plex.tv is not asked for the server's addresses. It has no
   bearing on which account sends the command.
 - Without it, the choice depends on the address the player answered at,
-  *[plex] url*, and what plex.tv lists. When plex.tv cannot be reached, the
+  *plex: url*, and what plex.tv lists. When plex.tv cannot be reached, the
   configured URL is the only candidate; when that is a loopback address
-  too, the command stops and asks for *--server-url*, or a *[plex] url* a
+  too, the command stops and asks for *--server-url*, or a *plex: url* a
   player can reach.
 
 # OUTPUT
@@ -307,8 +310,8 @@ plexdo player-remote-play livingroom-tv.lan 881 --dry-run --json |
     jq '{account, fetchFrom}'
 ```
 
-Send as the account signed in to the TV, which has a per-user section in
-the configuration, rather than working it out:
+Send as the account signed in to the TV, which has a *users* entry in the
+configuration, rather than working it out:
 
 ```
 plexdo player-remote-play livingroom-tv.lan 881 --player-user bob@example.com
@@ -337,13 +340,12 @@ plexdo player-remote-play livingroom-tv.lan 881 --player-user Clare
 
 # FILES
 
-The per-user sections of the configuration, and the token store, are
-described under *FILES* in *plexdo-conventions*(7). A section for a
-PIN-protected Home member holds just the PIN:
+The configuration's *users* entries, and where tokens and PINs are kept,
+are described under *FILES* in *plexdo-conventions*(7). A PIN-protected
+Home member needs only its PIN saved, not an entry:
 
 ```
-[826699965]
-pin = 1234
+plexdo set-pin 826699965
 ```
 
 # SEE ALSO

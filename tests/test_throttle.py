@@ -1,12 +1,18 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Pacing of operations that issue one request per element."""
 
 import argparse
 import time
 
-from plexdo.throttle import (DEFAULT_THROTTLE, THROTTLE_THRESHOLD, paced,
-                             throttle_delay)
+from plexdo.throttle import (
+    DEFAULT_THROTTLE,
+    THROTTLE_THRESHOLD,
+    paced,
+    throttle_delay,
+)
 
 
 def ns(**kw):
@@ -53,6 +59,7 @@ def test_zero_disables_pacing_however_large_the_run(monkeypatch):
 
 def test_pacing_announces_itself_once(monkeypatch, caplog):
     import logging
+
     caplog.set_level(logging.INFO, logger="plexdo")
     monkeypatch.setattr(time, "sleep", lambda _: None)
     list(paced(list(range(200)), ns(throttle=0.25)))

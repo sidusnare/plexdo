@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Regressions: each test pins a bug that shipped, so it cannot come back."""
 
@@ -24,14 +26,18 @@ def movie(**attributes):
     """A real plexapi Movie, built offline from XML."""
     attributes.setdefault("type", "movie")
     attributes.setdefault("ratingKey", "881")
-    return Movie(None, ET.Element("Video", {k: str(v) for k, v in attributes.items()}))
+    return Movie(
+        None, ET.Element("Video", {k: str(v) for k, v in attributes.items()})
+    )
 
 
 def episode(**attributes):
     """A real plexapi Episode, built offline from XML."""
     attributes.setdefault("type", "episode")
     attributes.setdefault("ratingKey", "4180")
-    return Episode(None, ET.Element("Video", {k: str(v) for k, v in attributes.items()}))
+    return Episode(
+        None, ET.Element("Video", {k: str(v) for k, v in attributes.items()})
+    )
 
 
 def answers(monkeypatch, *replies):
@@ -55,11 +61,13 @@ class Unknown:
 
 # --- build-chronological asks for a missing date, film or episode --------
 
+
 def test_a_film_without_a_date_is_asked_for_one(monkeypatch):
     """This used to crash: the prompt read episode-only attributes."""
     answers(monkeypatch, "1995-12-15")
-    assert prompt_for_date(movie(title="Heat", year=1995), None) == \
-        datetime.datetime(1995, 12, 15)
+    assert prompt_for_date(
+        movie(title="Heat", year=1995), None
+    ) == datetime.datetime(1995, 12, 15)
 
 
 def test_an_invalid_date_is_asked_for_again(monkeypatch, capsys):
@@ -82,21 +90,27 @@ def test_a_film_is_named_by_title_and_year():
 
 
 def test_an_episode_without_a_number_can_still_be_named():
-    """seasonNumber or index missing used to crash the :02d format."""
-    unnumbered = episode(title="Pilot", grandparentTitle="The Wire",
-                         parentIndex=1)
+    """SeasonNumber or index missing used to crash the :02d format."""
+    unnumbered = episode(
+        title="Pilot", grandparentTitle="The Wire", parentIndex=1
+    )
     assert _date_label(unnumbered) == "The Wire S01E?? - Pilot"
 
 
 # --- the config template is complete --------------------------------------
 
-def test_the_template_keeps_its_per_user_heading():
+
+def test_the_template_keeps_its_users_heading():
     """A missing quote once turned this line into a Python comment."""
-    assert ("# Per-user credentials, one section per user ID (see `plexdo\n"
-            "# list-users`).") in CONFIG_EXAMPLE
+    prose = " ".join(line.lstrip("# ") for line in CONFIG_EXAMPLE.splitlines())
+    assert (
+        "Other plex.tv accounts plexdo may act as, keyed by user id as "
+        "`plexdo list-users` shows it."
+    ) in prose
 
 
 # --- write-config-example never clobbers unasked -----------------------------
+
 
 @pytest.fixture
 def config(monkeypatch, tmp_path):
@@ -149,10 +163,16 @@ def test_a_new_config_is_written_private(config):
 
 # --- find-missing keeps machine-readable output parseable -----------------
 
+
 def find_missing_args(fmt):
-    return argparse.Namespace(format=fmt, seasons=None, all_shows=True,
-                              show=None, library_id=None,
-                              include_specials=False)
+    return argparse.Namespace(
+        format=fmt,
+        seasons=None,
+        all_shows=True,
+        show=None,
+        library_id=None,
+        include_specials=False,
+    )
 
 
 def test_no_gaps_is_an_empty_list_in_json(monkeypatch, capsys):
@@ -169,6 +189,7 @@ def test_no_gaps_is_still_a_sentence_in_a_table(monkeypatch, capsys):
 
 # --- copy-playlist-to-user emits one document ------------------------------
 
+
 class Source:
     """A playlist to copy from."""
 
@@ -184,17 +205,24 @@ def test_copy_to_user_is_a_single_json_document(monkeypatch, capsys):
     monkeypatch.setattr(copy, "server_for_user", lambda plex, uid: target)
     monkeypatch.setattr(copy, "resolve_playlist", lambda plex, name: Source())
     args = argparse.Namespace(
-        format="json", dry_run=False, overwrite=False, source_user_id=0,
-        source_playlist="Movie Night", user_id=7, dest="Movie Night",
+        format="json",
+        dry_run=False,
+        overwrite=False,
+        source_user_id=0,
+        source_playlist="Movie Night",
+        user_id=7,
+        dest="Movie Night",
     )
     copy.cmd_copy_playlist_to_user(None, args)
     record = json.loads(capsys.readouterr().out)
     assert (record["status"], record["playlist"]) == ("created", "Movie Night")
-    assert [(name, len(items)) for name, items in target.created] == \
-        [("Movie Night", 2)]
+    assert [(name, len(items)) for name, items in target.created] == [
+        ("Movie Night", 2)
+    ]
 
 
 # --- unknown keys end with a message, not a traceback ----------------------
+
 
 def test_an_unknown_playlist_ratingkey_is_a_clean_error():
     with pytest.raises(SystemExit) as exc:

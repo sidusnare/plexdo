@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """The server address a player is told to fetch from, whatever its network."""
 
@@ -7,19 +9,33 @@ import types
 import pytest
 from plexapi.exceptions import BadRequest
 
-from plexdo.playback import (Candidate, _choose_address, _plex_tv_candidates,
-                             fetch_address, parse_ip, url_of)
+from plexdo.playback import (
+    Candidate,
+    _choose_address,
+    _plex_tv_candidates,
+    fetch_address,
+    parse_ip,
+    url_of,
+)
 
 
 def connection(address, local=True, relay=False, secure=True, port=32400):
     """A plex.tv connection, https to a plex.direct name as plex.tv lists."""
     dashed = address.replace(".", "-").replace(":", "-")
-    uri = (f"https://{dashed}.abc123.plex.direct:{port}" if secure
-           else f"http://{address}:{port}")
+    uri = (
+        f"https://{dashed}.abc123.plex.direct:{port}"
+        if secure
+        else f"http://{address}:{port}"
+    )
     return types.SimpleNamespace(
-        address=address, port=port, local=local, relay=relay, uri=uri,
+        address=address,
+        port=port,
+        local=local,
+        relay=relay,
+        uri=uri,
         protocol="https" if secure else "http",
-        httpuri=f"http://{address}:{port}")
+        httpuri=f"http://{address}:{port}",
+    )
 
 
 class FakeServer:
@@ -27,8 +43,12 @@ class FakeServer:
 
     friendlyName = "nas"
 
-    def __init__(self, baseurl="http://10.10.0.5:32400", connections=(),
-                 plex_tv_down=False):
+    def __init__(
+        self,
+        baseurl="http://10.10.0.5:32400",
+        connections=(),
+        plex_tv_down=False,
+    ):
         self._baseurl = baseurl
         self._connections, self._down = list(connections), plex_tv_down
 
@@ -85,10 +105,18 @@ def test_scope_outranks_a_longer_shared_prefix():
     only 1 with the global 81.2.69.160; the global one must still win. The
     mirror case holds for a private player.
     """
-    assert chosen_host([candidate("10.255.255.5"), candidate("81.2.69.160")],
-                       "11.0.0.9") == "81.2.69.160"
-    assert chosen_host([candidate("11.0.0.5"), candidate("172.16.0.5")],
-                       "10.200.0.9") == "172.16.0.5"
+    assert (
+        chosen_host(
+            [candidate("10.255.255.5"), candidate("81.2.69.160")], "11.0.0.9"
+        )
+        == "81.2.69.160"
+    )
+    assert (
+        chosen_host(
+            [candidate("11.0.0.5"), candidate("172.16.0.5")], "10.200.0.9"
+        )
+        == "172.16.0.5"
+    )
 
 
 def test_an_ipv6_player_on_a_ula_network_gets_the_ula_address():
@@ -106,37 +134,49 @@ def test_a_remote_player_gets_the_servers_public_address():
 
 def test_a_name_beats_an_address_of_the_wrong_family():
     """A hostname might resolve to either family; a wrong family cannot work."""
-    named = [candidate("2a01:4f8:10::5"),
-             candidate("plex.example.lan", source="configured URL")]
+    named = [
+        candidate("2a01:4f8:10::5"),
+        candidate("plex.example.lan", source="configured URL"),
+    ]
     assert chosen_host(named, "10.20.0.40") == "plex.example.lan"
 
 
 def test_a_tie_keeps_the_configured_url():
-    """The same address listed twice ranks the same; plexdo's own URL, which
-    fetch_address lists first, wins."""
-    same = [candidate("10.10.0.5"),
-            candidate("10.10.0.5", source="configured URL", protocol="http")]
+    """The same address listed twice ranks the same.
+
+    plexdo's own URL, which fetch_address lists first, wins.
+    """
+    same = [
+        candidate("10.10.0.5"),
+        candidate("10.10.0.5", source="configured URL", protocol="http"),
+    ]
     picked = _choose_address(same[::-1], parse_ip("10.20.0.40"))
     assert picked.source == "configured URL"
 
 
 # --- plex.tv's addresses ---------------------------------------------------
 
+
 def test_plex_tv_addresses_are_named_by_their_plex_direct_host():
-    """https to a bare IP would fail the plex.direct certificate."""
-    [found] = _plex_tv_candidates(FakeServer(connections=[
-        connection("192.168.50.5")]))
+    """Https to a bare IP would fail the plex.direct certificate."""
+    [found] = _plex_tv_candidates(
+        FakeServer(connections=[connection("192.168.50.5")])
+    )
     assert found.host == "192-168-50-5.abc123.plex.direct"
     assert str(found.ip) == "192.168.50.5"
 
 
 def test_relayed_link_local_and_loopback_addresses_are_left_out():
-    found = _plex_tv_candidates(FakeServer(connections=[
-        connection("10.10.0.5", relay=True),
-        connection("fe80::1"),
-        connection("127.0.0.1"),
-        connection("192.168.50.5"),
-    ]))
+    found = _plex_tv_candidates(
+        FakeServer(
+            connections=[
+                connection("10.10.0.5", relay=True),
+                connection("fe80::1"),
+                connection("127.0.0.1"),
+                connection("192.168.50.5"),
+            ]
+        )
+    )
     assert [str(c.ip) for c in found] == ["192.168.50.5"]
 
 
@@ -146,12 +186,16 @@ def test_plex_tv_being_unreachable_leaves_the_configured_url():
 
 # --- the address for a particular player -------------------------------------
 
+
 def test_a_loopback_url_is_never_offered():
     """The template's localhost URL would send a TV looking on itself."""
-    server = FakeServer(baseurl="http://localhost:32400",
-                        connections=[connection("10.10.0.5")])
-    assert fetch_address(server, "TV", parse_ip("10.20.0.40"), None).host == \
-        "10-10-0-5.abc123.plex.direct"
+    server = FakeServer(
+        baseurl="http://localhost:32400", connections=[connection("10.10.0.5")]
+    )
+    assert (
+        fetch_address(server, "TV", parse_ip("10.20.0.40"), None).host
+        == "10-10-0-5.abc123.plex.direct"
+    )
 
 
 def test_no_usable_address_is_an_error_suggesting_server_url():
@@ -162,10 +206,17 @@ def test_no_usable_address_is_an_error_suggesting_server_url():
 
 
 def test_server_url_is_taken_exactly_as_given():
-    picked = fetch_address(FakeServer(), "TV", parse_ip("10.20.0.40"),
-                           "http://plex.site-b.example:32401")
-    assert (picked.protocol, picked.host, picked.port) == \
-        ("http", "plex.site-b.example", 32401)
+    picked = fetch_address(
+        FakeServer(),
+        "TV",
+        parse_ip("10.20.0.40"),
+        "http://plex.site-b.example:32401",
+    )
+    assert (picked.protocol, picked.host, picked.port) == (
+        "http",
+        "plex.site-b.example",
+        32401,
+    )
 
 
 def test_a_server_url_that_is_not_a_url_is_refused():
@@ -175,6 +226,10 @@ def test_a_server_url_that_is_not_a_url_is_refused():
 
 def test_an_ipv6_literal_goes_into_a_url_bracketed():
     """The player joins address and port into a URL."""
-    picked = fetch_address(FakeServer(), "TV", parse_ip("2a01:4f8:20::77"),
-                           "http://[2a01:4f8:10::5]:32400")
+    picked = fetch_address(
+        FakeServer(),
+        "TV",
+        parse_ip("2a01:4f8:20::77"),
+        "http://[2a01:4f8:10::5]:32400",
+    )
     assert url_of(picked) == "http://[2a01:4f8:10::5]:32400"

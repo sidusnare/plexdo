@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Pacing for operations that issue one request per element.
 
@@ -8,11 +10,11 @@ a server down or trip its rate limiting, so those loops are paced. Small runs
 are left alone: the delay would be pure latency for no benefit.
 """
 
-from typing import Any, Iterator, Sequence, TypeVar
 import time
+from collections.abc import Iterator, Sequence
+from typing import Any, TypeVar
 
 from plexdo.constants import LOG
-
 
 T = TypeVar("T")
 
@@ -51,7 +53,10 @@ def paced(items: Sequence[T], args: Any, what: str = "requests") -> Iterator[T]:
     LOG.info(
         "Pacing %d %s %.3gs apart to go easy on the server; about %s, or "
         "--throttle 0 to disable.",
-        total, what, delay, _describe(delay * (total - 1)),
+        total,
+        what,
+        delay,
+        _describe(delay * (total - 1)),
     )
     for index, item in enumerate(items):
         if index:

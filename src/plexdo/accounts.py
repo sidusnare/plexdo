@@ -1,19 +1,23 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """User lookup, per-user servers, and account classification."""
 
-from typing import Any, Iterator, List, Optional, Tuple
+import argparse
 import sys
+from collections.abc import Iterator
+from typing import Any
 
 from plexapi.exceptions import BadRequest, NotFound, Unauthorized
 from plexapi.myplex import MyPlexAccount, MyPlexUser
 from plexapi.server import PlexServer
 
-from plexdo.config import cached_config, section_optional, token_store_path
+from plexdo.config import cached_config, configured_users, user_option
 from plexdo.console import clean_text
 from plexdo.constants import LOG
 from plexdo.identify import resolve_identifier
-from plexdo.tokens import lookup, store_token
+from plexdo.tokens import lookup, saved_password, store_token
 
 
 class UserAccessError(RuntimeError):
@@ -45,10 +49,11 @@ def _access_denied(user_title: str, user_id: int) -> UserAccessError:
         "there is nothing an admin token can do on their behalf.\n\n"
         f"Share at least one library with {user_title!r} in Plex under "
         "Settings > Users & Sharing, then try again.\n\n"
-        "If that user does have access under their own login, add their "
-        f"credentials to a [{user_id}] section of the config file and they "
-        "will be used automatically. Pass 0 to act as the admin account "
-        "itself.",
+        "If that user does have access under their own login, add a "
+        f"users: {user_id}: entry with their username to the config file, "
+        "and sign them in once with plexdo login --username; their token "
+        "will then be used automatically. Pass 0 to act as the admin "
+        "account itself.",
         summary=(
             f"access denied (401) - no libraries are shared with "
             f"{user_title!r} on this server"
@@ -56,7 +61,7 @@ def _access_denied(user_title: str, user_id: int) -> UserAccessError:
     )
 
 
-def connect_with_token(plex: PlexServer, token: str) -> Optional[PlexServer]:
+def connect_with_token(plex: PlexServer, token: str) -> PlexServer | None:
     """Return a server connected with a token, or None if it is refused."""
     try:
         # pylint: disable-next=protected-access
@@ -68,16 +73,16 @@ def connect_with_token(plex: PlexServer, token: str) -> Optional[PlexServer]:
         return None
 
 
-def _candidate_usernames(user_id: int, user: MyPlexUser) -> List[str]:
+def _candidate_usernames(user_id: int, user: MyPlexUser) -> list[str]:
     """Names this user's token might be filed under, most specific first."""
-    configured = section_optional(cached_config(), str(user_id), "username")
+    configured = user_option(cached_config(), user_id, "username")
     names = [
         configured,
         getattr(user, "username", None),
         getattr(user, "email", None),
         getattr(user, "title", None),
     ]
-    seen: List[str] = []
+    seen: list[str] = []
     for name in names:
         text = clean_text(name or "")
         if text and text not in seen:
@@ -85,7 +90,9 @@ def _candidate_usernames(user_id: int, user: MyPlexUser) -> List[str]:
     return seen
 
 
-def connect_as_shared_user(plex: PlexServer, user: MyPlexUser) -> Optional[PlexServer]:
+def connect_as_shared_user(
+    plex: PlexServer, user: MyPlexUser
+) -> PlexServer | None:
     """Stage 1: the admin-issued, server-scoped token for this user."""
     try:
         token = user.get_token(plex.machineIdentifier)
@@ -100,11 +107,10 @@ def connect_as_shared_user(plex: PlexServer, user: MyPlexUser) -> Optional[PlexS
 
 def _connect_from_store(
     plex: PlexServer, user: MyPlexUser, user_id: int
-) -> Optional[PlexServer]:
+) -> PlexServer | None:
     """Stage 2: a token saved previously for this user."""
-    path = token_store_path(cached_config())
     for name in _candidate_usernames(user_id, user):
-        token = lookup(path, name)
+        token = lookup(name)
         if not token:
             continue
         server = connect_with_token(plex, token)
@@ -115,22 +121,22 @@ def _connect_from_store(
     return None
 
 
-def _login_section(user_id: int) -> Optional[Tuple[str, MyPlexAccount]]:
-    """Sign in with the credentials in the [<user_id>] section, if any.
+def _login_entry(user_id: int) -> tuple[str, MyPlexAccount] | None:
+    """Sign in as the users entry for user_id, with its saved password.
 
     Returns the configured username with the account, since that is the
-    name its token is filed under, or None when there are no credentials or
-    plex.tv refuses them.
+    name its token is filed under, or None when there is no entry, no
+    password was saved for it, or plex.tv refuses it.
     """
-    cfg = cached_config()
-    section = str(user_id)
-    username = section_optional(cfg, section, "username")
-    password = section_optional(cfg, section, "password")
+    username = user_option(cached_config(), user_id, "username")
+    password = saved_password(username) if username else None
     if not (username and password):
-        LOG.debug("No username/password in config section [%s]", section)
+        LOG.debug(
+            "No users entry with a saved password for user id %s", user_id
+        )
         return None
 
-    LOG.info("Logging in as %r for user id %s", username, section)
+    LOG.info("Logging in as %r for user id %s", username, user_id)
     try:
         return username, MyPlexAccount(username=username, password=password)
     except (Unauthorized, BadRequest) as exc:
@@ -138,11 +144,9 @@ def _login_section(user_id: int) -> Optional[Tuple[str, MyPlexAccount]]:
         return None
 
 
-def _connect_by_login(
-    plex: PlexServer, user_id: int
-) -> Optional[PlexServer]:
-    """Stage 3: log in with the credentials in the [<user_id>] section."""
-    login = _login_section(user_id)
+def _connect_by_login(plex: PlexServer, user_id: int) -> PlexServer | None:
+    """Stage 3: log in as the users entry, with its saved password."""
+    login = _login_entry(user_id)
     if login is None:
         return None
     username, account = login
@@ -152,18 +156,19 @@ def _connect_by_login(
     if server is None:
         LOG.warning(
             "%r signed in to plex.tv but that account cannot reach this "
-            "server; nothing has been shared with it.", username,
+            "server; nothing has been shared with it.",
+            username,
         )
         return None
 
-    store_token(token_store_path(cached_config()), username, token)
+    store_token(username, token)
     LOG.info("Saved a token for %r for future runs", username)
     return server
 
 
-def _stored_account(username: str) -> Optional[MyPlexAccount]:
+def _stored_account(username: str) -> MyPlexAccount | None:
     """The plex.tv account behind a stored token, or None if it is stale."""
-    token = lookup(token_store_path(cached_config()), username)
+    token = lookup(username)
     if not token:
         return None
     try:
@@ -173,44 +178,37 @@ def _stored_account(username: str) -> Optional[MyPlexAccount]:
         return None
 
 
-def configured_sections() -> List[Tuple[int, str]]:
-    """(user id, username) for each [<user_id>] section naming a username."""
-    cfg = cached_config()
-    found = []
-    for section in cfg.sections():
-        username = section_optional(cfg, section, "username")
-        if section.isdigit() and username:
-            found.append((int(section), username))
-    return found
+def configured_entries() -> list[tuple[int, str]]:
+    """(user id, username) for each users entry in the config."""
+    return configured_users(cached_config())
 
 
-def configured_account(user_id: int, username: str) -> Optional[MyPlexAccount]:
-    """The account of one [<user_id>] section, signed in, or None.
+def configured_account(user_id: int, username: str) -> MyPlexAccount | None:
+    """The account of one users entry, signed in, or None.
 
-    A token already stored for the section's username is used when plex.tv
-    still accepts it; otherwise the section's password signs in, and the
+    A token already stored for the entry's username is used when plex.tv
+    still accepts it; otherwise a password saved for it signs in, and the
     new token is saved so that happens once.
     """
     account = _stored_account(username)
     if account is not None:
         return account
-    login = _login_section(user_id)
+    login = _login_entry(user_id)
     if login is None:
         return None
     account = login[1]
-    store_token(token_store_path(cached_config()), username,
-                account.authenticationToken)
+    store_token(username, account.authenticationToken)
     LOG.info("Saved a token for %r for future runs", username)
     return account
 
 
-def configured_accounts() -> Iterator[Tuple[int, MyPlexAccount]]:
-    """Each account with a [<user_id>] section in the config, signed in.
+def configured_accounts() -> Iterator[tuple[int, MyPlexAccount]]:
+    """Each account with a users entry in the config, signed in.
 
     Accounts are produced one at a time, so a caller that finds what it
     wants early signs in no more.
     """
-    for user_id, username in configured_sections():
+    for user_id, username in configured_entries():
         account = configured_account(user_id, username)
         if account is not None:
             yield user_id, account
@@ -219,15 +217,16 @@ def configured_accounts() -> Iterator[Tuple[int, MyPlexAccount]]:
 def server_for_user(plex: PlexServer, user_id: int) -> PlexServer:
     """Return a PlexServer scoped to the given user.
 
-    Pass user_id=0 to use the admin account (the token from config).
+    Pass user_id=0 to use the admin account (the saved admin token).
 
     Otherwise three sources are tried in turn, because a server will refuse
     an admin-issued token for a user it has shared nothing with:
 
     1. the server-scoped token the admin can mint via get_token()
-    2. a token already saved in the JSON token store for that user
-    3. a fresh login using the username and password in the config section
-       named for the user ID, whose token is then saved for next time
+    2. a token already saved in the secret store for that user
+    3. a fresh login as the users entry for the user ID, with a password
+       saved by login --save-password, whose token is then saved for next
+       time
 
     Raises UserAccessError when none of them yields access.
     """
@@ -287,27 +286,32 @@ def account_type(user: MyPlexUser) -> str:
 # Namespace attributes that hold a user identifier, resolved centrally in
 # cli.main() so every command handler receives a plain numeric user ID.
 USER_ID_ARGUMENTS = (
-    "user_id", "user_a", "user_b", "source_user_id", "dest_user_id",
+    "user_id",
+    "user_a",
+    "user_b",
+    "source_user_id",
+    "dest_user_id",
 )
 
 
-def user_roster(plex: PlexServer) -> List[Tuple[int, str]]:
+def user_roster(plex: PlexServer) -> list[tuple[int, str]]:
     """Return (id, title) for the admin account and every shared user."""
     account = plex.myPlexAccount()
     roster = [(0, clean_text(getattr(account, "title", "") or "admin"))]
     roster.extend(
-        (int(user.id), clean_text(user.title or ""))
-        for user in account.users()
+        (int(user.id), clean_text(user.title or "")) for user in account.users()
     )
     return roster
 
 
-def resolve_user_identifier(roster: List[Tuple[int, str]], value: Any) -> int:
+def resolve_user_identifier(roster: list[tuple[int, str]], value: Any) -> int:
     """Resolve a numeric user ID or a user title to a numeric user ID."""
     return resolve_identifier(roster, value, "user", "list-users")
 
 
-def resolve_user_arguments(plex: PlexServer, args: "argparse.Namespace") -> None:
+def resolve_user_arguments(
+    plex: PlexServer, args: "argparse.Namespace"
+) -> None:
     """Replace user ID/title arguments with numeric user IDs, in place.
 
     The roster is fetched once per invocation, so a command taking two user
@@ -315,10 +319,14 @@ def resolve_user_arguments(plex: PlexServer, args: "argparse.Namespace") -> None
     given none of them costs nothing.
     """
     present = [
-        name for name in USER_ID_ARGUMENTS if getattr(args, name, None) is not None
+        name
+        for name in USER_ID_ARGUMENTS
+        if getattr(args, name, None) is not None
     ]
     if not present:
         return
     roster = user_roster(plex)
     for name in present:
-        setattr(args, name, resolve_user_identifier(roster, getattr(args, name)))
+        setattr(
+            args, name, resolve_user_identifier(roster, getattr(args, name))
+        )

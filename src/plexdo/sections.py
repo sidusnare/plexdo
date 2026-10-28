@@ -1,9 +1,12 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Library section lookup shared by the library, search, and sync commands."""
 
-from typing import Any, List, Optional, Tuple
+import argparse
 import sys
+from typing import Any
 
 from plexapi.exceptions import NotFound
 from plexapi.server import PlexServer
@@ -20,7 +23,7 @@ def resolve_section(plex: PlexServer, library_id: int) -> Any:
         sys.exit(f"Library ID not found: {library_id}")
 
 
-def resolve_sections(plex: PlexServer, library_id: Optional[int]) -> List[Any]:
+def resolve_sections(plex: PlexServer, library_id: int | None) -> list[Any]:
     """Return one section when library_id is given, otherwise every section."""
     if library_id is not None:
         return [resolve_section(plex, library_id)]
@@ -32,7 +35,7 @@ def resolve_sections(plex: PlexServer, library_id: Optional[int]) -> List[Any]:
 LIBRARY_ID_ARGUMENT = "library_id"
 
 
-def _library_roster(plex: PlexServer) -> List[Tuple[int, str]]:
+def _library_roster(plex: PlexServer) -> list[tuple[int, str]]:
     """Return (id, title) for every library section on the server."""
     return [
         (int(section.key), clean_text(section.title or ""))
@@ -40,12 +43,16 @@ def _library_roster(plex: PlexServer) -> List[Tuple[int, str]]:
     ]
 
 
-def resolve_library_identifier(roster: List[Tuple[int, str]], value: Any) -> int:
+def resolve_library_identifier(
+    roster: list[tuple[int, str]], value: Any
+) -> int:
     """Resolve a numeric library ID or a library title to a numeric ID."""
     return resolve_identifier(roster, value, "library", "list-libraries")
 
 
-def resolve_library_arguments(plex: PlexServer, args: "argparse.Namespace") -> None:
+def resolve_library_arguments(
+    plex: PlexServer, args: "argparse.Namespace"
+) -> None:
     """Replace a library ID/title argument with a numeric ID, in place.
 
     The roster is fetched only when a library argument is actually present, so
@@ -55,4 +62,6 @@ def resolve_library_arguments(plex: PlexServer, args: "argparse.Namespace") -> N
     if value is None:
         return
     roster = _library_roster(plex)
-    setattr(args, LIBRARY_ID_ARGUMENT, resolve_library_identifier(roster, value))
+    setattr(
+        args, LIBRARY_ID_ARGUMENT, resolve_library_identifier(roster, value)
+    )

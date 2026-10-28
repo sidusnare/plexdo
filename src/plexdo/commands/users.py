@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """User listing command."""
 
@@ -28,10 +30,14 @@ def cmd_list_users(plex: PlexServer, args: argparse.Namespace) -> None:
 
 def register(
     sub: "argparse._SubParsersAction",
-    parents: "List[argparse.ArgumentParser]",
+    parents: "list[argparse.ArgumentParser]",
 ) -> None:
     """Register the user listing subparser."""
-    sub.add_parser("list-users", parents=parents, help="List all managed/home users (id, type, title).")
+    sub.add_parser(
+        "list-users",
+        parents=parents,
+        help="List all managed/home users (id, type, title).",
+    )
 
 
 COMMANDS = {"list-users": cmd_list_users}

@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Serialisers for the machine-readable output formats.
 
@@ -7,21 +9,20 @@ command emitting one object (``show-metadata``, ``login``) and a command
 emitting many (``list-titles``) can share one code path.
 """
 
-from typing import Any, Dict, List, Union
-from xml.sax.saxutils import escape, quoteattr
 import csv
 import io
 import json
+from typing import Any
+from xml.sax.saxutils import escape, quoteattr
 
-
-Record = Dict[str, Any]
-Payload = Union[Record, List[Record], Any]
+Record = dict[str, Any]
+Payload = Record | list[Record] | Any
 
 # "table" is handled by console.print_table / print_metadata, not here.
 OUTPUT_FORMATS = ("table", "json", "yaml", "csv", "clixml")
 
 
-def _as_records(data: Payload) -> List[Record]:
+def _as_records(data: Payload) -> list[Record]:
     """Normalise a payload to a list of records."""
     if isinstance(data, dict):
         return [data]
@@ -65,15 +66,18 @@ def _yaml_scalar(value: Any) -> str:
     return f'"{text}"'
 
 
-def _yaml_lines(data: Payload, indent: int = 0) -> List[str]:
+def _yaml_lines(data: Payload, indent: int = 0) -> list[str]:
     """Render a nested payload as YAML lines at the given indent level."""
     pad = "  " * indent
     if isinstance(data, dict):
-        lines: List[str] = []
+        lines: list[str] = []
         for key, value in data.items():
             if isinstance(value, (dict, list)):
                 if not value:
-                    lines.append(f"{pad}{key}: " + ("{}" if isinstance(value, dict) else "[]"))
+                    lines.append(
+                        f"{pad}{key}: "
+                        + ("{}" if isinstance(value, dict) else "[]")
+                    )
                 else:
                     lines.append(f"{pad}{key}:")
                     lines.extend(_yaml_lines(value, indent + 1))
@@ -103,9 +107,9 @@ def to_yaml(data: Payload) -> str:
 
 
 def to_csv(data: Payload) -> str:
-    """Render as CSV with a header row.
+    r"""Render as CSV with a header row.
 
-    Uses "\\n" line endings rather than the RFC's CRLF so the output matches
+    Uses "\n" line endings rather than the RFC's CRLF so the output matches
     every other format when piped into ordinary Unix tooling.
     """
     records = _as_records(data)
@@ -113,8 +117,10 @@ def to_csv(data: Payload) -> str:
         return ""
     buffer = io.StringIO()
     writer = csv.DictWriter(
-        buffer, fieldnames=list(records[0].keys()),
-        extrasaction="ignore", lineterminator="\n",
+        buffer,
+        fieldnames=list(records[0].keys()),
+        extrasaction="ignore",
+        lineterminator="\n",
     )
     writer.writeheader()
     for record in records:
@@ -151,7 +157,9 @@ def to_clixml(data: Payload) -> str:
         lines.append(f'  <Obj RefId="{index}">')
         if index == 0:
             lines.append('    <TN RefId="0">')
-            lines.append("      <T>System.Management.Automation.PSCustomObject</T>")
+            lines.append(
+                "      <T>System.Management.Automation.PSCustomObject</T>"
+            )
             lines.append("      <T>System.Object</T>")
             lines.append("    </TN>")
         else:

@@ -1,11 +1,14 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Terminal output: JSON, box-drawn tables, and metadata records."""
 
-from typing import Any, Dict, List, Optional
+import argparse
 import shutil
 import sys
 import unicodedata
+from typing import Any
 
 from plexdo.constants import LOG
 from plexdo.formats import render
@@ -43,7 +46,7 @@ STREAMABLE_FORMATS = ("table", "json", "yaml", "csv")
 
 
 def stream_record(
-    record: Dict[str, Any], args: "argparse.Namespace", first: bool
+    record: dict[str, Any], args: "argparse.Namespace", first: bool
 ) -> None:
     """Emit one record of a stream in the selected machine-readable format.
 
@@ -63,7 +66,7 @@ def stream_record(
 
 
 def clean_text(value: Any) -> str:
-    """Convert a table cell value to a clean string, stripping control characters."""
+    """Convert a table cell value to a string without control characters."""
     return str(value).strip()
 
 
@@ -91,16 +94,30 @@ def _pad(text: str, width: int) -> str:
 # (cp1252, or a redirected ASCII stream) cannot encode U+2500 and friends, so
 # printing them raises UnicodeEncodeError and the command emits nothing at all.
 _BOX_UNICODE = {
-    "h": "\u2500", "v": "\u2502",
-    "tl": "\u250c", "tm": "\u252c", "tr": "\u2510",
-    "ml": "\u251c", "mm": "\u253c", "mr": "\u2524",
-    "bl": "\u2514", "bm": "\u2534", "br": "\u2518",
+    "h": "\u2500",
+    "v": "\u2502",
+    "tl": "\u250c",
+    "tm": "\u252c",
+    "tr": "\u2510",
+    "ml": "\u251c",
+    "mm": "\u253c",
+    "mr": "\u2524",
+    "bl": "\u2514",
+    "bm": "\u2534",
+    "br": "\u2518",
 }
 _BOX_ASCII = {
-    "h": "-", "v": "|",
-    "tl": "+", "tm": "+", "tr": "+",
-    "ml": "+", "mm": "+", "mr": "+",
-    "bl": "+", "bm": "+", "br": "+",
+    "h": "-",
+    "v": "|",
+    "tl": "+",
+    "tm": "+",
+    "tr": "+",
+    "ml": "+",
+    "mm": "+",
+    "mr": "+",
+    "bl": "+",
+    "bm": "+",
+    "br": "+",
 }
 
 
@@ -109,7 +126,7 @@ def _stdout_encoding() -> str:
     return getattr(sys.stdout, "encoding", None) or "utf-8"
 
 
-def _box() -> Dict[str, str]:
+def _box() -> dict[str, str]:
     """Return box-drawing glyphs stdout can actually encode."""
     try:
         "".join(_BOX_UNICODE.values()).encode(_stdout_encoding())
@@ -133,7 +150,7 @@ def _printable(text: str) -> str:
         return text.encode(encoding, "replace").decode(encoding, "replace")
 
 
-def _rule(widths: List[int], left: str, mid: str, right: str) -> str:
+def _rule(widths: list[int], left: str, mid: str, right: str) -> str:
     """Build a horizontal box-drawing rule for the given column widths."""
     return left + mid.join(_box()["h"] * (w + 2) for w in widths) + right
 
@@ -143,7 +160,7 @@ MIN_COLUMN_WIDTH = 8
 TRUNCATION_MARK = "..."
 
 
-def table_limit(args: "argparse.Namespace") -> Optional[int]:
+def table_limit(args: "argparse.Namespace") -> int | None:
     """Column budget for table output, or None to keep every character.
 
     Only an interactive terminal is measured: piping to a file or to grep
@@ -157,12 +174,12 @@ def table_limit(args: "argparse.Namespace") -> Optional[int]:
     return shutil.get_terminal_size().columns
 
 
-def _table_width(widths: List[int]) -> int:
+def _table_width(widths: list[int]) -> int:
     """Rendered width of a table with the given column widths."""
     return sum(width + 2 for width in widths) + len(widths) + 1
 
 
-def _fit_widths(widths: List[int], limit: Optional[int]) -> List[int]:
+def _fit_widths(widths: list[int], limit: int | None) -> list[int]:
     """Shrink the widest column repeatedly until the table fits.
 
     Columns stop at MIN_COLUMN_WIDTH first, since a narrower one carries
@@ -176,7 +193,7 @@ def _fit_widths(widths: List[int], limit: Optional[int]) -> List[int]:
         while _table_width(fitted) > limit:
             widest = max(range(len(fitted)), key=lambda i: fitted[i])
             if fitted[widest] <= floor:
-                break      # every column is at this floor
+                break  # every column is at this floor
             fitted[widest] -= 1
     return fitted
 
@@ -199,26 +216,32 @@ def _truncate(text: str, width: int) -> str:
 
 
 def _report_narrowing(
-    headers: List[str], natural: List[int], fitted: List[int], limit: int
+    headers: list[str], natural: list[int], fitted: list[int], limit: int
 ) -> None:
     """Say which columns were shrunk, and how to stop it happening."""
     shrunk = [
         f"{name} {was}->{now}"
-        for name, was, now in zip(headers, natural, fitted) if now < was
+        for name, was, now in zip(headers, natural, fitted, strict=True)
+        if now < was
     ]
     if shrunk:
         LOG.info(
             "Narrowed %s to fit a %d-column terminal; use --wide to keep "
-            "every character.", ", ".join(shrunk), limit,
+            "every character.",
+            ", ".join(shrunk),
+            limit,
         )
 
 
-def print_table(rows: List[Dict[str, Any]], limit: Optional[int] = None) -> None:
+def print_table(rows: list[dict[str, Any]], limit: int | None = None) -> None:
     """Print a list of dicts as a box-drawn, display-width-aligned table."""
     if not rows:
         return
     headers = list(rows[0].keys())
-    cells = [[_printable(clean_text(row.get(h, ""))) for h in headers] for row in rows]
+    cells = [
+        [_printable(clean_text(row.get(h, ""))) for h in headers]
+        for row in rows
+    ]
     widths = [
         max([_display_width(h)] + [_display_width(r[i]) for r in cells])
         for i, h in enumerate(headers)
@@ -231,22 +254,34 @@ def print_table(rows: List[Dict[str, Any]], limit: Optional[int] = None) -> None
     box = _box()
     vline = box["v"]
     print(_rule(fitted, box["tl"], box["tm"], box["tr"]))
-    print(vline + vline.join(
-        f" {_pad(_truncate(h, w), w)} " for h, w in zip(headers, fitted)) + vline)
+    print(
+        vline
+        + vline.join(
+            f" {_pad(_truncate(h, w), w)} "
+            for h, w in zip(headers, fitted, strict=True)
+        )
+        + vline
+    )
     print(_rule(fitted, box["ml"], box["mm"], box["mr"]))
     for row_cells in cells:
-        print(vline + vline.join(
-            f" {_pad(_truncate(c, w), w)} " for c, w in zip(row_cells, fitted)) + vline)
+        print(
+            vline
+            + vline.join(
+                f" {_pad(_truncate(c, w), w)} "
+                for c, w in zip(row_cells, fitted, strict=True)
+            )
+            + vline
+        )
     print(_rule(fitted, box["bl"], box["bm"], box["br"]))
 
 
-def print_metadata(
-    record: Dict[str, Any], limit: Optional[int] = None
-) -> None:
+def print_metadata(record: dict[str, Any], limit: int | None = None) -> None:
     """Print a key-value metadata record as a box-drawn, aligned table."""
     if not record:
         return
-    pairs = [(_printable(k), _printable(clean_text(v))) for k, v in record.items()]
+    pairs = [
+        (_printable(k), _printable(clean_text(v))) for k, v in record.items()
+    ]
     widths = [
         max(_display_width(k) for k, _ in pairs),
         max(_display_width(v) for _, v in pairs),
@@ -260,6 +295,8 @@ def print_metadata(
     vline = box["v"]
     print(_rule(fitted, box["tl"], box["tm"], box["tr"]))
     for key, value in pairs:
-        print(f"{vline} {_pad(_truncate(key, fitted[0]), fitted[0])} "
-              f"{vline} {_pad(_truncate(value, fitted[1]), fitted[1])} {vline}")
+        print(
+            f"{vline} {_pad(_truncate(key, fitted[0]), fitted[0])} "
+            f"{vline} {_pad(_truncate(value, fitted[1]), fitted[1])} {vline}"
+        )
     print(_rule(fitted, box["bl"], box["bm"], box["br"]))

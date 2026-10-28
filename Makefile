@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
+#
 # Makefile for plexdo (plexdo)
 #
 # Common targets:
@@ -48,7 +52,7 @@ PS_TARGET   := $(DESTDIR)$(PS_COMPLETION_DIR)/plexdo.ps1
 .PHONY: help install uninstall reinstall develop install-completion \
         uninstall-completion install-completion-bash install-completion-zsh \
         install-completion-fish install-completion-powershell install-man \
-        uninstall-man check-version \
+        uninstall-man check-version derive \
         smoke check-assets test \
         build check lint dist-check clean distclean wiki
 
@@ -66,7 +70,8 @@ help:
 	@echo "  uninstall-completion  remove all installed completion scripts"
 	@echo "  build                 build the sdist and wheel into dist/"
 	@echo "  test                  run the test suite"
-	@echo "  lint                  run pylint over src/plexdo"
+	@echo "  lint                  ruff, pylint, ShellCheck, yamllint, markdownlint, reuse"
+	@echo "  derive                rewrite the man page version and the SBOM from pyproject"
 	@echo "  dist-check            twine check the built artifacts"
 	@echo "  wiki                  man/*.scd -> GitHub wiki pages in build/wiki"
 	@echo "  check                 lint + build + dist-check"
@@ -162,8 +167,19 @@ uninstall-completion:
 build: clean
 	$(PYTHON) -m build
 
+# Every linter the project requires. One that is not installed fails the
+# target, and the shell names it.
 lint:
+	$(PYTHON) -m ruff check src tests tools
+	$(PYTHON) -m ruff format --check src tests tools
 	$(PYTHON) -m pylint src/$(PACKAGE)
+	shellcheck tools/wiki-pages.sh
+	shellcheck -s bash $(BASH_COMPLETION)
+	yamllint --strict .
+	PYTHONPATH=src $(PYTHON) -c "from plexdo.constants import CONFIG_EXAMPLE; \
+print(CONFIG_EXAMPLE, end='')" | yamllint --strict -c .yamllint.yaml -
+	npx --no-install markdownlint-cli2
+	reuse lint
 
 dist-check:
 	$(PYTHON) -m twine check dist/*
@@ -175,16 +191,14 @@ WIKI_DIR := build/wiki
 wiki:
 	sh tools/wiki-pages.sh man $(WIKI_DIR)
 
-# The version appears in three places; drift is silent otherwise.
+# pyproject.toml alone defines the version; the man page's .TH line and the
+# SBOM are derived from it. derive rewrites them; check-version fails, naming
+# them, when they are out of date.
+derive:
+	$(PYTHON) tools/derive.py
+
 check-version:
-	@v=$$(sed -n 's/^__version__ = "\(.*\)"/\1/p' src/$(PACKAGE)/__init__.py); \
-	p=$$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -1); \
-	m=$$(sed -n 's/^\.TH .* "plexdo \([^"]*\)".*/\1/p' $(MAN_PAGE)); \
-	if [ "$$v" = "$$p" ] && [ "$$v" = "$$m" ]; then \
-		echo "version $$v consistent across __init__.py, pyproject.toml, and the man page"; \
-	else \
-		echo "version mismatch: __init__=$$v pyproject=$$p man=$$m" >&2; exit 1; \
-	fi
+	@$(PYTHON) tools/derive.py --check
 
 # Import the package and build the full parser. pylint cannot catch a module
 # that is valid Python but has lost its register()/COMMANDS tail, which is
@@ -197,7 +211,7 @@ build_parser(); \
 h, n = build_registry(); \
 missing = [m.__name__ for m in MODULES if not hasattr(m, 'register') or not getattr(m, 'COMMANDS', None)]; \
 assert not missing, 'modules missing register()/COMMANDS: %s' % missing; \
-assert len(h) >= 29, 'only %d commands registered' % len(h); \
+assert len(h) >= 30, 'only %d commands registered' % len(h); \
 print('smoke: %d commands across %d modules' % (len(h), len(MODULES)))"
 
 # The completions and man page are mirrored into the package as data files;

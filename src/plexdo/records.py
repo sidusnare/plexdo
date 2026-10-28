@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Turning plexapi objects into plain records for listing output.
 
@@ -9,12 +11,12 @@ what the server already sent and costs no extra calls. `show-metadata` is the
 route to the complete picture for a single item.
 """
 
-from typing import Any, Dict, Iterator, List, Tuple
 import datetime
+from collections.abc import Iterator
+from typing import Any
 
 from plexdo.console import clean_text
 from plexdo.convert import parse_date
-
 
 # How far to descend into nested plexapi objects. Media -> parts -> Part is
 # two levels, which is what carries the file paths.
@@ -30,8 +32,11 @@ def _jsonable(value: Any, depth: int = 0) -> Any:
     if value is None or isinstance(value, (bool, int, float, str)):
         return value
     if isinstance(value, (datetime.datetime, datetime.date)):
-        return value.isoformat(sep=" ") if isinstance(
-            value, datetime.datetime) else value.isoformat()
+        return (
+            value.isoformat(sep=" ")
+            if isinstance(value, datetime.datetime)
+            else value.isoformat()
+        )
     if isinstance(value, (list, tuple)):
         return [_jsonable(item, depth) for item in value]
     # Genres, directors, collections and friends are tag objects.
@@ -47,13 +52,13 @@ def _jsonable(value: Any, depth: int = 0) -> Any:
                 if not name.startswith("_") and not callable(inner)
             }
         except TypeError:
-            nested = {}          # no __dict__ to look into
+            nested = {}  # no __dict__ to look into
         if nested:
             return nested
     return str(value)
 
 
-def _readable_names(item: Any) -> List[str]:
+def _readable_names(item: Any) -> list[str]:
     """Every public field name an item exposes.
 
     Instance attributes alone are not enough: plexapi moved genres,
@@ -66,7 +71,7 @@ def _readable_names(item: Any) -> List[str]:
     return sorted(name for name in names if not name.startswith("_"))
 
 
-def loaded_fields(item: Any) -> Dict[str, Any]:
+def loaded_fields(item: Any) -> dict[str, Any]:
     """Every field the item carries, JSON-safe and sorted.
 
     Reads with plexapi's auto-reload disabled, so a field that happens to be
@@ -74,16 +79,16 @@ def loaded_fields(item: Any) -> Dict[str, Any]:
     one round trip per item. A "files" key is added alongside, since the
     paths are otherwise several levels down.
     """
-    fields: Dict[str, Any] = {}
+    fields: dict[str, Any] = {}
     restore = getattr(item, "_autoReload", None)
     if restore is not None:
-        item._autoReload = False        # pylint: disable=protected-access
+        item._autoReload = False  # pylint: disable=protected-access
     try:
         for name in _readable_names(item):
             try:
                 value = getattr(item, name)
-            except Exception:           # pylint: disable=broad-except
-                continue                # a property that cannot resolve offline
+            except Exception:  # pylint: disable=broad-except
+                continue  # a property that cannot resolve offline
             if callable(value):
                 continue
             fields[name] = _jsonable(value)
@@ -97,7 +102,7 @@ def loaded_fields(item: Any) -> Dict[str, Any]:
     return fields
 
 
-def _media_versions(item: Any) -> Iterator[Tuple[bool, List[Tuple[bool, str]]]]:
+def _media_versions(item: Any) -> Iterator[tuple[bool, list[tuple[bool, str]]]]:
     """Yield (selected, parts) for each media version of an item.
 
     Reads the XML plexapi already holds in ``_data`` rather than the ``media``
@@ -121,14 +126,16 @@ def _media_versions(item: Any) -> Iterator[Tuple[bool, List[Tuple[bool, str]]]]:
         yield (
             bool(getattr(media, "selected", False)),
             [
-                (bool(getattr(part, "selected", False)),
-                 getattr(part, "file", None) or "")
+                (
+                    bool(getattr(part, "selected", False)),
+                    getattr(part, "file", None) or "",
+                )
                 for part in getattr(media, "parts", None) or []
             ],
         )
 
 
-def file_paths(item: Any) -> List[str]:
+def file_paths(item: Any) -> list[str]:
     """Server-side paths of every file backing an item.
 
     An item can have several media versions and a version several parts, so
@@ -136,14 +143,11 @@ def file_paths(item: Any) -> List[str]:
     their own and yield nothing; their files belong to their episodes.
     """
     return [
-        path
-        for _, parts in _media_versions(item)
-        for _, path in parts
-        if path
+        path for _, parts in _media_versions(item) for _, path in parts if path
     ]
 
 
-def _preferred(entries: List[Tuple[bool, Any]]) -> List[Any]:
+def _preferred(entries: list[tuple[bool, Any]]) -> list[Any]:
     """Entries Plex marked as selected, or all of them when none is marked.
 
     A session marks the version and part actually being played, which is the
@@ -173,7 +177,7 @@ def release_date(item: Any) -> str:
     return str(year) if year else ""
 
 
-def summary_row(item: Any) -> Dict[str, Any]:
+def summary_row(item: Any) -> dict[str, Any]:
     """The compact record shown in table output.
 
     Machine-readable formats carry every field the listing returned; these
@@ -189,10 +193,12 @@ def summary_row(item: Any) -> Dict[str, Any]:
     }
 
 
-def cache_row(item: Any) -> Dict[str, Any]:
+def cache_row(item: Any) -> dict[str, Any]:
     """The minimal record the completion cache needs."""
-    return {"ratingKey": int(item.ratingKey),
-            "title": clean_text(fields_title(item))}
+    return {
+        "ratingKey": int(item.ratingKey),
+        "title": clean_text(fields_title(item)),
+    }
 
 
 def fields_title(item: Any) -> str:
@@ -200,16 +206,18 @@ def fields_title(item: Any) -> str:
     return vars(item).get("title", "") or ""
 
 
-def season_records(show: Any) -> Dict[str, List[Dict[str, Any]]]:
+def season_records(show: Any) -> dict[str, list[dict[str, Any]]]:
     """Episodes of a show, grouped into an object keyed by season name.
 
     This walks seasons and episodes, so it costs API calls proportional to the
     size of the show; it is only built for machine-readable output.
     """
-    seasons: Dict[str, List[Dict[str, Any]]] = {}
+    seasons: dict[str, list[dict[str, Any]]] = {}
     for season in show.seasons():
         name = clean_text(vars(season).get("title") or "")
         if not name:
             name = f"Season {vars(season).get('index', '?')}"
-        seasons[name] = [loaded_fields(episode) for episode in season.episodes()]
+        seasons[name] = [
+            loaded_fields(episode) for episode in season.episodes()
+        ]
     return seasons

@@ -1,10 +1,12 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Find gaps in the episode numbering of every season of every show."""
 
-from typing import Any, Dict, List, Optional, Set, Tuple
 import argparse
 import textwrap
+from typing import Any
 
 from plexapi.server import PlexServer
 from plexapi.video import Show
@@ -17,7 +19,7 @@ from plexdo.throttle import paced
 from plexdo.titles import fetch_item
 
 
-def episode_gaps(numbers: List[int]) -> List[int]:
+def episode_gaps(numbers: list[int]) -> list[int]:
     """Return the episode numbers missing from a season.
 
     The run starts at 0 when the season has an episode 0, otherwise at 1, and
@@ -32,7 +34,7 @@ def episode_gaps(numbers: List[int]) -> List[int]:
     return [n for n in range(start, present[-1] + 1) if n not in present]
 
 
-def _season_row(show: Any, season: Any) -> Optional[Dict[str, Any]]:
+def _season_row(show: Any, season: Any) -> dict[str, Any] | None:
     """Report one season, or None when its numbering is complete."""
     episodes = season.episodes()
     numbers = [vars(episode).get("index") for episode in episodes]
@@ -51,9 +53,9 @@ def _season_row(show: Any, season: Any) -> Optional[Dict[str, Any]]:
     }
 
 
-def parse_seasons(text: str) -> Set[int]:
+def parse_seasons(text: str) -> set[int]:
     """Parse "1" or "1,3,5" into a set of season numbers."""
-    numbers: Set[int] = set()
+    numbers: set[int] = set()
     for part in text.split(","):
         part = part.strip()
         if not part:
@@ -70,7 +72,9 @@ def parse_seasons(text: str) -> Set[int]:
     return numbers
 
 
-def _wanted(number: Any, chosen: Optional[Set[int]], include_specials: bool) -> bool:
+def _wanted(
+    number: Any, chosen: set[int] | None, include_specials: bool
+) -> bool:
     """Whether a season should be examined.
 
     Naming a season explicitly overrides the usual skipping of season 0:
@@ -82,10 +86,10 @@ def _wanted(number: Any, chosen: Optional[Set[int]], include_specials: bool) -> 
 
 
 def _show_rows(
-    show: Any, include_specials: bool, chosen: Optional[Set[int]] = None
-) -> List[Dict[str, Any]]:
+    show: Any, include_specials: bool, chosen: set[int] | None = None
+) -> list[dict[str, Any]]:
     """Report every incomplete season of one show."""
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for season in show.seasons():
         if not _wanted(vars(season).get("index"), chosen, include_specials):
             continue
@@ -95,10 +99,11 @@ def _show_rows(
     return rows
 
 
-def _show_sections(plex: PlexServer, library_id: Optional[str]) -> List[Any]:
+def _show_sections(plex: PlexServer, library_id: str | None) -> list[Any]:
     """Every show library, or the single one named."""
     sections = [
-        section for section in resolve_sections(plex, library_id)
+        section
+        for section in resolve_sections(plex, library_id)
         if section.type == "show"
     ]
     if not sections:
@@ -107,20 +112,24 @@ def _show_sections(plex: PlexServer, library_id: Optional[str]) -> List[Any]:
     return sections
 
 
-def resolve_show(plex: PlexServer, identifier: str, library_id: Optional[str]) -> Any:
+def resolve_show(
+    plex: PlexServer, identifier: str, library_id: str | None
+) -> Any:
     """Find one show by ratingKey or title.
 
     Uses the same precedence as every other identifier in plexdo: a numeric
     value is a ratingKey, a title matches exactly before case-insensitively,
     and an ambiguous title aborts rather than guessing.
     """
-    roster: List[Tuple[int, str]] = []
+    roster: list[tuple[int, str]] = []
     for section in _show_sections(plex, library_id):
         roster.extend(
             (int(show.ratingKey), clean_text(vars(show).get("title") or ""))
             for show in section.all()
         )
-    key = resolve_identifier(roster, identifier, "show", "list-titles <library>")
+    key = resolve_identifier(
+        roster, identifier, "show", "list-titles <library>"
+    )
     show = fetch_item(plex, key)
     if not isinstance(show, Show):
         raise SystemExit(
@@ -129,10 +138,12 @@ def resolve_show(plex: PlexServer, identifier: str, library_id: Optional[str]) -
     return show
 
 
-def _flatten(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _flatten(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Render the missing list as text, for the table renderer."""
-    return [dict(row, missing=", ".join(str(n) for n in row["missing"]))
-            for row in rows]
+    return [
+        dict(row, missing=", ".join(str(n) for n in row["missing"]))
+        for row in rows
+    ]
 
 
 def cmd_find_missing(plex: PlexServer, args: argparse.Namespace) -> None:
@@ -171,9 +182,11 @@ def cmd_find_missing(plex: PlexServer, args: argparse.Namespace) -> None:
     output(_flatten(rows) if output_format(args) == "table" else rows, args)
 
 
-def _scan_libraries(plex: PlexServer, args: argparse.Namespace) -> List[Dict[str, Any]]:
+def _scan_libraries(
+    plex: PlexServer, args: argparse.Namespace
+) -> list[dict[str, Any]]:
     """Walk every show of every selected library."""
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for section in _show_sections(plex, args.library_id):
         shows = section.all()
         LOG.info("Checking %d show(s) in '%s'", len(shows), section.title)
@@ -184,11 +197,12 @@ def _scan_libraries(plex: PlexServer, args: argparse.Namespace) -> List[Dict[str
 
 def register(
     sub: "argparse._SubParsersAction",
-    parents: "List[argparse.ArgumentParser]",
+    parents: "list[argparse.ArgumentParser]",
 ) -> None:
     """Register the find-missing subparser."""
     parser = sub.add_parser(
-        "find-missing", parents=parents,
+        "find-missing",
+        parents=parents,
         help="Find gaps in the episode numbering of a show's seasons.",
         description=textwrap.fill(
             "Report the episode numbers missing between the start of a "
@@ -201,32 +215,49 @@ def register(
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "show", metavar="SHOW", nargs="?", default=None,
+        "show",
+        metavar="SHOW",
+        nargs="?",
+        default=None,
         help=(
             "Show title (str) or ratingKey (int) to check. Obtain either with "
             "list-titles. Omit only when using -A."
         ),
     )
     parser.add_argument(
-        "-l", "--library", dest="library_id", metavar="LIBRARY", default=None,
+        "-l",
+        "--library",
+        dest="library_id",
+        metavar="LIBRARY",
+        default=None,
         help=(
             "Library ID (int) or title (str) to look in. Obtain both with "
             "list-libraries. Narrows the search for SHOW, or the sweep for -A."
         ),
     )
     parser.add_argument(
-        "-A", "--all", dest="all_shows", action="store_true", default=False,
+        "-A",
+        "--all",
+        dest="all_shows",
+        action="store_true",
+        default=False,
         help="Check every show, rather than one named show.",
     )
     parser.add_argument(
-        "-s", "--season", dest="seasons", metavar="SEASONS", default=None,
+        "-s",
+        "--season",
+        dest="seasons",
+        metavar="SEASONS",
+        default=None,
         help=(
             "Season number, or several separated by commas, as in 1,3,5. "
             "Applies to a single show. Naming season 0 includes the specials."
         ),
     )
     parser.add_argument(
-        "--include-specials", action="store_true", default=False,
+        "--include-specials",
+        action="store_true",
+        default=False,
         help=(
             "Also check season 0 when no season is named. Specials are "
             "numbered irregularly, so this is off by default."

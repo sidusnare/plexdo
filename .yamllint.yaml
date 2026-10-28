@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
+#
+#
+# yamllint configuration: the default rules, at Google's 80 columns.
+---
+extends: default
+
+ignore: |
+  node_modules/
+  build/
+  dist/
+
+rules:
+  line-length:
+    max: 80
+  # GitHub Actions requires the key "on", which YAML 1.1 reads as a
+  # boolean; keys are exempt, values are still checked.
+  truthy:
+    check-keys: false

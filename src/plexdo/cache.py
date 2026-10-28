@@ -1,10 +1,12 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Completion cache written as a side effect of list commands."""
 
-from pathlib import Path
-from typing import Any, Dict, List
 import json
+from pathlib import Path
+from typing import Any
 
 from plexdo.config import cached_config, config_optional
 from plexdo.constants import CONFIG_PATH, DEFAULT_CACHE_DIR, LOG
@@ -13,7 +15,7 @@ from plexdo.constants import CONFIG_PATH, DEFAULT_CACHE_DIR, LOG
 def cache_dir() -> Path:
     """Return the completion cache directory.
 
-    [plex] cache_dir overrides the platform default. The config is only
+    plex: cache_dir overrides the platform default. The config is only
     consulted when it exists, so this stays usable before `plexdo login` has
     ever been run.
     """
@@ -24,8 +26,8 @@ def cache_dir() -> Path:
     return DEFAULT_CACHE_DIR
 
 
-def write_cache(name: str, data: List[Dict[str, Any]]) -> None:
-    """Atomically write data to the completion cache, silently ignoring errors."""
+def write_cache(name: str, data: list[dict[str, Any]]) -> None:
+    """Atomically write data to the completion cache, ignoring errors."""
     try:
         directory = cache_dir()
         directory.mkdir(parents=True, exist_ok=True)

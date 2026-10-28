@@ -1,4 +1,8 @@
 #compdef plexdo
+# SPDX-FileCopyrightText: 2026 SidusNare
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
+#
 # zsh completion for plexdo
 #
 # Installation:
@@ -208,6 +212,7 @@ _plexdo_commands() {
     'copy-watched:Synchronise watched state between two users'
     'login:Authenticate with plex.tv and save a token'
     'logout:Sign out of plex.tv and remove the saved tokens'
+    'set-pin:Save or remove a Plex Home PIN in the keyring'
     'write-config-example:Write a template config file'
   )
   _describe -t commands 'plexdo command' cmds
@@ -386,12 +391,18 @@ _plexdo_subcommand() {
       _arguments $_plexdo_global_opts \
         '(-u --username)'{-u,--username}'[Plex username or email]:username:' \
         '(-p --password)'{-p,--password}'[Plex password (INSECURE: visible in ps and shell history)]:password:' \
+        '--save-password[Also save the password in the system keyring]' \
         '(-c --code)'{-c,--code}'[Two-factor authentication code]:code:' \
         '(-2 --two-factor)'{-2,--two-factor}'[Prompt for a two-factor code]'
       ;;
     logout)
       _arguments $_plexdo_global_opts \
-        '(-u --username)'{-u,--username}'[Sign out only this name from the token file]:username:'
+        '(-u --username)'{-u,--username}'[Sign out only this saved name]:username:'
+      ;;
+    set-pin)
+      _arguments $_plexdo_global_opts \
+        '--remove[Remove the saved PIN instead of prompting for one]' \
+        '1:user:_plexdo_users'
       ;;
     *)
       _arguments $_plexdo_global_opts

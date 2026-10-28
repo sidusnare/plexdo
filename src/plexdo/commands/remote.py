@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Telling a player to play something, by talking to the player directly.
 
@@ -27,11 +29,11 @@ instead; with none, the command is tried anyway with a warning, since some
 players accept it regardless.
 """
 
-from typing import Any, Dict, List, NamedTuple, Optional, Tuple
-from xml.etree.ElementTree import ParseError
 import argparse
 import socket
 import sys
+from typing import Any, NamedTuple
+from xml.etree.ElementTree import ParseError
 
 from plexapi.client import PlexClient
 from plexapi.exceptions import PlexApiException, Unauthorized
@@ -39,16 +41,25 @@ from plexapi.myplex import MyPlexAccount, MyPlexUser
 from plexapi.server import PlexServer
 from requests import RequestException
 
-from plexdo.accounts import (configured_account, configured_accounts,
-                             configured_sections, connect_as_shared_user,
-                             connect_with_token)
-from plexdo.config import cached_config, section_optional
+from plexdo.accounts import (
+    configured_account,
+    configured_accounts,
+    configured_entries,
+    connect_as_shared_user,
+    connect_with_token,
+)
 from plexdo.console import clean_text, output, output_format
 from plexdo.constants import CONFIG_PATH, LOG
-from plexdo.playback import (IPAddress, add_play_arguments, fetch_address,
-                             parse_ip, play_fields, url_host)
+from plexdo.playback import (
+    IPAddress,
+    add_play_arguments,
+    fetch_address,
+    parse_ip,
+    play_fields,
+    url_host,
+)
 from plexdo.titles import fetch_item
-
+from plexdo.tokens import saved_pin
 
 # The UDP port players answer GDM discovery on, the message asking them,
 # and the seconds to wait for the answer.
@@ -75,11 +86,11 @@ class Controller(NamedTuple):
 
     name: str
     token: str
-    server: PlexServer   # the item is fetched as this account, so the play is
-                         # recorded against it
+    server: PlexServer  # the item is fetched as this account, so the play is
+    # recorded against it
 
 
-def _player_addresses(host: str) -> List[IPAddress]:
+def _player_addresses(host: str) -> list[IPAddress]:
     """The IP addresses to try for host, in the resolver's order.
 
     An address is itself. A name is resolved here, and each address it has
@@ -93,7 +104,7 @@ def _player_addresses(host: str) -> List[IPAddress]:
         infos = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
     except socket.gaierror as exc:
         sys.exit(f"Could not resolve the player's host name {host!r}: {exc}")
-    found: List[IPAddress] = []
+    found: list[IPAddress] = []
     for info in infos:
         address = parse_ip(str(info[4][0]))
         if address is not None and address not in found:
@@ -103,12 +114,14 @@ def _player_addresses(host: str) -> List[IPAddress]:
 
 
 def _player_url(address: IPAddress, port: int) -> str:
-    """The URL of a player at an IP address, which is all the Host header
-    will then carry."""
+    """The URL of a player at an IP address.
+
+    The address is then all the Host header carries.
+    """
     return f"http://{url_host(str(address))}:{port}"
 
 
-def _gdm_port(reply: bytes) -> Optional[int]:
+def _gdm_port(reply: bytes) -> int | None:
     """The port a GDM reply advertises, or None when it is not a player's.
 
     The reply is HTTP-like: a status line, then "Name: value" headers.
@@ -121,14 +134,14 @@ def _gdm_port(reply: bytes) -> Optional[int]:
         name, _, value = line.partition(":")
         headers[name.strip().lower()] = value.strip()
     if "player" not in headers.get("content-type", "player"):
-        return None   # a server, sharing the address with a player
+        return None  # a server, sharing the address with a player
     try:
         return int(headers.get("port", ""))
     except ValueError:
         return None
 
 
-def _advertised_port(address: IPAddress) -> Optional[int]:
+def _advertised_port(address: IPAddress) -> int | None:
     """Ask the player at address over GDM which port it listens on.
 
     GDM is IPv4 only, and a player that does not answer, or a network
@@ -144,10 +157,13 @@ def _advertised_port(address: IPAddress) -> Optional[int]:
                 reply, sender = sock.recvfrom(4096)
                 port = _gdm_port(reply) if sender[0] == str(address) else None
                 if port is not None:
-                    LOG.info("%s says over GDM that it listens on port %d.",
-                             address, port)
+                    LOG.info(
+                        "%s says over GDM that it listens on port %d.",
+                        address,
+                        port,
+                    )
                     return port
-        except OSError as exc:   # socket.timeout included
+        except OSError as exc:  # socket.timeout included
             LOG.info("%s did not answer over GDM: %s", address, exc)
             return None
 
@@ -155,18 +171,16 @@ def _advertised_port(address: IPAddress) -> Optional[int]:
 def _listening(address: IPAddress, port: int) -> bool:
     """Whether a guessed port takes a TCP connection at all."""
     try:
-        with socket.create_connection((str(address), port),
-                                      timeout=_CONNECT_TIMEOUT):
+        with socket.create_connection(
+            (str(address), port), timeout=_CONNECT_TIMEOUT
+        ):
             return True
     except OSError as exc:
-        LOG.info("Nothing listening at %s: %s", _player_url(address, port),
-                 exc)
+        LOG.info("Nothing listening at %s: %s", _player_url(address, port), exc)
         return False
 
 
-def _endpoints(
-    address: IPAddress, port: Optional[int]
-) -> List[Tuple[int, bool]]:
+def _endpoints(address: IPAddress, port: int | None) -> list[tuple[int, bool]]:
     """The ports to try at address, each with whether it is a guess."""
     if port is not None:
         return [(port, False)]
@@ -188,15 +202,18 @@ def _probe(url: str, fallback_token: str) -> PlexClient:
         return PlexClient(baseurl=url, timeout=_PROBE_TIMEOUT)
     except Unauthorized:
         LOG.debug("%s wants a token to say who it is; asking with one.", url)
-        return PlexClient(baseurl=url, token=fallback_token,
-                          timeout=_PROBE_TIMEOUT)
+        return PlexClient(
+            baseurl=url, token=fallback_token, timeout=_PROBE_TIMEOUT
+        )
 
 
 def _find_player(
-    addresses: List[IPAddress], port: Optional[int], fallback_token: str
-) -> Tuple[PlexClient, IPAddress, str]:
-    """The player, and the address and URL it answered at, trying each
-    address, and each port when port is None, in turn."""
+    addresses: list[IPAddress], port: int | None, fallback_token: str
+) -> tuple[PlexClient, IPAddress, str]:
+    """The player, and the address and URL it answered at.
+
+    Each address is tried in turn, and each port when port is None.
+    """
     failures = []
     for address in addresses:
         for each, guessed in _endpoints(address, port):
@@ -208,8 +225,12 @@ def _find_player(
                 probe = _probe(url, fallback_token)
             # A ParseError or IndexError is something answering that is not
             # a player: plexapi parses the reply and takes its first element.
-            except (PlexApiException, RequestException, ParseError,
-                    IndexError) as exc:
+            except (
+                PlexApiException,
+                RequestException,
+                ParseError,
+                IndexError,
+            ) as exc:
                 LOG.info("No player answered at %s: %s", url, exc)
                 failures.append(f"{url}: {exc}")
                 continue
@@ -217,9 +238,12 @@ def _find_player(
                 return probe, address, url
             # Something answered, but not with a player's description.
             failures.append(f"{url}: not a Plex player")
-    hint = ("the --port given" if port is not None else
-            "the port, which the player did not say over GDM: give it with "
-            "--port")
+    hint = (
+        "the --port given"
+        if port is not None
+        else "the port, which the player did not say over GDM: give it with "
+        "--port"
+    )
     sys.exit(
         "No Plex player answered at " + "; ".join(failures) + ". Check the "
         f"address and {hint}, and that the player allows remote control: "
@@ -232,8 +256,9 @@ def _signed_in_to(account: MyPlexAccount, machine_id: str) -> bool:
     try:
         devices = account.devices()
     except (PlexApiException, RequestException) as exc:
-        LOG.info("Could not list %s's devices on plex.tv: %s",
-                 account.username, exc)
+        LOG.info(
+            "Could not list %s's devices on plex.tv: %s", account.username, exc
+        )
         return False
     return any(device.clientIdentifier == machine_id for device in devices)
 
@@ -246,12 +271,14 @@ def _is_admin(plex: PlexServer, account: MyPlexAccount) -> bool:
     """
     owner = (plex.myPlexUsername or "").lower()
     return bool(owner) and owner in (
-        (account.email or "").lower(), (account.username or "").lower())
+        (account.email or "").lower(),
+        (account.username or "").lower(),
+    )
 
 
 def _server_as(
     plex: PlexServer, current: MyPlexAccount, account: MyPlexAccount
-) -> Optional[PlexServer]:
+) -> PlexServer | None:
     """The server as account, or None when it will not have it.
 
     The account's own plex.tv token first. A server may refuse that, as it
@@ -264,14 +291,19 @@ def _server_as(
         return server
     for user in current.users():
         if user.id == account.id:
-            LOG.info("The server refused %s's own token; using the token "
-                     "it issues for that user.", user.title)
+            LOG.info(
+                "The server refused %s's own token; using the token "
+                "it issues for that user.",
+                user.title,
+            )
             return connect_as_shared_user(plex, user)
     return None
 
 
 def _as_account(
-    plex: PlexServer, current: MyPlexAccount, account: MyPlexAccount,
+    plex: PlexServer,
+    current: MyPlexAccount,
+    account: MyPlexAccount,
     strict: bool,
 ) -> Controller:
     """Send as account, and fetch the item as it too.
@@ -295,20 +327,25 @@ def _as_account(
             f"Share the library with {name}, or leave out --player-user to "
             "send as plexdo's own account."
         )
-    LOG.warning("The server will not let %s fetch the item; fetching it as "
-                "%s, which the player will switch to.", name, current.username)
+    LOG.warning(
+        "The server will not let %s fetch the item; fetching it as "
+        "%s, which the player will switch to.",
+        name,
+        current.username,
+    )
     return Controller(name, token, plex)
 
 
 def _is_account(account: MyPlexAccount, value: str) -> bool:
     """Whether value names account by plex.tv id, username, or email."""
-    return value.lower() in (str(account.id), (account.username or "").lower(),
-                             (account.email or "").lower())
+    return value.lower() in (
+        str(account.id),
+        (account.username or "").lower(),
+        (account.email or "").lower(),
+    )
 
 
-def _home_member_named(
-    current: MyPlexAccount, value: str
-) -> Optional[MyPlexUser]:
+def _home_member_named(current: MyPlexAccount, value: str) -> MyPlexUser | None:
     """The member of plexdo's Plex Home that value names, or None.
 
     Named by plex.tv id, username, or email, or, for a managed user, which
@@ -318,8 +355,11 @@ def _home_member_named(
     for user in current.users():
         if not user.home:
             continue
-        names = {str(user.id), (user.username or "").lower(),
-                 (user.email or "").lower()}
+        names = {
+            str(user.id),
+            (user.username or "").lower(),
+            (user.email or "").lower(),
+        }
         if not user.username:
             names.add((user.title or "").lower())
         if wanted in names - {""}:
@@ -329,40 +369,43 @@ def _home_member_named(
 
 def _switch_to(
     current: MyPlexAccount, user: MyPlexUser
-) -> Tuple[Optional[MyPlexAccount], str]:
+) -> tuple[MyPlexAccount | None, str]:
     """Switch into a Plex Home member: its account, or None and why not.
 
-    No password is needed, only the member's PIN when it has one, taken
-    from pin in its [<user id>] section.
+    No password is needed, only the member's PIN when it has one, which
+    plexdo set-pin saves.
     """
-    pin = section_optional(cached_config(), str(user.id), "pin")
+    pin = saved_pin(user.id)
     try:
         account = current.switchHomeUser(user, pin=pin)
     except PlexApiException as exc:
         LOG.info("plex.tv refused the switch to %s: %s", user.title, exc)
         return None, str(exc)
-    LOG.info("--player-user is %s, a member of plexdo's Plex Home.",
-             user.title)
+    LOG.info("--player-user is %s, a member of plexdo's Plex Home.", user.title)
     return account, ""
 
 
-def _configured_account_named(value: str) -> Optional[MyPlexAccount]:
+def _configured_account_named(value: str) -> MyPlexAccount | None:
     """The account from the config that value names, signed in, or None.
 
-    A section whose id or username is value is taken at its word, before
+    An entry whose id or username is value is taken at its word, before
     any sign-in. Failing that, the others are signed in one at a time and
-    compared by id, username, and email, since a section may file an
+    compared by id, username, and email, since an entry may file an
     account under its email when value is its username, or the reverse.
     """
-    sections = configured_sections()
-    named = [s for s in sections if value.lower() in (str(s[0]), s[1].lower())]
-    for user_id, username in named + [s for s in sections if s not in named]:
+    entries = configured_entries()
+    named = [e for e in entries if value.lower() in (str(e[0]), e[1].lower())]
+    for user_id, username in named + [e for e in entries if e not in named]:
         account = configured_account(user_id, username)
         if account is None:
             continue
         if (user_id, username) in named or _is_account(account, value):
-            LOG.info("--player-user %s is %s, from section [%s].",
-                     value, account.username, user_id)
+            LOG.info(
+                "--player-user %s is %s, from users entry %s.",
+                value,
+                account.username,
+                user_id,
+            )
             return account
     return None
 
@@ -379,51 +422,61 @@ def _named_controller(plex: PlexServer, value: str) -> Controller:
     refused = ""
     try:
         current = plex.myPlexAccount()
-        if _is_account(current, value) or (value == "0"
-                                           and _is_admin(plex, current)):
+        if _is_account(current, value) or (
+            value == "0" and _is_admin(plex, current)
+        ):
             LOG.info("--player-user %s is plexdo's own account.", value)
             # pylint: disable-next=protected-access
             return Controller(current.username, plex._token, plex)
         member = _home_member_named(current, value)
-        account, refused = (_switch_to(current, member) if member
-                            else (None, ""))
+        account, refused = _switch_to(current, member) if member else (None, "")
         if account is None:
             account = _configured_account_named(value)
         if account is not None:
             return _as_account(plex, current, account, strict=True)
     except (PlexApiException, RequestException) as exc:
-        sys.exit(f"Could not ask plex.tv about the account to send as "
-                 f"({exc}); --player-user {value} needs it.")
+        sys.exit(
+            f"Could not ask plex.tv about the account to send as "
+            f"({exc}); --player-user {value} needs it."
+        )
     if member is not None:
         sys.exit(
             f"Could not switch to {member.title!r}, a member of plexdo's "
             f"Plex Home: plex.tv refused ({refused}). A member with a PIN "
-            f"needs it as pin in a [{member.id}] section of {CONFIG_PATH}; "
-            "or give that section the account's username and password."
+            f"needs it saved with plexdo set-pin {member.id}; or add a users "
+            f"entry for it to {CONFIG_PATH} and sign it in once with plexdo "
+            "login --username."
         )
     sys.exit(
         f"No credentials for the player user {value!r}: it is not plexdo's "
         f"own account, {current.username}, nor a member of its Plex Home, "
-        f"and no [<user id>] section of {CONFIG_PATH} is for it, by id, "
-        "username, or email. Add one with that account's username and "
-        "password."
+        f"and no users entry in {CONFIG_PATH} is for it, by id, username, "
+        "or email. Add one with that account's username, and sign it in once "
+        "with plexdo login --username."
     )
 
 
 def _configured_controller(
     plex: PlexServer, current: MyPlexAccount, machine_id: str
-) -> Optional[Controller]:
+) -> Controller | None:
     """An account from the config signed in to the player, if there is one."""
     try:
         for user_id, account in configured_accounts():
             if not _signed_in_to(account, machine_id):
                 continue
-            LOG.info("The player is signed in as %s, from section [%s].",
-                     account.username, user_id)
+            LOG.info(
+                "The player is signed in as %s, from users entry %s.",
+                account.username,
+                user_id,
+            )
             return _as_account(plex, current, account, strict=False)
     except (PlexApiException, RequestException) as exc:
-        LOG.warning("Could not sign in the accounts in %s (%s); trying the "
-                    "player as plexdo's own account.", CONFIG_PATH, exc)
+        LOG.warning(
+            "Could not sign in the accounts in %s (%s); trying the "
+            "player as plexdo's own account.",
+            CONFIG_PATH,
+            exc,
+        )
     return None
 
 
@@ -439,18 +492,25 @@ def _controller(plex: PlexServer, machine_id: str, title: str) -> Controller:
     try:
         current = plex.myPlexAccount()
     except (PlexApiException, RequestException) as exc:
-        LOG.warning("Could not ask plex.tv which account plexdo is signed in "
-                    "as (%s); trying the player with plexdo's own token.", exc)
+        LOG.warning(
+            "Could not ask plex.tv which account plexdo is signed in "
+            "as (%s); trying the player with plexdo's own token.",
+            exc,
+        )
         return Controller("plexdo's account", own_token, plex)
 
     own = Controller(current.username, own_token, plex)
     if _is_admin(plex, current):
-        LOG.info("%s is the server's admin; sending as that account.",
-                 current.username)
+        LOG.info(
+            "%s is the server's admin; sending as that account.",
+            current.username,
+        )
         return own
     if _signed_in_to(current, machine_id):
-        LOG.info("%s is signed in to the player; sending as that account.",
-                 current.username)
+        LOG.info(
+            "%s is signed in to the player; sending as that account.",
+            current.username,
+        )
         return own
     configured = _configured_controller(plex, current, machine_id)
     if configured is not None:
@@ -458,34 +518,41 @@ def _controller(plex: PlexServer, machine_id: str, title: str) -> Controller:
     LOG.warning(
         "%s is neither the server's admin nor signed in to %s, and no account "
         "in %s is signed in to it either; trying anyway, but the player may "
-        "refuse. Add the credentials of the account signed in to the player "
-        "as a [<user id>] section to fix that.",
-        current.username, title, CONFIG_PATH,
+        "refuse. Add the account signed in to the player as a users entry, "
+        "and sign it in once with plexdo login --username, to fix that.",
+        current.username,
+        title,
+        CONFIG_PATH,
     )
     return own
 
 
-def _report_remote(record: Dict[str, Any], args: argparse.Namespace) -> None:
+def _report_remote(record: dict[str, Any], args: argparse.Namespace) -> None:
     """One line for a table, or the record in any other format."""
     if output_format(args) != "table":
         output(record, args)
         return
     verb = "Would send" if record["status"] == "dry run" else "Sent"
-    print(f'{verb} "{record["title"]}" to {record["player"]} at '
-          f'{record["playerAddress"]} as {record["account"]}, fetching from '
-          f'{record["fetchFrom"]}.')
+    print(
+        f'{verb} "{record["title"]}" to {record["player"]} at '
+        f"{record['playerAddress']} as {record['account']}, fetching from "
+        f"{record['fetchFrom']}."
+    )
 
 
 def cmd_player_remote_play(plex: PlexServer, args: argparse.Namespace) -> None:
     """Connect to a player directly and tell it to play one item."""
     item = fetch_item(plex, args.rating_key)  # a bad key fails before probing
     own_token = plex._token  # pylint: disable=protected-access
-    probe, address, url = _find_player(_player_addresses(args.host),
-                                       args.port, own_token)
+    probe, address, url = _find_player(
+        _player_addresses(args.host), args.port, own_token
+    )
     title = clean_text(probe.title or "") or str(address)
-    controller = (_named_controller(plex, args.player_user)
-                  if args.player_user is not None
-                  else _controller(plex, probe.machineIdentifier, title))
+    controller = (
+        _named_controller(plex, args.player_user)
+        if args.player_user is not None
+        else _controller(plex, probe.machineIdentifier, title)
+    )
     if controller.server is not plex:
         # Fetched as the account sending it, so the play is recorded there.
         item = fetch_item(controller.server, args.rating_key)
@@ -506,46 +573,57 @@ def cmd_player_remote_play(plex: PlexServer, args: argparse.Namespace) -> None:
         return
 
     try:
-        client = PlexClient(server=controller.server, baseurl=url,
-                            token=controller.token)
-        client.playMedia(item, protocol=fetch.protocol,
-                         address=url_host(fetch.host), port=str(fetch.port))
+        client = PlexClient(
+            server=controller.server, baseurl=url, token=controller.token
+        )
+        client.playMedia(
+            item,
+            protocol=fetch.protocol,
+            address=url_host(fetch.host),
+            port=str(fetch.port),
+        )
     except Unauthorized as exc:
         sys.exit(
             f"{title} at {url} refused the command from {controller.name}: "
             f"{exc}\nA player takes commands only from an account it trusts, "
-            "normally the one signed in to it. Add that account's username "
-            f"and password to {CONFIG_PATH} as a [<user id>] section, and "
-            "plexdo will send as that account."
+            f"normally the one signed in to it. Add that account to "
+            f"{CONFIG_PATH} as a users entry, sign it in once with plexdo "
+            "login --username, and plexdo will send as that account."
         )
     except ParseError:
         # The status was a success, or plexapi would have raised before
         # parsing; some players just answer one with a bare "OK".
         LOG.debug("%s accepted the command with a reply that is not XML.", url)
     except (PlexApiException, RequestException) as exc:
-        sys.exit(f"Could not start {record['title']!r} on {title} at {url}: "
-                 f"{exc}")
+        sys.exit(
+            f"Could not start {record['title']!r} on {title} at {url}: {exc}"
+        )
     _report_remote(record, args)
 
 
 def register(
     sub: "argparse._SubParsersAction",
-    parents: "List[argparse.ArgumentParser]",
+    parents: "list[argparse.ArgumentParser]",
 ) -> None:
     """Register the player-remote-play subparser."""
     parser = sub.add_parser(
-        "player-remote-play", parents=parents,
+        "player-remote-play",
+        parents=parents,
         help="Connect to a player directly and tell it to play an item.",
     )
     parser.add_argument(
-        "host", metavar="HOST",
+        "host",
+        metavar="HOST",
         help=(
             "The player's host name or IP address. A name is resolved here "
             "and only the address is sent to the player."
         ),
     )
     parser.add_argument(
-        "--port", type=int, default=None, metavar="PORT",
+        "--port",
+        type=int,
+        default=None,
+        metavar="PORT",
         help=(
             "The port the player listens on for remote control (int). By "
             "default the player is asked over GDM, and failing that the "
@@ -553,12 +631,15 @@ def register(
         ),
     )
     parser.add_argument(
-        "--player-user", dest="player_user", default=None, metavar="USER",
+        "--player-user",
+        dest="player_user",
+        default=None,
+        metavar="USER",
         help=(
             "The account signed in to the player, to send the command as: "
-            "a plex.tv user id, username, or email. plexdo's own account, or "
-            "one with a [<user id>] section in the config. By default it is "
-            "worked out from the player's plex.tv devices."
+            "a plex.tv user id, username, or email. plexdo's own account, a "
+            "Plex Home member, or one with a users entry in the config. By "
+            "default it is worked out from the player's plex.tv devices."
         ),
     )
     add_play_arguments(parser)

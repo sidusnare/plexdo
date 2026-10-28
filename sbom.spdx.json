@@ -1,0 +1,263 @@
+{
+  "@context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld",
+  "@graph": [
+    {
+      "type": "CreationInfo",
+      "@id": "_:creationinfo",
+      "specVersion": "3.0.1",
+      "created": "2026-10-28T00:00:00Z",
+      "createdBy": [
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#author"
+      ],
+      "createdUsing": [
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#ai-model",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#derive"
+      ],
+      "comment": "The code was generated with the AI model named in createdUsing; models used before it was recorded are not known. plexdo neither includes nor depends on an AI model, so the SPDX AI profile does not apply."
+    },
+    {
+      "type": "Person",
+      "spdxId": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#author",
+      "creationInfo": "_:creationinfo",
+      "name": "SidusNare"
+    },
+    {
+      "type": "Tool",
+      "spdxId": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#ai-model",
+      "creationInfo": "_:creationinfo",
+      "name": "Claude Opus 5.5",
+      "comment": "The AI model that generated the code (AI-generated)."
+    },
+    {
+      "type": "Tool",
+      "spdxId": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#derive",
+      "creationInfo": "_:creationinfo",
+      "name": "tools/derive.py"
+    },
+    {
+      "type": "simplelicensing_LicenseExpression",
+      "spdxId": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#license",
+      "creationInfo": "_:creationinfo",
+      "simplelicensing_licenseExpression": "GPL-3.0-or-later"
+    },
+    {
+      "type": "simplelicensing_LicenseExpression",
+      "spdxId": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#data-license",
+      "creationInfo": "_:creationinfo",
+      "simplelicensing_licenseExpression": "CC0-1.0"
+    },
+    {
+      "type": "software_Package",
+      "spdxId": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#package",
+      "creationInfo": "_:creationinfo",
+      "name": "plexdo",
+      "software_packageVersion": "2.0.0rc1",
+      "software_packageUrl": "pkg:pypi/plexdo@2.0.0rc1",
+      "software_downloadLocation": "https://github.com/sidusnare/plexdo",
+      "software_homePage": "https://github.com/sidusnare/plexdo",
+      "software_primaryPurpose": "application",
+      "suppliedBy": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#author",
+      "originatedBy": [
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#author"
+      ],
+      "description": "A command-line interface for Plex Media Server: playlists, exports, watched-state sync, and library management."
+    },
+    {
+      "type": "software_Package",
+      "spdxId": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-plexapi",
+      "creationInfo": "_:creationinfo",
+      "name": "PlexAPI",
+      "software_packageUrl": "pkg:pypi/plexapi",
+      "comment": "Declared in pyproject.toml as PlexAPI>=4.15.10."
+    },
+    {
+      "type": "software_Package",
+      "spdxId": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-requests",
+      "creationInfo": "_:creationinfo",
+      "name": "requests",
+      "software_packageUrl": "pkg:pypi/requests",
+      "comment": "Declared in pyproject.toml as requests>=2.31."
+    },
+    {
+      "type": "software_Package",
+      "spdxId": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-keyring",
+      "creationInfo": "_:creationinfo",
+      "name": "keyring",
+      "software_packageUrl": "pkg:pypi/keyring",
+      "comment": "Declared in pyproject.toml as keyring>=24.0."
+    },
+    {
+      "type": "software_Package",
+      "spdxId": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-pyyaml",
+      "creationInfo": "_:creationinfo",
+      "name": "PyYAML",
+      "software_packageUrl": "pkg:pypi/pyyaml",
+      "comment": "Declared in pyproject.toml as PyYAML>=6.0."
+    },
+    {
+      "type": "LifecycleScopedRelationship",
+      "spdxId": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#depends-runtime",
+      "creationInfo": "_:creationinfo",
+      "relationshipType": "dependsOn",
+      "scope": "runtime",
+      "to": [
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-plexapi",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-requests",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-keyring",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-pyyaml"
+      ],
+      "from": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#package"
+    },
+    {
+      "type": "software_Package",
+      "spdxId": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-setuptools",
+      "creationInfo": "_:creationinfo",
+      "name": "setuptools",
+      "software_packageUrl": "pkg:pypi/setuptools",
+      "comment": "Declared in pyproject.toml as setuptools>=68."
+    },
+    {
+      "type": "software_Package",
+      "spdxId": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-wheel",
+      "creationInfo": "_:creationinfo",
+      "name": "wheel",
+      "software_packageUrl": "pkg:pypi/wheel",
+      "comment": "Declared in pyproject.toml as wheel."
+    },
+    {
+      "type": "LifecycleScopedRelationship",
+      "spdxId": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#depends-build",
+      "creationInfo": "_:creationinfo",
+      "relationshipType": "dependsOn",
+      "scope": "build",
+      "to": [
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-setuptools",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-wheel"
+      ],
+      "from": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#package"
+    },
+    {
+      "type": "software_Package",
+      "spdxId": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-pylint",
+      "creationInfo": "_:creationinfo",
+      "name": "pylint",
+      "software_packageUrl": "pkg:pypi/pylint",
+      "comment": "Declared in pyproject.toml as pylint>=3.0."
+    },
+    {
+      "type": "software_Package",
+      "spdxId": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-ruff",
+      "creationInfo": "_:creationinfo",
+      "name": "ruff",
+      "software_packageUrl": "pkg:pypi/ruff",
+      "comment": "Declared in pyproject.toml as ruff>=0.15."
+    },
+    {
+      "type": "software_Package",
+      "spdxId": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-build",
+      "creationInfo": "_:creationinfo",
+      "name": "build",
+      "software_packageUrl": "pkg:pypi/build",
+      "comment": "Declared in pyproject.toml as build>=1.0."
+    },
+    {
+      "type": "software_Package",
+      "spdxId": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-twine",
+      "creationInfo": "_:creationinfo",
+      "name": "twine",
+      "software_packageUrl": "pkg:pypi/twine",
+      "comment": "Declared in pyproject.toml as twine>=5.0."
+    },
+    {
+      "type": "software_Package",
+      "spdxId": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-pytest",
+      "creationInfo": "_:creationinfo",
+      "name": "pytest",
+      "software_packageUrl": "pkg:pypi/pytest",
+      "comment": "Declared in pyproject.toml as pytest>=8.0."
+    },
+    {
+      "type": "software_Package",
+      "spdxId": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-vulture",
+      "creationInfo": "_:creationinfo",
+      "name": "vulture",
+      "software_packageUrl": "pkg:pypi/vulture",
+      "comment": "Declared in pyproject.toml as vulture>=2.11."
+    },
+    {
+      "type": "software_Package",
+      "spdxId": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#npm-markdownlint-cli2",
+      "creationInfo": "_:creationinfo",
+      "name": "markdownlint-cli2",
+      "software_packageUrl": "pkg:npm/markdownlint-cli2",
+      "comment": "Declared in package.json as markdownlint-cli2@0.22.1."
+    },
+    {
+      "type": "LifecycleScopedRelationship",
+      "spdxId": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#depends-development",
+      "creationInfo": "_:creationinfo",
+      "relationshipType": "dependsOn",
+      "scope": "development",
+      "to": [
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-pylint",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-ruff",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-build",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-twine",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-pytest",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-vulture",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#npm-markdownlint-cli2"
+      ],
+      "from": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#package"
+    },
+    {
+      "type": "Relationship",
+      "spdxId": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#declared-license",
+      "creationInfo": "_:creationinfo",
+      "relationshipType": "hasDeclaredLicense",
+      "to": [
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#license"
+      ],
+      "from": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#package"
+    },
+    {
+      "type": "SpdxDocument",
+      "spdxId": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#document",
+      "creationInfo": "_:creationinfo",
+      "name": "plexdo 2.0.0rc1",
+      "dataLicense": "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#data-license",
+      "profileConformance": [
+        "core",
+        "software",
+        "simpleLicensing"
+      ],
+      "rootElement": [
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#package"
+      ],
+      "element": [
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#author",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#ai-model",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#derive",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#license",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#data-license",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#package",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-plexapi",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-requests",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-keyring",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-pyyaml",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#depends-runtime",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-setuptools",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-wheel",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#depends-build",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-pylint",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-ruff",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-build",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-twine",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-pytest",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#pypi-vulture",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#npm-markdownlint-cli2",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#depends-development",
+        "https://github.com/sidusnare/plexdo/spdx/2.0.0rc1#declared-license"
+      ]
+    }
+  ]
+}

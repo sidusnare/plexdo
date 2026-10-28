@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """Watched-state winner selection, in both directions."""
 
@@ -6,10 +8,12 @@ import datetime
 
 import pytest
 
-from plexdo.commands.watched import (WatchState, _select_winner, _states_match,
-                                     _planned_action as planned_action)
+from plexdo.commands.watched import WatchState, _select_winner, _states_match
+from plexdo.commands.watched import _planned_action as planned_action
 
-D = lambda day: datetime.datetime(2024, 1, day)
+
+def D(day):
+    return datetime.datetime(2024, 1, day)
 
 
 def S(played=False, offset=0, day=None):
@@ -30,7 +34,7 @@ def test_identical_states_are_a_no_op():
 
 
 def test_offsets_within_tolerance_count_as_identical():
-    """Plex rewrites viewOffset during playback; without this every run churns."""
+    """Plex rewrites viewOffset in playback; without this every run churns."""
     assert _states_match(S(offset=100_000), S(offset=105_000))
 
 
@@ -60,7 +64,7 @@ def test_when_both_watched_unwatch_takes_the_earliest():
 
 @pytest.mark.parametrize("unwatch", [False, True])
 def test_an_undated_state_never_wins(unwatch):
-    """lastViewedAt can be missing; it must not win by accident either way."""
+    """A missing lastViewedAt must not win by accident either way."""
     dated, undated = S(offset=100_000, day=5), S(offset=900_000)
     assert pick(dated, undated, unwatch) == "a"
 

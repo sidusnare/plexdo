@@ -1,9 +1,10 @@
+# SPDX-FileCopyrightText: 2026 SidusNare
 # SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 """M3U export using Plex server filesystem paths."""
 
 from pathlib import Path
-from typing import List
 
 from plexdo.constants import LOG, MediaItem
 from plexdo.paths import PathMapper, identity
@@ -12,7 +13,7 @@ from plexdo.titles import display_title
 
 
 def write_m3u(
-    sorted_items: List[MediaItem],
+    sorted_items: list[MediaItem],
     path: str,
     map_path: PathMapper = identity,
 ) -> None:
@@ -21,7 +22,7 @@ def write_m3u(
     *map_path* rewrites each path; it is the identity unless --prefix asked
     for something else.
     """
-    lines: List[str] = ["#EXTM3U"]
+    lines: list[str] = ["#EXTM3U"]
     for item in sorted_items:
         duration_ms = getattr(item, "duration", None)
         seconds = int(duration_ms / 1000) if duration_ms else -1
