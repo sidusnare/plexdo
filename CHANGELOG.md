@@ -12,6 +12,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.0.3] - 2026-10-28
+
+### Security
+
+- The Markdown linter used in development is markdownlint-cli2 0.24.0, whose
+  own dependencies include the fixed markdown-it, js-yaml, and smol-toml, in
+  place of 2.0.1's forcing those versions under an older release. One
+  low-severity KaTeX advisory remains in that tree with no fixed release in
+  reach; markdownlint never calls KaTeX, and plexdo does not ship it.
+
+### Fixed
+
+- Publishing a release installs the linters `make check` runs before running
+  it. Without them, no release since 2.0.0-rc.1 could be published to PyPI.
+
 ## [2.0.2] - 2026-10-28
 
 ### Changed
@@ -563,7 +578,8 @@ multi-user token handling, watched-state synchronisation, a status report,
 photo galleries, YAML/CSV/CLIXML output, shell completions for bash, zsh, and
 fish, a manual page, and packaging for PyPI. See the commit history.
 
-[Unreleased]: https://github.com/sidusnare/plexdo/compare/v2.0.2...HEAD
+[Unreleased]: https://github.com/sidusnare/plexdo/compare/v2.0.3...HEAD
+[2.0.3]: https://github.com/sidusnare/plexdo/compare/v2.0.2...v2.0.3
 [2.0.2]: https://github.com/sidusnare/plexdo/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/sidusnare/plexdo/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/sidusnare/plexdo/compare/v1.1.29...v2.0.0

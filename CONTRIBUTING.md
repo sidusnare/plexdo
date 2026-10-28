@@ -15,6 +15,12 @@ make develop      # editable install with the dev extras, ruff included
 npm ci            # markdownlint-cli2, at the version package.json pins
 ```
 
+markdownlint-cli2 needs Node 22 or newer, and `.nvmrc` names the version CI
+uses. Where the system's Node is older, as Debian stable's is, use the
+official build from <https://nodejs.org/>, checking its `SHASUMS256.txt`
+signature, and put its `bin` directory first on `PATH` for `npm ci` and
+`make check`.
+
 `make check` also needs ShellCheck, yamllint, and reuse; on Debian and Ubuntu
 they come from `sudo apt install shellcheck yamllint reuse`.
 

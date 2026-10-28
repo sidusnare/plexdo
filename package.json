@@ -4,12 +4,9 @@
   "description": "Development tools for plexdo that are not Python: Markdown lint.",
   "license": "GPL-3.0-or-later",
   "devDependencies": {
-    "markdownlint-cli2": "0.22.1"
+    "markdownlint-cli2": "0.24.0"
   },
-  "overrides": {
-    "markdown-it": "14.3.3",
-    "js-yaml": "4.3.2",
-    "smol-toml": "1.9.0",
-    "katex": "0.18.2"
+  "engines": {
+    "node": ">=22"
   }
 }

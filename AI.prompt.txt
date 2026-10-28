@@ -286,18 +286,25 @@ nothing to do with this version.
   (zsh and fish are not shells ShellCheck reads); yamllint, configured in
   `.yamllint.yaml` at 80 columns with `truthy` keys exempt because GitHub
   Actions requires the key `on`, passes on every YAML file and on the config
-  template plexdo writes; markdownlint-cli2, pinned in `package.json` at the
-  newest release supporting the Node of Debian stable (0.22.1 for Node 20),
-  passes on every Markdown file with `MD024 siblings_only` and `MD013` at 80
-  columns, code blocks and tables exempt. That release pins dependencies
-  with published vulnerabilities, so `package.json` `overrides` force the
-  fixed versions: `markdown-it` 14.3.3, `js-yaml` 4.3.2, `smol-toml` 1.9.0,
-  and `katex` 0.18.2. KaTeX is outside the `^0.16` range
-  `micromark-extension-math` asks for, which is safe only because
-  markdownlint imports that package's syntax extension and never calls its
-  KaTeX renderer, which is merely loaded. Drop each override once the
-  pinned markdownlint-cli2 depends on a fixed version itself; `npm audit`
-  must report nothing.
+  template plexdo writes; markdownlint-cli2, pinned in `package.json` at its
+  newest release (0.24.0), passes on every Markdown file with
+  `MD024 siblings_only` and `MD013` at 80 columns, code blocks and tables
+  exempt. It needs Node 22 or newer, which `package.json` declares in
+  `engines` and the Makefile checks before running it, naming `.nvmrc`;
+  `.nvmrc` holds the Node major CI uses (24, the LTS line). Where the
+  platform's Node is older, as Debian stable's 20 is, a developer runs the
+  official build from nodejs.org, its `SHASUMS256.txt` signature checked
+  against the Node.js release keys, rather than holding the linter back to
+  an old release.
+- The npm tree stays consistent: no `overrides` forcing a package outside
+  the range its dependent declares. A vulnerability in a development-only
+  npm dependency is fixed by upgrading the package that pulls it in. One
+  that no consistent tree avoids is left, with the reason recorded here:
+  KaTeX's GHSA-238p-pmpm-9mq7 (low), reached through
+  `markdownlint -> micromark-extension-math`, whose `^0.16` range no patched
+  KaTeX release satisfies. markdownlint imports only that package's syntax
+  extension; its KaTeX renderer is loaded and never called, and plexdo
+  ships none of it.
 - A linter suppression covers one line and one rule, with a comment saying
   why the code cannot change instead.
 - One Google rule is knowingly not followed: its guide imports modules, not
@@ -1367,9 +1374,12 @@ directory, and `uninstall` prefixes pip with `-` so an already-absent package
 still cleans up.
 
 CI runs `make check` on Python 3.11 through 3.14, installing ShellCheck and
-yamllint from apt, `reuse` and the Python tools from `.[dev]`, and
-markdownlint-cli2 with `npm ci`, plus jobs that parse all four completions
-and lint the man page.
+yamllint from apt, `reuse` and the Python tools from `.[dev]`, Node from
+`.nvmrc` with `actions/setup-node`, and markdownlint-cli2 with `npm ci`,
+plus jobs that parse all four completions and lint the man page.
+`publish.yml` runs the same `make check` before building a release, so it
+installs exactly the same tools: a linter added to `make check` is added to
+both workflows' install steps, or the next release fails to publish.
 
 **Every workflow declares `permissions`.** Without one, its jobs receive
 whatever the repository default grants, which CodeQL flags as

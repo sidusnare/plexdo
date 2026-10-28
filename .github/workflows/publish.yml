@@ -45,10 +45,22 @@ jobs:
         with:
           python-version: "3.12"
 
+      # markdownlint-cli2 needs Node 22 or newer; .nvmrc names the version.
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      # make check lints with every tool the project requires: ShellCheck
+      # and yamllint from apt, reuse from PyPI (apt's is too old to read
+      # REUSE.toml), and markdownlint-cli2 at the version package.json pins.
+      # ci.yml installs the same, since it runs the same make check.
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install -e ".[dev]" reuse
+          sudo apt-get update
+          sudo apt-get install -y shellcheck yamllint
+          npm ci
 
       # Everything that gates a normal pull request also gates a release:
       # the man page and SBOM matching pyproject's version, packaged

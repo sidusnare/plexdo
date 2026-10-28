@@ -8,7 +8,7 @@ include README.md
 include LICENSE
 recursive-include LICENSES *.txt
 include REUSE.toml sbom.spdx.json
-include package.json package-lock.json
+include package.json package-lock.json .nvmrc
 include .markdownlint-cli2.yaml .yamllint.yaml
 include requirements.txt
 include AI.prompt.txt AI.policy.txt

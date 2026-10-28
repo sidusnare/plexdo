@@ -31,9 +31,15 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      # markdownlint-cli2 needs Node 22 or newer; .nvmrc names the version.
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
       # make check lints with every tool the project requires: ShellCheck
       # and yamllint from apt, reuse from PyPI (apt's is too old to read
       # REUSE.toml), and markdownlint-cli2 at the version package.json pins.
+      # publish.yml installs the same, since it runs the same make check.
       - name: Install
         run: |
           python -m pip install --upgrade pip

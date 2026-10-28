@@ -11,7 +11,8 @@ path = ["AI.policy.txt", "TODO"]
 SPDX-FileCopyrightText = "2026 SidusNare"
 SPDX-License-Identifier = "GPL-3.0-or-later"
 
-# JSON allows no comments, and py.typed must stay empty for type checkers.
+# JSON allows no comments, py.typed must stay empty for type checkers, and
+# .nvmrc must hold the Node version alone, as the tools reading it expect.
 # package.json and sbom.spdx.json are AI-generated, by Claude Opus 5.5; the
 # SBOM records that in its creation information. package-lock.json is
 # written by npm.
@@ -21,6 +22,7 @@ path = [
   "package-lock.json",
   "sbom.spdx.json",
   "src/plexdo/py.typed",
+  ".nvmrc",
 ]
 SPDX-FileCopyrightText = "2026 SidusNare"
 SPDX-License-Identifier = "GPL-3.0-or-later"

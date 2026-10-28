@@ -178,6 +178,7 @@ lint:
 	yamllint --strict .
 	PYTHONPATH=src $(PYTHON) -c "from plexdo.constants import CONFIG_EXAMPLE; \
 print(CONFIG_EXAMPLE, end='')" | yamllint --strict -c .yamllint.yaml -
+	@node -e 'if (+process.versions.node.split(".")[0] < 22) { console.error("markdownlint-cli2 needs Node 22 or newer, not " + process.version + "; .nvmrc names the version to use."); process.exit(1) }'
 	npx --no-install markdownlint-cli2
 	reuse lint
 

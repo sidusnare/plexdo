@@ -22,3 +22,5 @@ ignores:
   - "node_modules/**"
   - "build/**"
   - "dist/**"
+  # pytest writes a README of its own here while the tests run.
+  - ".pytest_cache/**"
