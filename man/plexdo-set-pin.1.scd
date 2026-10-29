@@ -56,6 +56,11 @@ _USER_ID_
 *-v*, *--verbose*; *--debug*
 	*--debug* reports where secrets are kept.
 
+*--debug-log* _PATH_
+	Appends what *--debug* reports to _PATH_ instead, with the run's
+	time, CPU and memory use, and function run times. There are no HTTP
+	requests to record. See *DEBUG LOG* in *plexdo-conventions*(7).
+
 *--dry-run*
 	Prompt as the real run would, check the PIN, then save or remove
 	nothing, saying on standard error what would be done.

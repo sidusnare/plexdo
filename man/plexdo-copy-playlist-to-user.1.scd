@@ -68,6 +68,12 @@ _DEST_
 	*--verbose* reports the title the copy is made under, whether it
 	replaces anything, and why a skipped copy was skipped.
 
+*--debug-log* _PATH_
+	Appends what *--debug* reports to _PATH_ instead, with the run
+	profiled: each phase's time, every HTTP request and its wait, CPU and
+	memory use, and function run times. See *DEBUG LOG* in
+	*plexdo-conventions*(7).
+
 *--dry-run*
 	Decide the title, list the items, and stop without creating or
 	replacing anything. The outcome line says what would have happened.

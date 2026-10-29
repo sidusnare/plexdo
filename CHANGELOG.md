@@ -12,6 +12,34 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.1.0-rc.1] - 2026-10-29
+
+The first release candidate for 2.1.0. On PyPI this version is
+`2.1.0rc1`, the PEP 440 spelling of the same pre-release.
+
+### Added
+
+- `build-merge USER NAME FIRST SECOND [--ratio A:B]` mixes two playlists
+  into a new one, taking A items from the first, then B from the second, in
+  turn; the default is 1:1. Once one runs out, the rest of the other
+  follows, or with `-s/--stop-short` is left out. `-U/--unique` lists an
+  item in both playlists once. It takes the same `-o`, `--m3u`, `-p`, `-u`,
+  and `-a` as the other build commands.
+- `build-concatenated` takes `-U` as short for `--unique`.
+- `--debug-log PATH`, on every command, appends the debug output to a file
+  instead of stderr, each line starting with a Unix timestamp in
+  nanoseconds, with the run profiled: the run time of each phase and, from
+  cProfile, of each function; every HTTP request with its headers, status,
+  sizes, and wait; and CPU and memory use every five seconds. Secrets are
+  redacted in it. The file is created with mode 0600.
+
+### Security
+
+- Log output on stderr is redacted too: a token in a URL that a library
+  logs at `--debug`, such as urllib3's request line, or quotes in an error,
+  is replaced by `***`, as is any saved token or password wherever it
+  appears.
+
 ## [2.0.3] - 2026-10-28
 
 ### Security
@@ -578,7 +606,8 @@ multi-user token handling, watched-state synchronisation, a status report,
 photo galleries, YAML/CSV/CLIXML output, shell completions for bash, zsh, and
 fish, a manual page, and packaging for PyPI. See the commit history.
 
-[Unreleased]: https://github.com/sidusnare/plexdo/compare/v2.0.3...HEAD
+[Unreleased]: https://github.com/sidusnare/plexdo/compare/v2.1.0-rc.1...HEAD
+[2.1.0-rc.1]: https://github.com/sidusnare/plexdo/compare/v2.0.3...v2.1.0-rc.1
 [2.0.3]: https://github.com/sidusnare/plexdo/compare/v2.0.2...v2.0.3
 [2.0.2]: https://github.com/sidusnare/plexdo/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/sidusnare/plexdo/compare/v2.0.0...v2.0.1

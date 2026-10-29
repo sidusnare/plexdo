@@ -23,7 +23,7 @@ $script:PlexdoCacheDir = $null
 $script:PlexdoValueOptions = @(
     '--m3u', '--album', '--sort', '--media-type', '--library-id', '--section',
     '--prefix', '--throttle', '-p', '-l', '--library', '-t', '--title', '-u', '--user',
-    '--username', '--port', '--player-user', '--server-url',
+    '--username', '--port', '--player-user', '--server-url', '--ratio', '--debug-log',
     '-c', '--code', '-f', '--format'
 )
 
@@ -52,6 +52,7 @@ $script:PlexdoCommands = [ordered]@{
     'build-chronological'     = 'Date-sorted playlist from shows and movies'
     'build-randomize'         = 'Randomize a playlist into a new one'
     'build-concatenated'      = 'Join several playlists end to end into one'
+    'build-merge'             = 'Mix two playlists into one at a ratio'
     'copy-playlist-all-users' = 'Copy a playlist to all managed users'
     'copy-playlist-to-user'   = 'Copy a playlist to a specific user'
     'copy-watched'            = 'Synchronise watched state between two users'
@@ -66,6 +67,7 @@ $script:PlexdoGlobalFlags = [ordered]@{
     '--json'    = 'Shorthand for --format json'
     '--verbose' = 'Print high-level progress to stderr'
     '--debug'   = 'Print detailed internal logs to stderr'
+    '--debug-log' = 'Append the debug logs, profiled and timestamped, to a file'
     '--dry-run' = 'Show what would happen without mutating Plex'
     '--wide'    = 'Do not shrink table columns to the terminal width'
     '--throttle' = 'Seconds between requests in per-item operations; 0 disables'
@@ -282,7 +284,14 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
         $tokens = if ($tokens.Count -le 1) { @() } else { $tokens[0..($tokens.Count - 2)] }
     }
 
-    $command = $tokens | Where-Object { -not $_.StartsWith('-') } | Select-Object -First 1
+    # The first token that is neither an option nor an option's value.
+    $command = $null
+    $skipNext = $false
+    foreach ($token in $tokens) {
+        if ($skipNext) { $skipNext = $false; continue }
+        if ($script:PlexdoValueOptions -contains $token) { $skipNext = $true; continue }
+        if (-not $token.StartsWith('-')) { $command = $token; break }
+    }
     $previous = if ($tokens.Count) { $tokens[-1] } else { '' }
     $positionals = Get-PlexdoPositionals $tokens
     $index = $positionals.Count
@@ -339,6 +348,7 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
                 '^(build-|copy-playlist-)'          { $flags['--overwrite'] = 'Replace an existing playlist of the same name' }
                 '^build-'                           { $flags['--user'] = 'Create the playlist for this user instead'; $flags['--all-users'] = 'Create the playlist for every user on the server' }
                 '^build-concatenated$'              { $flags['--unique'] = 'Skip an item an earlier playlist already contributed' }
+                '^build-merge$'                     { $flags['--ratio'] = 'A:B: take A items from the first, then B from the second'; $flags['--stop-short'] = 'Stop when either playlist runs out'; $flags['--unique'] = 'Skip an item already taken' }
                 '^(list-titles|list-library|export-titles)$' { $flags['--album'] = 'Restrict to a single photo album' }
                 '^export-titles$'                   { $flags['--sort'] = 'Sort order' }
                 '^search$'                          { $flags['--media-type'] = 'Restrict to one media type'; $flags['--library-id'] = 'Restrict to one library' }
@@ -385,6 +395,8 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
                                       elseif ($index -eq 1) { $results = Get-PlexdoPlaylists $user } }
                 'build-concatenated' { if ($index -eq 0) { $results = Get-PlexdoUsers }
                                        elseif ($index -ge 2) { $results = Get-PlexdoPlaylists $user -IncludeKeys } }
+                'build-merge'       { if ($index -eq 0) { $results = Get-PlexdoUsers }
+                                      elseif ($index -in 2, 3) { $results = Get-PlexdoPlaylists $user -IncludeKeys } }
                 'copy-playlist-all-users' { if ($index -eq 0) { $results = Get-PlexdoUsers }
                                             elseif ($index -eq 1) { $results = Get-PlexdoPlaylists $user } }
                 'copy-playlist-to-user'   { if ($index -eq 0) { $results = Get-PlexdoUsers }

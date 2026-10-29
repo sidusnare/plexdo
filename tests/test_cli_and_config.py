@@ -73,6 +73,18 @@ def test_global_flags_work_after_the_command(parser, flag, attr, value):
     assert getattr(parser.parse_args(argv), attr) == value
 
 
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["--debug-log", "run.log", "list-users"],
+        ["list-users", "--debug-log", "run.log"],
+    ],
+)
+def test_debug_log_works_before_or_after_the_command(parser, argv):
+    assert parser.parse_args(argv).debug_log == "run.log"
+    assert parser.parse_args(["list-users"]).debug_log is None
+
+
 def test_a_flag_given_before_the_command_is_not_clobbered_by_the_subparser(
     parser,
 ):
@@ -93,12 +105,25 @@ def test_minus_one_parses_as_the_one_way_flag_not_a_negative_number(parser):
     assert parser.parse_args(["copy-watched", "7", "9", "-1"]).one_way is True
 
 
+def test_build_merge_keeps_minus_u_for_the_target_user(parser):
+    """-U is --unique; -u stays --user, as on every build command."""
+    args = parser.parse_args(
+        ["build-merge", "0", "Mix", "a", "b", "-s", "-U", "-u", "7"]
+    )
+    assert args.stop_short and args.unique
+    assert args.dest_user_id == "7"
+    default = parser.parse_args(["build-merge", "0", "Mix", "a", "b"])
+    assert default.ratio == (1, 1)
+
+
 @pytest.mark.parametrize(
     "command",
     [
         "build-interleaved",
         "build-chronological",
         "build-randomize",
+        "build-concatenated",
+        "build-merge",
         "copy-playlist-all-users",
         "copy-playlist-to-user",
     ],
@@ -122,6 +147,8 @@ def test_every_creating_command_offers_overwrite(parser, command):
         "build-interleaved",
         "build-chronological",
         "build-randomize",
+        "build-concatenated",
+        "build-merge",
     ],
 )
 def test_every_export_command_offers_a_path_prefix(parser, command):

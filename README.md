@@ -146,11 +146,34 @@ second run can finish, and the exit status is 1.
 
 ## Commands
 
-Every command accepts `-f/--format`, `-v/--verbose`, `--debug`, `--dry-run`,
-and `-V/--version`, and they may be given either before or after the command
-name - `plexdo --json list-users` and `plexdo list-users --json` are
-equivalent. Logging always goes to stderr, so machine-readable output on stdout
-is safe to pipe.
+Every command accepts `-f/--format`, `-v/--verbose`, `--debug`,
+`--debug-log PATH`, `--dry-run`, and `-V/--version`, and they may be given
+either before or after the command name - `plexdo --json list-users` and
+`plexdo list-users --json` are equivalent. Logging always goes to stderr, or
+the debug log, so machine-readable output on stdout is safe to pipe.
+
+### Debug log
+
+`--debug-log PATH` appends the `--debug` output to a file instead of stderr,
+and profiles the run. Every line starts with a Unix timestamp in nanoseconds,
+and beside the debug logging the file records:
+
+- each phase of the run - connecting, resolving arguments, the command - with
+  its run time, CPU and memory, and the HTTP calls it made;
+- every HTTP request, from plexdo or plexapi: method, URL, headers, status,
+  sizes, and how long it waited;
+- CPU and memory use every five seconds;
+- at the end, totals for the run and cProfile's tables of function run times.
+
+```bash
+plexdo list-playlists 0 --debug-log ~/plexdo-debug.log
+grep ' plexdo.http: recv ' ~/plexdo-debug.log    # every response and its wait
+```
+
+Tokens, passwords, PINs, cookies, and credential headers are redacted, on
+stderr too, and bodies are never written. The file is created readable by
+you alone; it still names your server, users, and titles, so treat it as
+private.
 
 ### Output formats
 
@@ -290,6 +313,7 @@ plexdo build-interleaved "Mixed Run" 101 202       # round-robin across shows
 plexdo build-chronological "By Air Date" 101 202   # date-sorted, shows and movies
 plexdo build-randomize 0 "Source" "Shuffled"       # secrets-backed shuffle
 plexdo build-concatenated 0 "All" "Part 1" "Part 2"  # joined end to end
+plexdo build-merge 0 "Mixed" "Shows" "Films" --ratio 2:1  # two shows per film
 ```
 
 Playlists are always built fully in memory, validated, previewed, and then
@@ -315,15 +339,29 @@ plexdo build-concatenated 0 "Mix" "Mix" "New Finds" -o   # append one to another
 ```
 
 Duplicates are kept by default, since a plain concatenation is faithful and
-Plex permits a repeat; `--unique` keeps only an item's first appearance,
+Plex permits a repeat; `-U/--unique` keeps only an item's first appearance,
 matching on ratingKey rather than title, and reports how many it skipped. An
 empty source is reported and contributes nothing - a typo that resolved to the
 wrong playlist otherwise looks exactly like a playlist that happens to be
 empty.
 
+`build-merge` mixes two playlists, taking items from each in turn at
+`--ratio A:B`: A from the first, then B from the second. The default, 1:1,
+alternates them. Each keeps its own order, and once one runs out the rest of
+the other follows, so nothing is left out; `--verbose` says how many items
+that is. `-s/--stop-short` stops there instead, so the whole result keeps the
+ratio. `-U/--unique` skips an item already taken, and the next item of the
+same playlist takes its place. Like `build-concatenated`, it reads both
+playlists before writing, so either may also be the destination:
+
+```bash
+plexdo build-merge 0 "Mix" "Mix" "New Finds" --ratio 3:1 -o  # one new in four
+plexdo build-merge 0 "Weekend" Shows Films --ratio 2:1 -s -U  # ends with a film
+```
+
 #### Who the playlist is built for
 
-All four build commands take `-u/--user` and `-a/--all-users`. Without either,
+All five build commands take `-u/--user` and `-a/--all-users`. Without either,
 the playlist lands where it always has: on the account the items came from.
 
 ```bash

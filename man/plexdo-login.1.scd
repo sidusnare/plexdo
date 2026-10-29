@@ -88,6 +88,12 @@ warning, and the first run moves it to the keyring by itself.
 	*--verbose* reports the sign-in being made; *--debug* adds whether a
 	saved password was used, and where secrets are kept.
 
+*--debug-log* _PATH_
+	Appends what *--debug* reports to _PATH_ instead, with the run
+	profiled: each phase's time, every HTTP request and its wait, CPU and
+	memory use, and function run times. See *DEBUG LOG* in
+	*plexdo-conventions*(7).
+
 *--dry-run*
 	Sign in to plex.tv for real, to prove the credentials work, but save
 	nothing: where the token, and with *--save-password* the password,

@@ -9,7 +9,7 @@ plexdo-build-concatenated - join several playlists end to end into a new one
 
 # SYNOPSIS
 
-*plexdo build-concatenated* _USER_ _NAME_ _PLAYLIST_... [*--unique*] [*-o*]
+*plexdo build-concatenated* _USER_ _NAME_ _PLAYLIST_... [*-U*] [*-o*]
 \[*--m3u* _PATH_ [*-p* _PREFIX_]] [*-u* _TARGET_ | *-a*] [_GLOBAL OPTIONS_]
 
 # DESCRIPTION
@@ -23,7 +23,7 @@ joined and replaced: naming one of the sources as _NAME_ with *-o* appends
 the others to it.
 
 By default the result keeps any item that appears more than once, as a
-plain concatenation should and as Plex permits; *--unique* keeps only each
+plain concatenation should and as Plex permits; *-U* keeps only each
 item's first appearance. An empty playlist among the sources is reported
 with a warning, since a mistyped name that matched the wrong playlist looks
 exactly like one that happens to be empty, and contributes nothing.
@@ -51,7 +51,7 @@ _PLAYLIST_...
 
 # OPTIONS
 
-*--unique*
+*-U*, *--unique*
 	Skip an item an earlier playlist already contributed, so an item
 	appearing in two playlists is listed once, where it first appeared.
 	Items are matched by ratingKey rather than title, so two episodes
@@ -107,6 +107,12 @@ wrong for one user stops the others.
 	*--verbose* reports each playlist's size as it is read, how many
 	repeats *--unique* skipped, the size of the result, its creation or
 	replacement, and under *-a* how many users were served.
+
+*--debug-log* _PATH_
+	Appends what *--debug* reports to _PATH_ instead, with the run
+	profiled: each phase's time, every HTTP request and its wait, CPU and
+	memory use, and function run times. See *DEBUG LOG* in
+	*plexdo-conventions*(7).
 
 *--dry-run*
 	Read, join, and preview, check _NAME_ as usual, and stop without
@@ -177,5 +183,6 @@ plexdo build-concatenated Alice "From Alice" "Road Trip" "Comfort TV" \\
 
 # SEE ALSO
 
-*plexdo-append-playlist*(1), *plexdo-build-randomize*(1),
-*plexdo-list-playlists*(1), *plexdo-conventions*(7), *plexdo*(1)
+*plexdo-append-playlist*(1), *plexdo-build-merge*(1),
+*plexdo-build-randomize*(1), *plexdo-list-playlists*(1),
+*plexdo-conventions*(7), *plexdo*(1)

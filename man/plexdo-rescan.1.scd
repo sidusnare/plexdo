@@ -58,6 +58,12 @@ _LIBRARY_
 	*--verbose* reports the scan being triggered and, with *-n*, the
 	cancellation; *--debug* adds each library's cancellation.
 
+*--debug-log* _PATH_
+	Appends what *--debug* reports to _PATH_ instead, with the run
+	profiled: each phase's time, every HTTP request and its wait, CPU and
+	memory use, and function run times. See *DEBUG LOG* in
+	*plexdo-conventions*(7).
+
 *--dry-run*
 	Resolve _LIBRARY_ and stop: nothing is cancelled and no scan starts.
 	*-s* is unaffected, since listing changes nothing.

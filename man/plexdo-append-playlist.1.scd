@@ -60,6 +60,12 @@ None beyond the global options.
 	*--verbose* reports how many items are being added, and when they
 	have been.
 
+*--debug-log* _PATH_
+	Appends what *--debug* reports to _PATH_ instead, with the run
+	profiled: each phase's time, every HTTP request and its wait, CPU and
+	memory use, and function run times. See *DEBUG LOG* in
+	*plexdo-conventions*(7).
+
 *--dry-run*
 	Look up every item, fail as usual if any is not found, list them, and
 	stop without adding anything.

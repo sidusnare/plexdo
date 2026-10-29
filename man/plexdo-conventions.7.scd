@@ -49,6 +49,12 @@ command in particular.
 	Report detailed internal logging on standard error. Implies
 	everything *--verbose* shows.
 
+*--debug-log* _PATH_
+	Append what *--debug* would report to the file _PATH_ instead of
+	standard error, with the run profiled: see *DEBUG LOG* below.
+	Standard error then shows what it would without *--debug*. A leading
+	*~* is expanded. *--debug* is not needed with it.
+
 *--dry-run*
 	For a command that changes Plex: do everything up to the change,
 	show what would be done, and stop. It concerns Plex only: a file a
@@ -182,6 +188,80 @@ pause goes between elements, so _n_ elements wait _n_-1 times, and a run of
 level, with its expected duration. *--throttle 0* turns pacing off. Each
 command page says which of its loops are paced.
 
+# DEBUG LOG
+
+*--debug-log* _PATH_ appends to _PATH_, creating it readable by its owner
+alone, mode 0600, when it does not exist; a file that does keeps its mode.
+A path that cannot be opened is an error, exit status *1*, before the
+command runs. Each line is written as it happens, so a run that is killed
+leaves every line it got to.
+
+Every line starts with the time it was written, as nanoseconds since the
+Unix epoch, then the level, the logger, and the message:
+
+```
+1793281340444273380 DEBUG plexdo.http: recv id=1 status=200 reason="OK" ...
+```
+
+A message spanning several lines, such as a traceback or a table, carries
+the time on each, so every line can be sorted, filtered, and cut on its
+own. Beside everything *--debug* reports, the file holds the profile of the
+run, in lines of _key_*=*_value_ pairs:
+
+*plexdo.profile: run start*
+	The version of *plexdo*, Python, plexapi, and requests, the platform,
+	the process ID, the command, and its arguments.
+
+*plexdo.profile: span*
+	One per phase: *migrate*, *connect*, *resolve-arguments*, and
+	*command:*_NAME_. The time it took, its CPU and memory, and how many
+	HTTP requests it made and how long it waited on them.
+
+*plexdo.http: send*, *recv*, *fail*
+	One *send* line as each HTTP request goes out, from *plexdo* or a
+	library it uses: its *id*, method, URL, body size, and headers. Then
+	a *recv* line with the same *id*: the status, the wait from sending to
+	the whole response, in *wait_ns*, the part of it before the headers
+	arrived, in *headers_ns*, the size and type of the body, and the
+	headers. A request that gets no response has a *fail* line with the
+	error instead. A redirect is a request of its own.
+
+*plexdo.profile: resources*
+	Every five seconds: CPU and memory over the five seconds since the
+	last one.
+
+*plexdo.profile: run end*
+	The exit status, *interrupted*, or *exception:*_TYPE_; the whole
+	run's time, CPU, and memory; how many HTTP requests it made, its total
+	wait on them, and that wait as a share of the run; and its slowest
+	request.
+
+*plexdo.profile: functions by*
+	Two tables from Python's cProfile of the 40 functions taking most
+	time: by cumulative time, the calls they make included, and by their
+	own time alone.
+
+Times are nanoseconds: *wall_ns* on a monotonic clock, *cpu_ns* the
+process's CPU time, and *user_ns* and *system_ns* its user and kernel
+parts, which the operating system counts more coarsely. *cpu_percent* is
+CPU time over wall time, near 0 for a run waiting on the network and above
+100 for one busy in more than one thread. *rss_bytes* is the resident
+memory in use, on Linux and Windows; *peak_rss_bytes* the most used so
+far, everywhere. A figure the platform does not give is *None*.
+
+Secrets are redacted to *\*\*\**, in the file and on standard error alike:
+the value of every query parameter, header, JSON key, or _key_*=*_value_
+named like a token, password, PIN, cookie, or *Authorization*; the
+password in a URL; and any token, password, or PIN *plexdo* has read from
+the secret store, been given at a prompt, or sent in a request, wherever it
+appears, unless it is shorter than eight characters, which is redacted
+only where named. Request and response bodies are never written, only
+their sizes. The file still records which server, users, libraries, and
+items a run touched, so treat it as private.
+
+Profiling costs time: cProfile slows the code it watches, and its tables
+show the profiler's own overhead too.
+
 # EXIT STATUS
 
 *0*
@@ -277,6 +357,7 @@ _~/.local/etc/plexdo.ini_, _plexdo.ini.migrated_
 *plexdo-player-remote-play*(1),
 *plexdo-build-interleaved*(1), *plexdo-build-chronological*(1),
 *plexdo-build-randomize*(1), *plexdo-build-concatenated*(1),
-*plexdo-copy-playlist-all-users*(1), *plexdo-copy-playlist-to-user*(1),
-*plexdo-copy-watched*(1), *plexdo-login*(1), *plexdo-logout*(1),
-*plexdo-set-pin*(1), and *plexdo-write-config-example*(1).
+*plexdo-build-merge*(1), *plexdo-copy-playlist-all-users*(1),
+*plexdo-copy-playlist-to-user*(1), *plexdo-copy-watched*(1),
+*plexdo-login*(1), *plexdo-logout*(1), *plexdo-set-pin*(1), and
+*plexdo-write-config-example*(1).

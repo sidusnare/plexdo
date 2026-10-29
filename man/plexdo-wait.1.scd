@@ -152,6 +152,12 @@ is taken even when nothing was playing to begin with.
 	format, where they would otherwise be hidden. A failed poll is warned
 	about whatever the setting.
 
+*--debug-log* _PATH_
+	Appends what *--debug* reports to _PATH_ instead, with the run
+	profiled: each phase's time, every HTTP request and its wait, CPU and
+	memory use, and function run times. See *DEBUG LOG* in
+	*plexdo-conventions*(7).
+
 *--dry-run*
 	No effect: waiting changes nothing on the server.
 

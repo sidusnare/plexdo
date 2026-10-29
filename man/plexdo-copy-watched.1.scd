@@ -88,6 +88,12 @@ _USER_ _USER_
 	*--verbose* reports how many items were read for each user, and how
 	many changes were made; *--debug* adds each change *-1* prevented.
 
+*--debug-log* _PATH_
+	Appends what *--debug* reports to _PATH_ instead, with the run
+	profiled: each phase's time, every HTTP request and its wait, CPU and
+	memory use, and function run times. See *DEBUG LOG* in
+	*plexdo-conventions*(7).
+
 *--dry-run*
 	List the planned changes and stop without making any. A full-library
 	comparison can plan a great many changes, so preview it first.

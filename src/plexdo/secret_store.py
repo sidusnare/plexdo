@@ -31,6 +31,7 @@ from keyring.backends import chainer, fail
 
 from plexdo.config import cached_config, check_file_permissions, config_optional
 from plexdo.constants import CONFIG_PATH, DEFAULT_SECRETS_FILE, LOG
+from plexdo.security import hide_in_logs
 
 SERVICE = "plexdo"
 
@@ -222,7 +223,10 @@ def load(kind: str) -> Secrets:
         return {}
     if not isinstance(data, dict):
         return {}
-    return {str(name): str(value) for name, value in data.items() if value}
+    secrets = {str(name): str(value) for name, value in data.items() if value}
+    for value in secrets.values():
+        hide_in_logs(value)
+    return secrets
 
 
 def save(kind: str, secrets: Secrets) -> None:
@@ -230,6 +234,8 @@ def save(kind: str, secrets: Secrets) -> None:
 
     None left removes the entry, so no secret outlives the last one.
     """
+    for value in secrets.values():
+        hide_in_logs(value)
     if secrets:
         backend().write(kind, json.dumps(secrets, sort_keys=True))
     else:

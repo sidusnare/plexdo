@@ -77,6 +77,11 @@ under *FILES* in *plexdo-conventions*(7).
 *-v*, *--verbose*; *--debug*
 	No effect: there is nothing more to report.
 
+*--debug-log* _PATH_
+	Appends what *--debug* reports to _PATH_ instead, with the run's
+	time, CPU and memory use, and function run times. There are no HTTP
+	requests to record. See *DEBUG LOG* in *plexdo-conventions*(7).
+
 *--dry-run*
 	Write nothing, and say on standard error where the template would be
 	written and whether that would create the file or replace one. An

@@ -6,8 +6,10 @@
 
 import argparse
 import datetime
+import re
 import sys
 from collections.abc import Iterator, Sequence
+from typing import NamedTuple
 
 from plexapi.playlist import Playlist
 from plexapi.server import PlexServer
@@ -215,6 +217,161 @@ def cmd_build_concatenated(plex: PlexServer, args: argparse.Namespace) -> None:
         write_m3u(items, args.m3u, mapper_for(user_plex, args))
 
 
+def _parse_ratio(text: str) -> tuple[int, int]:
+    """The two counts of a ratio such as "2:1", for argparse."""
+    match = re.fullmatch(r"\s*(\d+)\s*:\s*(\d+)\s*", text, re.ASCII)
+    if match:
+        first, second = int(match.group(1)), int(match.group(2))
+        if first and second:
+            return first, second
+    raise argparse.ArgumentTypeError(
+        f"expected two whole numbers above 0, such as 2:1, not {text!r}"
+    )
+
+
+class Merged(NamedTuple):
+    """What _merge made, and what --verbose says about it.
+
+    *ran_out* is 0 or 1 for the playlist that ran out first, or None when
+    both ran out on the same turn. *unmixed* counts the items of the other
+    that follow on their own; *left_out*, those --stop-short never reached,
+    repeats among them; *skipped*, the repeats --unique passed over.
+    """
+
+    items: list[MediaItem]
+    ran_out: int | None
+    unmixed: int
+    left_out: int
+    skipped: int
+
+
+def _take_run(
+    source: Sequence[MediaItem],
+    start: int,
+    count: int,
+    seen: set[int] | None,
+) -> tuple[list[MediaItem], int]:
+    """Up to *count* items of *source* from *start*, and where to go on.
+
+    With *seen*, an item whose ratingKey is in it is passed over rather than
+    taken, so a repeat does not use up a place in the run, and each item
+    taken is added to it.
+    """
+    run: list[MediaItem] = []
+    while len(run) < count and start < len(source):
+        item = source[start]
+        start += 1
+        if seen is not None:
+            key = int(item.ratingKey)
+            if key in seen:
+                continue
+            seen.add(key)
+        run.append(item)
+    return run, start
+
+
+def _merge(
+    first: Sequence[MediaItem],
+    second: Sequence[MediaItem],
+    ratio: tuple[int, int],
+    *,
+    stop_short: bool = False,
+    unique: bool = False,
+) -> Merged:
+    """Alternate runs of the two playlists at the given ratio.
+
+    A ratio of 2:1 takes two items from *first*, then one from *second*,
+    and so on, each keeping its own order. A playlist has run out on the
+    first turn it has nothing to give. From that turn on, the rest of the
+    other follows on its own, or with *stop_short* is left out, so the
+    result ends with the last turn both took part in.
+
+    Repeats are kept, as Plex allows. With *unique* an item already taken
+    is passed over, as in build-concatenated, and the next one takes its
+    place, so the ratio still holds.
+    """
+    sources = (first, second)
+    starts = [0, 0]
+    seen: set[int] | None = set() if unique else None
+    items: list[MediaItem] = []
+    ran_out: int | None = None
+    tail_start = 0
+    while starts[0] < len(first) or starts[1] < len(second):
+        before = list(starts)
+        runs = []
+        for side in (0, 1):
+            run, starts[side] = _take_run(
+                sources[side], starts[side], ratio[side], seen
+            )
+            runs.append(run)
+        if ran_out is None and bool(runs[0]) != bool(runs[1]):
+            ran_out = 0 if not runs[0] else 1
+            tail_start = len(items)
+            if stop_short:
+                starts = before
+                break
+        items.extend(runs[0] + runs[1])
+    return Merged(
+        items=items,
+        ran_out=ran_out,
+        unmixed=0 if stop_short or ran_out is None else len(items) - tail_start,
+        left_out=sum(len(s) - n for s, n in zip(sources, starts, strict=True)),
+        skipped=sum(starts) - len(items),
+    )
+
+
+def cmd_build_merge(plex: PlexServer, args: argparse.Namespace) -> None:
+    """Build one playlist from two others, mixed at a ratio."""
+    user_plex = server_for_user(plex, args.user_id)
+
+    # Both sources are read before anything is written, so either may be the
+    # destination under --overwrite, as with build-concatenated.
+    sources = _collect_sources(user_plex, [args.first, args.second], args)
+    first, second = sources[0][1], sources[1][1]
+    merged = _merge(
+        first,
+        second,
+        args.ratio,
+        stop_short=args.stop_short,
+        unique=args.unique,
+    )
+    items = merged.items
+
+    names = (args.first, args.second)
+    if merged.ran_out is not None:
+        other = names[1 - merged.ran_out]
+        if args.stop_short:
+            LOG.info(
+                "'%s' runs out first; --stop-short left out the last %d "
+                "item(s) of '%s'.",
+                names[merged.ran_out],
+                merged.left_out,
+                other,
+            )
+        else:
+            LOG.info(
+                "'%s' runs out first; the last %d item(s) of '%s' follow "
+                "unmixed.",
+                names[merged.ran_out],
+                merged.unmixed,
+                other,
+            )
+    if merged.skipped:
+        LOG.info("--unique: skipped %d repeated item(s).", merged.skipped)
+    LOG.info(
+        "Merged %d and %d item(s) at %d:%d into %d item(s)",
+        len(first),
+        len(second),
+        *args.ratio,
+        len(items),
+    )
+
+    deliver_playlist(plex, user_plex, args.name, items, args)
+
+    if args.m3u:
+        write_m3u(items, args.m3u, mapper_for(user_plex, args))
+
+
 def register(
     sub: "argparse._SubParsersAction",
     parents: "list[argparse.ArgumentParser]",
@@ -287,6 +444,7 @@ def register(
         ),
     )
     p_bn.add_argument(
+        "-U",
         "--unique",
         action="store_true",
         default=False,
@@ -300,12 +458,65 @@ def register(
     add_prefix_argument(p_bn)
     add_user_target_arguments(p_bn)
 
+    p_bm = sub.add_parser(
+        "build-merge",
+        parents=parents,
+        help="Mix two playlists into one new playlist at a ratio.",
+    )
+    add_user_argument(p_bm)
+    p_bm.add_argument("name", help="Name for the new playlist (str).")
+    for which in ("first", "second"):
+        p_bm.add_argument(
+            which,
+            metavar=which.upper(),
+            help=(
+                f"The {which} playlist to mix. Playlist name (str) or "
+                "ratingKey (int). Obtain either with list-playlists."
+            ),
+        )
+    p_bm.add_argument(
+        "--ratio",
+        type=_parse_ratio,
+        default="1:1",
+        metavar="A:B",
+        help=(
+            "Take A items from FIRST, then B from SECOND, in turn (default "
+            "1:1). Once one runs out, the rest of the other follows, unless "
+            "--stop-short is given."
+        ),
+    )
+    p_bm.add_argument(
+        "-s",
+        "--stop-short",
+        action="store_true",
+        default=False,
+        help=(
+            "Stop when either playlist runs out, leaving out the rest of "
+            "the other, so the whole result keeps the ratio."
+        ),
+    )
+    p_bm.add_argument(
+        "-U",
+        "--unique",
+        action="store_true",
+        default=False,
+        help=(
+            "Skip an item already taken, so a title in both playlists is "
+            "listed once; the next item takes its place in the ratio."
+        ),
+    )
+    add_overwrite_argument(p_bm)
+    add_m3u_argument(p_bm)
+    add_prefix_argument(p_bm)
+    add_user_target_arguments(p_bm)
+
 
 COMMANDS = {
     "build-interleaved": cmd_build_interleaved,
     "build-chronological": cmd_build_chronological,
     "build-randomize": cmd_build_randomize,
     "build-concatenated": cmd_build_concatenated,
+    "build-merge": cmd_build_merge,
 }
 
 REQUIRES_PLEX = frozenset(COMMANDS)

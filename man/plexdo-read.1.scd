@@ -59,6 +59,14 @@ None beyond the global options.
 	streamed from. That URL carries the access token: do not share
 	verbose output.
 
+*--debug-log* _PATH_
+	Appends what *--debug* reports to _PATH_ instead, with the run
+	profiled: each phase's time, every HTTP request and its wait, CPU and
+	memory use, and function run times. The stream's request is logged
+	as it starts, with the size the server gives, so its wait covers the
+	response headers and not the stream. See *DEBUG LOG* in
+	*plexdo-conventions*(7).
+
 *--dry-run*
 	Resolve the item and print its title, server-side path, and streaming
 	URL on standard error instead of streaming it. The URL carries the

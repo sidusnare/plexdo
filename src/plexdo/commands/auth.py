@@ -21,6 +21,7 @@ from plexdo.config import Config, config_optional, load_config
 from plexdo.connection import server_url
 from plexdo.console import output, output_format
 from plexdo.constants import CONFIG_EXAMPLE, CONFIG_PATH, LOG
+from plexdo.security import hide_in_logs
 from plexdo.tokens import (
     ADMIN_KEY,
     TokenStore,
@@ -50,6 +51,7 @@ def _prompt_password() -> str:
     password = getpass.getpass("Plex password: ")
     if not password:
         sys.exit("Password is required.")
+    hide_in_logs(password)
     return password
 
 

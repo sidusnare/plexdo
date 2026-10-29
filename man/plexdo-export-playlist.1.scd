@@ -59,6 +59,12 @@ _PATH_
 	*--verbose* reports how many items are exported, and where; *--debug*
 	adds the library roots used by *--prefix*.
 
+*--debug-log* _PATH_
+	Appends what *--debug* reports to _PATH_ instead, with the run
+	profiled: each phase's time, every HTTP request and its wait, CPU and
+	memory use, and function run times. See *DEBUG LOG* in
+	*plexdo-conventions*(7).
+
 *--dry-run*
 	No effect: nothing on the server changes, and the file is still
 	written.

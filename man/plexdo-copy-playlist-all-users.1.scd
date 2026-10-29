@@ -79,6 +79,12 @@ _PLAYLIST_
 	*--verbose* reports the title each copy is made under and whether it
 	replaces anything; *--debug* adds the full error behind each *failed*.
 
+*--debug-log* _PATH_
+	Appends what *--debug* reports to _PATH_ instead, with the run
+	profiled: each phase's time, every HTTP request and its wait, CPU and
+	memory use, and function run times. See *DEBUG LOG* in
+	*plexdo-conventions*(7).
+
 *--dry-run*
 	Decide each user's title and outcome, print the lines, and stop
 	without creating or replacing anything.

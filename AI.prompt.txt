@@ -380,7 +380,9 @@ src/plexdo/
     constants.py    windows_app_dir, default_paths, Paths, PATHS, CONFIG_PATH,
                     DEFAULT_CACHE_DIR, DEFAULT_SECRETS_FILE, STORE_CHOICES,
                     config_text, CONFIG_EXAMPLE, LOG
-    logs.py         configure_logging
+    logs.py         configure_logging, open_debug_log, RedactingFormatter,
+                    TimestampedFormatter
+    profiling.py    profiled, span, usage, Run, Usage
     config.py       load_config, parse_config, cached_config, config_optional,
                     user_option, configured_users, expand_environment,
                     check_file_permissions, Config
@@ -426,7 +428,8 @@ src/plexdo/
     throttle.py     paced, throttle_delay
     playback.py     fetch_address, parse_ip, url_host, url_of, play_fields,
                     add_play_arguments, Candidate, IPAddress
-    security.py     scrub_password_argument
+    security.py     scrub_password_argument, redact, redact_headers,
+                    hide_in_logs, hide_request_secrets
     data/           the four completions and the man page, as package data
     commands/       one module per group (see COMMANDS)
 ```
@@ -639,9 +642,9 @@ present.
 
 ## GLOBAL FLAGS
 
-`-f/--format`, `--json`, `-v/--verbose`, `--debug`, `--dry-run`, `-W/--wide`,
-`--throttle`, `-V/--version`. They must work **either before or after the
-command name**.
+`-f/--format`, `--json`, `-v/--verbose`, `--debug`, `--debug-log PATH`,
+`--dry-run`, `-W/--wide`, `--throttle`, `-V/--version`. They must work
+**either before or after the command name**.
 
 Implement with `_add_global_flags(parser, suppress=False)` called twice: once
 on the top-level parser with ordinary defaults, and once on an
@@ -654,7 +657,79 @@ before the subcommand: `plexdo --json list-users` would print a table.
 
 `--format` writes to `dest="format"`; `--json` is a `store_const` alias
 writing to that same destination, so there is one attribute and no way for the
-two to disagree. All logging goes to stderr only.
+two to disagree. All logging goes to stderr only, or to the `--debug-log`
+file; never to stdout.
+
+### The debug log
+
+`--debug-log PATH` sends everything `--debug` would show to PATH instead,
+and stderr keeps the level it would have without `--debug`; `--debug` is
+not needed with it. `logs.open_debug_log` opens it with `os.open`,
+`O_APPEND | O_CREAT`, mode 0600, so a new file is its owner's alone and
+earlier runs are kept, and line buffered, so a killed run loses nothing it
+logged; a path that cannot be opened is a `sys.exit` naming it, before the
+command runs. Expand `~`.
+
+`TimestampedFormatter` starts **every line**, not every record, with
+`time.time_ns()` at the moment it is formatted, then `LEVEL logger:
+message`; a traceback or a cProfile table carries the stamp on each line.
+`LogRecord.created` is a float and cannot hold nanoseconds at today's epoch,
+so it is not used.
+
+`profiling.profiled(enabled, command)` is the context `cli.main` runs the
+command in, after `scrub_password_argument` so no `--password` reaches the
+run start line: a `profiling.Run` with `--debug-log`, `nullcontext()`
+without. `profiling.span(name)` times one phase - `migrate`, `connect`,
+`resolve-arguments`, `command:NAME` - and is a no-op with no Run active.
+The Run writes, as `key=value` pairs so the file is as easy to grep as to
+read:
+- `plexdo.profile: run start` - plexdo, Python, plexapi, and requests
+  versions, platform, pid, command, `json.dumps(sys.argv)`;
+- `span` lines - wall, CPU, user and system time, `cpu_percent`, memory,
+  and the HTTP calls and wait inside the span;
+- `plexdo.http: send` / `recv` / `fail` - Run replaces
+  `requests.Session.send` for the run and restores it after, so every
+  session, plexapi's included, is seen. `send` has an id, method, URL,
+  body size, and headers; `recv` the status, reason, `wait_ns` (send to
+  whole response, by `perf_counter_ns`), `headers_ns` (requests'
+  `elapsed`), body size and type, and headers; `fail` the error, before
+  re-raising. Never read the body of a `stream=True` response, which would
+  consume what `read` streams: give its Content-Length. A redirect comes
+  back through `send`; a thread-local depth keeps the nested hops out of
+  the totals, so no wait counts twice;
+- `resources` every `SAMPLE_SECONDS` (5) from a daemon thread, over the
+  interval since the last;
+- `run end` - status (`SystemExit` code, `interrupted`,
+  `exception:TYPE`), totals, the HTTP count, wait, its share of the run,
+  and the slowest request, then cProfile's top `TOP_FUNCTIONS` (40) by
+  cumulative and by own time. Python 3.12 allows one profiler at a time,
+  so `enable()` raising `ValueError` is logged and the run goes on
+  without the tables.
+CPU is `time.process_time_ns()` with `os.times()` for the user/system split.
+Memory without a dependency: current RSS from `/proc/self/statm` on Linux
+and `GetProcessMemoryInfo` through ctypes on Windows, the peak from
+`resource.getrusage` (`ru_maxrss`, KiB except bytes on macOS) or Windows;
+Linux updates the peak lazily, so report at least the current figure, and
+`None` where the platform gives nothing. psutil would be a dependency for
+one feature.
+
+Redaction is in `security`. Both handlers, stderr and file, use
+`RedactingFormatter`, which redacts the **whole formatted record**,
+traceback included, since urllib3 logs request lines with their query
+string and requests' exceptions quote URLs. `redact` replaces: the value of
+any `name=value`, `name: value`, or quoted-key pair whose name is a token,
+password, passwd, secret (as a suffix: `X-Plex-Token`, `authToken`), `pin`,
+`X-Plex-Pin`, `X-Plex-Code`, `verificationCode`, `Authorization`, or a
+cookie header, its scheme with it; the password in `scheme://user:pass@`;
+and every value `hide_in_logs` was given. That registry is fed by
+`secret_store.load` and `save`, the password prompt and
+`scrub_password_argument`, and `hide_request_secrets`, which `send` calls
+before the request goes out with the secret-named query parameters and
+headers, a Basic credential's decoded password included. Values under 8
+characters are not registered: a four-digit PIN would blank out every
+matching number; named, it is still redacted. Bodies are never logged,
+only their sizes. Name the registry what it is (`_KnownSecrets`), per the
+naming rule above.
 
 ## OUTPUT
 
@@ -723,7 +798,7 @@ turn it off.
 Apply wherever a loop makes one request per element and the count can exceed
 50: the seasons walk in `list-titles`, `find-missing -A`, applying watched
 state in `copy-watched`, removing entries in `clean-playlist`, reading each
-source in `build-concatenated`, `collect_photos`, and the per-user loop in
+source in `build-concatenated` and `build-merge`, `collect_photos`, and the per-user loop in
 `fanout.run_per_user`, which serves `copy-playlist-all-users` and every build
 command given `-a`. Functions needing it take an optional `args`.
 
@@ -850,16 +925,35 @@ touched.
   It once read episode-only attributes and crashed on every undated film.
   Running out of input is a `sys.exit` naming the item, not an `EOFError`.
 - `build-randomize USER SOURCE DEST` - Fisher-Yates via `secrets.randbelow`.
-- `build-concatenated USER NAME PLAYLIST... [--unique]` - joins the sources
+- `build-concatenated USER NAME PLAYLIST... [-U]` - joins the sources
   end to end, keeping the order within each and the order they were named in.
   Read **every** source before writing anything, so naming a source as the
   destination works under `--overwrite`: the items are already in memory when
   the old playlist goes. Duplicates are kept by default - a concatenation is
-  faithful, and Plex permits a repeat - while `--unique` keeps only an item's
-  first appearance, matched on ratingKey rather than title, and reports how
-  many it skipped. Warn about an empty source rather than passing over it: a
-  typo that resolved to the wrong playlist looks exactly like a playlist that
-  happens to be empty.
+  faithful, and Plex permits a repeat - while `-U/--unique` keeps only an
+  item's first appearance, matched on ratingKey rather than title, and
+  reports how many it skipped. Warn about an empty source rather than
+  passing over it: a typo that resolved to the wrong playlist looks exactly
+  like a playlist that happens to be empty.
+- `build-merge USER NAME FIRST SECOND [--ratio A:B] [-s] [-U]` - mixes two
+  playlists in turn, A items from FIRST then B from SECOND, default 1:1,
+  each keeping its own order. Parse the ratio in argparse (`type=`), so a
+  bad one is a usage error, exit 2: two ASCII whole numbers above 0 joined
+  by `:`. A side has run out on the first turn it has nothing to give; a
+  turn cut short because fewer items were left still counts. From that turn
+  the rest of the other follows by default, rather than being dropped, and
+  `--verbose` reports how many items follow unmixed; `-s/--stop-short`
+  leaves them out instead, the turn included, and reports how many. Sizes
+  that match the ratio run out together, with no tail, so `-s` changes
+  nothing. Repeats are kept; `-U/--unique` passes over an item already
+  taken, by ratingKey, and the next item of the same side takes its place,
+  so the ratio holds, and under `-s` a side left with only repeats has run
+  out. `-U`, not `-u`: every build command's `-u` is `--user`.
+  `build-concatenated` takes the same `-U`; `-s` means nothing there, since
+  it reads every source to the end. Read both sources through the same
+  helper as `build-concatenated`, before writing anything, so either may be
+  the destination under `--overwrite`; an empty side is warned about the
+  same way.
 - `copy-playlist-all-users USER PLAYLIST` - skips the source user, prints the
   item list **once** before the loop and passes `preview=False` thereafter,
   then one line per user (`created`, `replaced`, `skipped`, `failed`) printed
@@ -886,15 +980,15 @@ touched.
 
 #### Who a built playlist is for
 
-All four build commands take `-u/--user` and `-a/--all-users`, registered
+All five build commands take `-u/--user` and `-a/--all-users`, registered
 through `fanout.add_user_target_arguments` as a mutually exclusive group -
 writing the pair out on each parser is what trips `duplicate-code`. Without
 either, the playlist goes where it always did: the account the items came
 from, which is the admin server for the two that take rating keys and the
-source user's server for the two that take playlists. `deliver_playlist` takes
-both servers for exactly that reason. `-a` targets `accounts.user_roster`,
-which **includes the admin** at id 0, because the admin is a user of the
-server too.
+source user's server for the three that take playlists. `deliver_playlist`
+takes both servers for exactly that reason. `-a` targets
+`accounts.user_roster`, which **includes the admin** at id 0, because the
+admin is a user of the server too.
 
 `fanout.run_per_user` holds the loop: print the item list once, then run a
 per-user action and print its one-line outcome as it completes, so a long run

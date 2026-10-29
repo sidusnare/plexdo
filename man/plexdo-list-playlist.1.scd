@@ -60,6 +60,12 @@ _PLAYLIST_
 	how the user's connection was made and the library roots used by
 	*--prefix*.
 
+*--debug-log* _PATH_
+	Appends what *--debug* reports to _PATH_ instead, with the run
+	profiled: each phase's time, every HTTP request and its wait, CPU and
+	memory use, and function run times. See *DEBUG LOG* in
+	*plexdo-conventions*(7).
+
 *--dry-run*
 	No effect: nothing on the server changes, and *--m3u* still writes its
 	file.

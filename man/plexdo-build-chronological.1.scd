@@ -112,6 +112,12 @@ libraries the items come from for the playlist to be created for them.
 	creation or replacement, and under *-a* how many users were served.
 	*--debug* adds each ratingKey as it is processed.
 
+*--debug-log* _PATH_
+	Appends what *--debug* reports to _PATH_ instead, with the run
+	profiled: each phase's time, every HTTP request and its wait, CPU and
+	memory use, and function run times. See *DEBUG LOG* in
+	*plexdo-conventions*(7).
+
 *--dry-run*
 	Build, date, and preview the list, check the title as usual, and stop
 	without creating or replacing anything. Missing dates are still

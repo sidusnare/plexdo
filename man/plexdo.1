@@ -4,7 +4,7 @@
 .\" Man page for plexdo (plexdo).
 .\" Edit alongside AI.prompt.txt. The version and date on the .TH line are
 .\" written by tools/derive.py from pyproject.toml; do not edit them here.
-.TH PLEXDO 1 "2026-10-28" "plexdo 2.0.3" "User Commands"
+.TH PLEXDO 1 "2026-10-29" "plexdo 2.1.0rc1" "User Commands"
 .
 .SH NAME
 plexdo \- command\-line interface for Plex Media Server
@@ -64,6 +64,17 @@ Print high\-level progress to standard error.
 .B \-\-debug
 Print detailed internal logs to standard error.
 .TP
+.BI \-\-debug\-log " PATH"
+Append the detailed internal logs to
+.I PATH
+instead, created with mode 0600, and profile the run: every line starts with
+the time it was written in nanoseconds since the Unix epoch, and beside the
+debug logs the file records each phase's run time, every HTTP request with its
+headers, status, sizes, and wait, CPU and memory use every five seconds, and
+cProfile's table of function run times. Secrets are redacted, there and on
+standard error. Standard error shows what it would without
+.BR \-\-debug .
+.TP
 .B \-\-dry\-run
 Show what would happen without mutating Plex.
 .TP
@@ -88,8 +99,9 @@ Print the installed version and exit.
 .BR \-h ", " \-\-help
 Print help and exit. Every command accepts this.
 .PP
-All logging goes to standard error, so machine\-readable output on standard
-output is always safe to pipe.
+All logging goes to standard error, or to the
+.B \-\-debug\-log
+file, so machine\-readable output on standard output is always safe to pipe.
 .
 .SH OUTPUT FORMATS
 .TP
@@ -185,18 +197,33 @@ Shuffle a playlist into a new one, using
 .BR secrets (3)
 rather than a predictable generator.
 .TP
-.BI build\-concatenated " user name playlist ... " [ \-\-unique ]
+.BI build\-concatenated " user name playlist ... " [ \-U ]
 Join several playlists end to end into one new playlist, keeping the order
 within each and the order they were named in. Every source is read before
 anything is written, so a source may also be the destination when
 .BR \-o ", " \-\-overwrite
 is given.
-.BI \-\-unique
+.BR \-U ", " \-\-unique
 skips an item an earlier playlist already contributed; without it the result is
 a faithful concatenation, repeats and all, which is what Plex permits. An empty
 source is reported and contributes nothing.
+.TP
+.BI build\-merge " user name first second " [ \-\-ratio " A:B" "] [" \-s "] [" \-U ]
+Mix two playlists into one new playlist, taking
+.I A
+items from the first, then
+.I B
+from the second, in turn; the default ratio is 1:1. Each keeps its own order,
+and once one runs out the rest of the other follows;
+.BR \-s ", " \-\-stop\-short
+stops there instead.
+.BR \-U ", " \-\-unique
+skips an item already taken, and the next takes its place. As with
+.BR build\-concatenated ,
+both are read before anything is written, so either may also be the
+destination.
 .PP
-All four accept
+All five accept
 .BR \-o ", " \-\-overwrite ,
 .BI \-\-m3u " PATH",
 .BR \-p ", " \-\-prefix ,

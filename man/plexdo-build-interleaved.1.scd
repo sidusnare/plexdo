@@ -102,6 +102,12 @@ to be created for them.
 	*--verbose* reports each show's episode count, the playlist's size, its
 	creation or replacement, and under *-a* how many users were served.
 
+*--debug-log* _PATH_
+	Appends what *--debug* reports to _PATH_ instead, with the run
+	profiled: each phase's time, every HTTP request and its wait, CPU and
+	memory use, and function run times. See *DEBUG LOG* in
+	*plexdo-conventions*(7).
+
 *--dry-run*
 	Build and preview the list, check the title as usual, and stop
 	without creating or replacing anything. Under *-u* or *-a*, each user's
@@ -168,5 +174,5 @@ plexdo build-interleaved "Mixed Run" 4102 5310 -a -o --json > results.json
 # SEE ALSO
 
 *plexdo-build-chronological*(1), *plexdo-build-randomize*(1),
-*plexdo-build-concatenated*(1), *plexdo-list-show*(1),
-*plexdo-conventions*(7), *plexdo*(1)
+*plexdo-build-concatenated*(1), *plexdo-build-merge*(1),
+*plexdo-list-show*(1), *plexdo-conventions*(7), *plexdo*(1)

@@ -172,7 +172,8 @@ _plexdo_positional() {
     if (( skip )); then skip=0; continue; fi
     case ${words[i]} in
       --m3u|--album|--sort|--media-type|--library-id|-l|--library|-t|--title|\
-      -u|--username|-p|--password|-c|--code|-f|--format|--section|-p|--prefix|--throttle) skip=1; continue ;;
+      -u|--username|-p|--password|-c|--code|-f|--format|--section|-p|--prefix|--throttle|\
+      --ratio|--debug-log) skip=1; continue ;;
       -*) continue ;;
     esac
     if (( count == want )); then print -r -- ${words[i]}; return; fi
@@ -207,6 +208,7 @@ _plexdo_commands() {
     'build-chronological:Date-sorted playlist from shows and movies'
     'build-randomize:Randomize a playlist into a new one'
     'build-concatenated:Join several playlists end to end into one'
+    'build-merge:Mix two playlists into one at a ratio'
     'copy-playlist-all-users:Copy a playlist to all managed users'
     'copy-playlist-to-user:Copy a playlist to a specific user'
     'copy-watched:Synchronise watched state between two users'
@@ -222,6 +224,7 @@ _plexdo_global_opts=(
   '--json[Output machine-readable JSON instead of tables]'
   '--verbose[Print high-level progress to stderr]'
   '--debug[Print detailed internal logs to stderr]'
+  '--debug-log[Append the debug logs, profiled and timestamped, to a file]:debug log:_files'
   '--dry-run[Show what would happen without mutating Plex]'
   '(-W --wide)'{-W,--wide}'[Do not shrink table columns to the terminal width]'
   '--throttle[Seconds between requests in per-item operations; 0 disables]:seconds:'
@@ -359,10 +362,21 @@ _plexdo_subcommand() {
     build-concatenated)
       _arguments $_plexdo_global_opts $pfx $m3u $target \
         '(-o --overwrite)'{-o,--overwrite}'[Replace an existing playlist of the same name]' \
-        '--unique[Skip an item an earlier playlist already contributed]' \
+        '(-U --unique)'{-U,--unique}'[Skip an item an earlier playlist already contributed]' \
         '1:user:_plexdo_users' \
         '2:new playlist name:' \
         '*:source playlist:{_plexdo_playlists_or_keys $(_plexdo_positional 0)}'
+      ;;
+    build-merge)
+      _arguments $_plexdo_global_opts $pfx $m3u $target \
+        '(-o --overwrite)'{-o,--overwrite}'[Replace an existing playlist of the same name]' \
+        '--ratio[Take A items from the first, then B from the second]:ratio (A\:B):' \
+        '(-s --stop-short)'{-s,--stop-short}'[Stop when either playlist runs out]' \
+        '(-U --unique)'{-U,--unique}'[Skip an item already taken]' \
+        '1:user:_plexdo_users' \
+        '2:new playlist name:' \
+        '3:first playlist:{_plexdo_playlists_or_keys $(_plexdo_positional 0)}' \
+        '4:second playlist:{_plexdo_playlists_or_keys $(_plexdo_positional 0)}'
       ;;
     copy-playlist-all-users)
       _arguments $_plexdo_global_opts \

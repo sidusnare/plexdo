@@ -271,14 +271,14 @@ PYEOF
 _plexdo_commands() {
     echo "list-libraries list-titles list-library list-users list-playlists list-playlist \
 list-show show-metadata search read rescan status wait player-remote-play find-missing build-interleaved build-chronological build-randomize \
-build-concatenated \
+build-concatenated build-merge \
 copy-playlist-all-users copy-playlist-to-user export-playlist remove-playlist \
 append-playlist clean-playlist export-titles copy-watched login logout set-pin \
 write-config-example"
 }
 
 _plexdo_global_flags() {
-    echo "-f --format --json -v --verbose --debug --dry-run -W --wide --throttle -V --version -h --help"
+    echo "-f --format --json -v --verbose --debug --debug-log --dry-run -W --wide --throttle -V --version -h --help"
 }
 
 _plexdo_output_formats() {
@@ -286,11 +286,13 @@ _plexdo_output_formats() {
 }
 
 # Find the first non-flag positional word after the program name (= the sub-command).
+# A global option given before it takes its value with it.
 _plexdo_find_cmd() {
-    local i
+    local i skip_next=0
     for (( i=1; i < cword; i++ )); do
+        if (( skip_next )); then skip_next=0; continue; fi
         case "${words[$i]}" in
-            --json|--verbose|--debug|--dry-run|--help) ;;
+            -f|--format|--throttle|--debug-log) skip_next=1 ;;
             -*) ;;
             *) echo "${words[$i]}"; return ;;
         esac
@@ -305,7 +307,12 @@ _plexdo_positional_count() {
     for (( i=1; i < cword; i++ )); do
         word="${words[$i]}"
         if (( skip_next )); then skip_next=0; continue; fi
-        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle|-s|--season|-l|--library|-u|--user|--port|--player-user|--server-url) skip_next=1; continue ;; esac
+        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle|--season|-l|--library|-u|--user|--port|--player-user|--server-url|--ratio|--debug-log) skip_next=1; continue ;; esac
+        # -s takes a value only where it is --session or --season.
+        if [[ "$word" == -s ]]; then
+            case "$cmd" in wait|find-missing) skip_next=1 ;; esac
+            continue
+        fi
         if [[ "$word" == -* ]]; then continue; fi
         if (( ! found_cmd )); then
             [[ "$word" == "$cmd" ]] && found_cmd=1
@@ -323,7 +330,12 @@ _plexdo_nth_positional() {
     for (( i=1; i < cword; i++ )); do
         word="${words[$i]}"
         if (( skip_next )); then skip_next=0; continue; fi
-        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle|-s|--season|-l|--library|-u|--user|--port|--player-user|--server-url) skip_next=1; continue ;; esac
+        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle|--season|-l|--library|-u|--user|--port|--player-user|--server-url|--ratio|--debug-log) skip_next=1; continue ;; esac
+        # -s takes a value only where it is --session or --season.
+        if [[ "$word" == -s ]]; then
+            case "$cmd" in wait|find-missing) skip_next=1 ;; esac
+            continue
+        fi
         if [[ "$word" == -* ]]; then continue; fi
         if (( ! found_cmd )); then
             [[ "$word" == "$cmd" ]] && found_cmd=1
@@ -348,8 +360,8 @@ _plexdo_complete() {
     local cmd pos uid
     cmd="$(_plexdo_find_cmd)"
 
-    # --m3u PATH -> file path
-    if [[ "$prev" == "--m3u" ]]; then
+    # --m3u PATH, --debug-log PATH -> file path
+    if [[ "$prev" == "--m3u" || "$prev" == "--debug-log" ]]; then
         COMPREPLY=(); _plexdo_compreply < <(compgen -f -- "$cur")
         return
     fi
@@ -369,7 +381,9 @@ _plexdo_complete() {
             build-interleaved|build-chronological|build-randomize)
                 COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --m3u --prefix -p -o --overwrite --user -u --all-users -a" -- "$cur") ;;
             build-concatenated)
-                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --m3u --prefix -p -o --overwrite --unique --user -u --all-users -a" -- "$cur") ;;
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --m3u --prefix -p -o --overwrite --unique -U --user -u --all-users -a" -- "$cur") ;;
+            build-merge)
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --m3u --prefix -p -o --overwrite --ratio --stop-short -s --unique -U --user -u --all-users -a" -- "$cur") ;;
             export-playlist|export-titles)
                 COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --prefix -p" -- "$cur") ;;
             clean-playlist)
@@ -550,10 +564,10 @@ _plexdo_complete() {
                 *) COMPREPLY=() ;;
             esac ;;
 
-        # <user_id> <name> <playlist...> [--unique] [--m3u] [-o] [-u USER | -a]
+        # <user_id> <name> <playlist...> [-U] [--m3u] [-o] [-u USER | -a]
         build-concatenated)
             if [[ "$cur" == -* ]]; then
-                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --unique --m3u --overwrite -o --prefix -p --user -u --all-users -a" -- "$cur")
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --unique -U --m3u --overwrite -o --prefix -p --user -u --all-users -a" -- "$cur")
                 return
             fi
             case $pos in
@@ -561,6 +575,19 @@ _plexdo_complete() {
                 1) COMPREPLY=() ;;
                 *) uid="$(_plexdo_nth_positional "$cmd" 0)"
                    _plexdo_complete_playlist_id_or_name "$uid" ;;
+            esac ;;
+
+        # <user_id> <name> <first> <second> [--ratio A:B] [-s] [-U] [--m3u] [-o] [-u USER | -a]
+        build-merge)
+            if [[ "$cur" == -* ]]; then
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --ratio --stop-short -s --unique -U --m3u --overwrite -o --prefix -p --user -u --all-users -a" -- "$cur")
+                return
+            fi
+            case $pos in
+                0) _plexdo_complete_user_id ;;
+                2|3) uid="$(_plexdo_nth_positional "$cmd" 0)"
+                   _plexdo_complete_playlist_id_or_name "$uid" ;;
+                *) COMPREPLY=() ;;
             esac ;;
 
         # <source_user_id> <source_playlist> [-o]

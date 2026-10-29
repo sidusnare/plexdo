@@ -110,6 +110,7 @@ function __plexdo_positionals
     set -l toks (commandline -opc)
     set -e toks[1]
     set -l seen_cmd 0
+    set -l cmd
     set -l skip 0
     for t in $toks
         if test $skip -eq 1
@@ -117,14 +118,19 @@ function __plexdo_positionals
             continue
         end
         switch $t
-            case --m3u --album --sort --media-type --library-id -l --library -t --title -u --user --username -p --password -c --code -f --format --section -p --prefix --throttle -s --season --port --player-user --server-url
+            case --m3u --album --sort --media-type --library-id -l --library -t --title -u --user --username -p --password -c --code -f --format --section -p --prefix --throttle --season --port --player-user --server-url --ratio --debug-log
                 set skip 1
+                continue
+            case -s
+                # -s takes a value only where it is --session or --season.
+                contains -- "$cmd" wait find-missing; and set skip 1
                 continue
             case '-*'
                 continue
         end
         if test $seen_cmd -eq 0
             set seen_cmd 1
+            set cmd $t
             continue
         end
         echo $t
@@ -209,7 +215,7 @@ end
 set -l plexdo_cmds list-libraries list-titles list-library list-show export-titles search status find-missing \
     list-users list-playlists list-playlist export-playlist remove-playlist \
     append-playlist clean-playlist show-metadata read rescan status wait player-remote-play find-missing build-interleaved \
-    build-chronological build-randomize build-concatenated copy-playlist-all-users \
+    build-chronological build-randomize build-concatenated build-merge copy-playlist-all-users \
     copy-playlist-to-user copy-watched login logout set-pin write-config-example
 
 # No bare filename completion anywhere; each rule opts in explicitly.
@@ -245,6 +251,7 @@ for prog in plexdo
     complete -c $prog -n __plexdo_no_subcommand -a build-chronological -d 'Date-sorted playlist from shows and movies'
     complete -c $prog -n __plexdo_no_subcommand -a build-randomize -d 'Randomize a playlist into a new one'
     complete -c $prog -n __plexdo_no_subcommand -a build-concatenated -d 'Join several playlists end to end into one'
+    complete -c $prog -n __plexdo_no_subcommand -a build-merge -d 'Mix two playlists into one at a ratio'
     complete -c $prog -n __plexdo_no_subcommand -a copy-playlist-all-users -d 'Copy a playlist to all managed users'
     complete -c $prog -n __plexdo_no_subcommand -a copy-playlist-to-user -d 'Copy a playlist to a specific user'
     complete -c $prog -n __plexdo_no_subcommand -a copy-watched -d 'Synchronise watched state between two users'
@@ -257,6 +264,7 @@ for prog in plexdo
     complete -c $prog -l json -d 'Output machine-readable JSON instead of tables'
     complete -c $prog -s v -l verbose -d 'Print high-level progress to stderr'
     complete -c $prog -l debug -d 'Print detailed internal logs to stderr'
+    complete -c $prog -rF -l debug-log -d 'Append the debug logs, profiled and timestamped, to a file'
     complete -c $prog -l dry-run -d 'Show what would happen without mutating Plex'
     complete -c $prog -s W -l wide -d 'Do not shrink table columns to the terminal width'
     complete -c $prog -x -l throttle -d 'Seconds between requests in per-item operations; 0 disables'
@@ -282,7 +290,7 @@ for prog in plexdo
     complete -c $prog -n "__fish_seen_subcommand_from build-interleaved build-chronological; and not __plexdo_at 0" \
         -a '(__plexdo_rating_keys)' -d 'item'
 
-    complete -c $prog -n "__fish_seen_subcommand_from search list-playlists list-playlist export-playlist remove-playlist append-playlist clean-playlist build-randomize build-concatenated copy-playlist-all-users copy-playlist-to-user copy-watched set-pin; and __plexdo_at 0" \
+    complete -c $prog -n "__fish_seen_subcommand_from search list-playlists list-playlist export-playlist remove-playlist append-playlist clean-playlist build-randomize build-concatenated build-merge copy-playlist-all-users copy-playlist-to-user copy-watched set-pin; and __plexdo_at 0" \
         -a '(__plexdo_users)' -d 'user'
     complete -c $prog -n "__fish_seen_subcommand_from copy-watched; and __plexdo_at 1" \
         -a '(__plexdo_users)' -d 'user'
@@ -295,16 +303,20 @@ for prog in plexdo
         -a '(__plexdo_playlists_or_keys 0)' -d 'playlist'
     complete -c $prog -n "__fish_seen_subcommand_from build-concatenated; and not __plexdo_at 0; and not __plexdo_at 1" \
         -a '(__plexdo_playlists_or_keys 0)' -d 'playlist'
+    complete -c $prog -n "__fish_seen_subcommand_from build-merge; and __plexdo_at 2" \
+        -a '(__plexdo_playlists_or_keys 0)' -d 'playlist'
+    complete -c $prog -n "__fish_seen_subcommand_from build-merge; and __plexdo_at 3" \
+        -a '(__plexdo_playlists_or_keys 0)' -d 'playlist'
 
     complete -c $prog -rF -n "__fish_seen_subcommand_from export-titles; and __plexdo_at 1"
     complete -c $prog -rF -n "__fish_seen_subcommand_from export-playlist; and __plexdo_at 2"
 
     # -- per-command options -------------------------------------------------
     complete -c $prog -x -s p -l prefix \
-        -n '__fish_seen_subcommand_from list-playlist list-show export-playlist export-titles build-interleaved build-chronological build-randomize build-concatenated' \
+        -n '__fish_seen_subcommand_from list-playlist list-show export-playlist export-titles build-interleaved build-chronological build-randomize build-concatenated build-merge' \
         -d 'Rewrite exported paths onto this prefix'
     complete -c $prog -rF -l m3u \
-        -n '__fish_seen_subcommand_from list-playlist list-show build-interleaved build-chronological build-randomize build-concatenated' \
+        -n '__fish_seen_subcommand_from list-playlist list-show build-interleaved build-chronological build-randomize build-concatenated build-merge' \
         -d 'Also export an M3U file using Plex server paths'
     complete -c $prog -x -l album -n '__fish_seen_subcommand_from list-titles list-library export-titles' \
         -a '(__plexdo_albums 0)' -d 'Restrict to a single photo album'
@@ -318,15 +330,21 @@ for prog in plexdo
     complete -c $prog -s s -l status -n '__fish_seen_subcommand_from rescan' -d 'Print all active scan jobs'
     complete -c $prog -s n -l now -n '__fish_seen_subcommand_from rescan' -d 'Cancel pending scans first'
     complete -c $prog -s o -l overwrite \
-        -n '__fish_seen_subcommand_from copy-playlist-all-users copy-playlist-to-user build-interleaved build-chronological build-randomize build-concatenated' \
+        -n '__fish_seen_subcommand_from copy-playlist-all-users copy-playlist-to-user build-interleaved build-chronological build-randomize build-concatenated build-merge' \
         -d 'Replace an existing playlist of the same name'
     complete -c $prog -s o -l overwrite -n '__fish_seen_subcommand_from write-config-example' \
         -d 'Replace an existing config file'
-    complete -c $prog -l unique -n '__fish_seen_subcommand_from build-concatenated' \
+    complete -c $prog -s U -l unique -n '__fish_seen_subcommand_from build-concatenated' \
         -d 'Skip an item an earlier playlist already contributed'
-    complete -c $prog -x -s u -l user -n '__fish_seen_subcommand_from build-interleaved build-chronological build-randomize build-concatenated' \
+    complete -c $prog -x -l ratio -n '__fish_seen_subcommand_from build-merge' \
+        -d 'A:B: take A items from the first, then B from the second'
+    complete -c $prog -s s -l stop-short -n '__fish_seen_subcommand_from build-merge' \
+        -d 'Stop when either playlist runs out'
+    complete -c $prog -s U -l unique -n '__fish_seen_subcommand_from build-merge' \
+        -d 'Skip an item already taken'
+    complete -c $prog -x -s u -l user -n '__fish_seen_subcommand_from build-interleaved build-chronological build-randomize build-concatenated build-merge' \
         -a '(__plexdo_users)' -d 'Create the playlist for this user instead'
-    complete -c $prog -s a -l all-users -n '__fish_seen_subcommand_from build-interleaved build-chronological build-randomize build-concatenated' \
+    complete -c $prog -s a -l all-users -n '__fish_seen_subcommand_from build-interleaved build-chronological build-randomize build-concatenated build-merge' \
         -d 'Create the playlist for every user on the server'
     complete -c $prog -x -s s -l session -n '__fish_seen_subcommand_from wait' -d 'Follow the session with this sessionKey'
     complete -c $prog -x -s r -l rating-key -n '__fish_seen_subcommand_from wait' \

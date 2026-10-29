@@ -31,6 +31,7 @@ from plexdo.connection import connect_plex
 from plexdo.formats import OUTPUT_FORMATS
 from plexdo.logs import configure_logging
 from plexdo.migrate import migrate_legacy_config
+from plexdo.profiling import profiled, span
 from plexdo.sections import resolve_library_arguments
 from plexdo.security import scrub_password_argument
 from plexdo.throttle import DEFAULT_THROTTLE, THROTTLE_THRESHOLD
@@ -114,6 +115,17 @@ def _add_global_flags(
         help="Print detailed internal logs to stderr.",
     )
     parser.add_argument(
+        "--debug-log",
+        metavar="PATH",
+        default=argparse.SUPPRESS if suppress else None,
+        help=(
+            "Append detailed internal logs to PATH instead of printing them, "
+            "each line starting with a Unix timestamp in nanoseconds, with "
+            "profiling: phase and function run times, HTTP requests and "
+            "their waits, and CPU and memory use. Secrets are redacted."
+        ),
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         default=default,
@@ -139,8 +151,8 @@ def build_parser() -> argparse.ArgumentParser:
         ),
         epilog=(
             "Global flags (-f/--format, --json, -v/--verbose, --debug, "
-            "--dry-run, -V/--version) may be given either before or after the "
-            "command name."
+            "--debug-log, --dry-run, -V/--version) may be given either before "
+            "or after the command name."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -160,11 +172,19 @@ def main(argv: list[str] | None = None) -> None:
         parser.print_help()
         sys.exit(1)
 
-    configure_logging(args.verbose, args.debug)
+    configure_logging(args.verbose, args.debug, args.debug_log)
     scrub_password_argument(args)
+    # After the scrubbing, so the run start line never shows a --password.
+    with profiled(args.debug_log is not None, args.command):
+        _run(args)
+
+
+def _run(args: argparse.Namespace) -> None:
+    """Run the command args names, each phase timed for --debug-log."""
     # Before any command reads the configuration or a secret, so the first
     # run after an upgrade from 1.x finds both where they now belong.
-    migrate_legacy_config()
+    with span("migrate"):
+        migrate_legacy_config()
 
     handlers, needs_plex = build_registry()
     handler = handlers.get(args.command)
@@ -172,16 +192,20 @@ def main(argv: list[str] | None = None) -> None:
         sys.exit(f"Unknown command: {args.command}")
 
     if args.command in needs_plex:
-        plex = connect_plex(cached_config())
+        with span("connect"):
+            plex = connect_plex(cached_config())
         # Commands receive numeric user and library IDs; titles are resolved
         # here so no handler has to care which form the user typed.
-        resolve_user_arguments(plex, args)
-        resolve_library_arguments(plex, args)
+        with span("resolve-arguments"):
+            resolve_user_arguments(plex, args)
+            resolve_library_arguments(plex, args)
         try:
-            handler(plex, args)
+            with span(f"command:{args.command}"):
+                handler(plex, args)
         except UserAccessError as exc:
             # Raised deep in accounts.server_for_user so the all-users loop
             # can skip a user; for a single-user command it is fatal.
             sys.exit(str(exc))
     else:
-        handler(None, args)
+        with span(f"command:{args.command}"):
+            handler(None, args)

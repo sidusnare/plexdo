@@ -64,6 +64,12 @@ When nothing is left, the next command needing a server says to run
 	removed, and how many sessions are left; *--debug* adds where secrets
 	are kept.
 
+*--debug-log* _PATH_
+	Appends what *--debug* reports to _PATH_ instead, with the run
+	profiled: each phase's time, every HTTP request and its wait, CPU and
+	memory use, and function run times. See *DEBUG LOG* in
+	*plexdo-conventions*(7).
+
 *--dry-run*
 	List the sessions that would be signed out, without contacting plex.tv
 	or removing anything.
