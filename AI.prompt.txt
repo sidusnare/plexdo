@@ -458,14 +458,14 @@ Every module in `commands/` exposes exactly three names:
   every `add_parser` call so each inherits the global flags.
 - `COMMANDS` maps command name to handler.
 - `REQUIRES_PLEX` is the subset needing a server; `auth` has an empty
-  frozenset because `login` and `write-config-example` run before a token
-  exists, `logout` must work once the server no longer accepts one, and
-  `set-pin` only touches the secret store.
+  frozenset because `login` and the two `write-*-example` commands run
+  before a token exists, `logout` must work once the server no longer
+  accepts one, and `set-pin` only touches the secret store.
 
-`commands/__init__.py` holds a `MODULES` tuple whose order sets the order of
-subcommands in `--help`, plus `register_all(sub, parents)` and
-`build_registry()`. Adding a command means adding a module and listing it;
-`cli.py` never changes.
+`commands/__init__.py` holds a `MODULES` tuple, `register_all(sub, parents)`,
+`build_registry()`, and `GROUPS`, which is what `--help` lists the commands
+from (see COMMAND NAMES AND HELP). Adding a command means adding a module,
+listing it, and naming the command in one group; `cli.py` never changes.
 
 ## PLATFORM DEFAULTS
 
@@ -595,7 +595,7 @@ that finds its account early signs in no more. When all three fail, raise
 `UserAccessError` explaining that admin rights do not override per-user
 scoping and that a `users` entry signed in once with `login --username`
 would fix it. It must be an ordinary `Exception`, **not** a `sys.exit`:
-`copy-playlist-all-users` catches per-user failures and continues, and
+`playlist-copy --all` catches per-user failures and continues, and
 `SystemExit` would tear down the whole run. `cli.main` converts it to a
 clean exit for single-user commands. It carries a one-line `summary` so a
 loop reports each skip in one line.
@@ -663,7 +663,11 @@ on the top-level parser with ordinary defaults, and once on an
 The SUPPRESS default is essential, not cosmetic. A subparser parses into its
 own namespace and then copies **every** attribute onto the main one, so
 ordinary defaults on the inherited copies would silently clobber a flag given
-before the subcommand: `plexdo --json list-users` would print a table.
+before the subcommand: `plexdo --json users-list` would print a table.
+
+Add them to an argument group titled `global options`, in order of their
+long names, on both parsers. argparse carries a parent's groups over by
+title, so every command's help lists them apart from its own options.
 
 `--format` writes to `dest="format"`; `--json` is a `store_const` alias
 writing to that same destination, so there is one attribute and no way for the
@@ -744,7 +748,7 @@ naming rule above.
 ## OUTPUT
 
 `output(data, args)` dispatches on `output_format(args)`, accepting **either**
-a single record or a list so `show-metadata` and `list-titles` share the path.
+a single record or a list so `show-metadata` and `library-list` share the path.
 No command reaches for `json.dumps` directly.
 
 ### Formats
@@ -806,11 +810,11 @@ no benefit. Announce once at info level with the expected duration and how to
 turn it off.
 
 Apply wherever a loop makes one request per element and the count can exceed
-50: the seasons walk in `list-titles`, `find-missing -A`, applying watched
-state in `copy-watched`, removing entries in `clean-playlist`, reading each
-source in `build-concatenated` and `build-merge`, `collect_photos`, and the per-user loop in
-`fanout.run_per_user`, which serves `copy-playlist-all-users` and every build
-command given `-a`. Functions needing it take an optional `args`.
+50: the seasons walk in `library-list`, `missing-find -A`, applying watched
+state in `show-watched-cp`, removing entries in `playlist-clean`, reading each
+source in `merge-build`, `collect_photos`, and the per-user loop in
+`fanout.run_per_user`, which serves `playlist-copy --all`, and
+`playlist-build` and `merge-build` given `-a`. Functions needing it take an optional `args`.
 
 ## RECORDS
 
@@ -858,7 +862,7 @@ plexapi's `NotFound` escaping as a traceback: look it up with
 `titles.find_item`, which returns None, and `fetch_item` wraps that for every
 other fatal lookup, `fetch_show` included. Nothing calls `fetchItem` bare.
 
-Every build command constructs the list fully in memory, validates it is
+Every command that creates a playlist constructs the list fully in memory, validates it is
 non-empty, prints a numbered preview, and makes exactly one `createPlaylist`
 call. `finalize_playlist` enforces this and returns `"created"` or
 `"replaced"`.
@@ -884,21 +888,80 @@ Without `--overwrite`, a taken name falls back to appending `" admin copy"`;
 if that is taken too the target is skipped with a warning and nothing is
 touched.
 
+## COMMAND NAMES AND HELP
+
+A command is named `<object>-<action>`: what it acts on, then what it does
+to it (`playlist-list`, `playlist-export`, `libraries-list`). Plural objects
+list many (`playlists-list USER`), singular ones show one (`playlist-list
+USER PLAYLIST`). The exceptions are fixed names, kept exactly:
+`merge-build`, `show-watched-cp`, `missing-find`, `titles-export`, the
+single words (`search`, `read`, `rescan`, `status`, `wait`, `login`,
+`logout`), and `show-metadata`, `player-remote-play`, `set-pin`,
+`write-config-example`, and `write-secrets-example`. There are no aliases:
+one command, one name, so `COMMANDS` has exactly one entry per command.
+
+Releases up to 2.1.0-rc.1 named commands `<action>-<object>`. 3.0.0 renamed
+them, an incompatible change and so a MAJOR one, and also
+folded `build-interleaved`, `build-chronological`, `build-randomize`, and
+`append-playlist` into `playlist-build`, and `copy-playlist-all-users` and
+`copy-playlist-to-user` into `playlist-copy`, and removed
+`build-concatenated` and `list-titles` (whose alias `list-library` became
+`library-list`). None of the old names is accepted.
+
+`plexdo --help` lists the commands under five headings, in this order, and
+sorted by name within each. `commands.GROUPS` is that list, and every
+command must be in exactly one group (a test holds it to the registry):
+
+| Group | Commands |
+| --- | --- |
+| libraries and titles | `album-list`, `albums-list`, `libraries-list`, `library-list`, `missing-find`, `search`, `show-list`, `show-metadata`, `titles-export` |
+| playlists | `merge-build`, `playlist-build`, `playlist-clean`, `playlist-copy`, `playlist-export`, `playlist-list`, `playlist-remove`, `playlists-list` |
+| playback and watched state | `player-remote-play`, `read`, `show-watched-cp`, `wait` |
+| server | `rescan`, `status`, `users-list` |
+| account and configuration | `login`, `logout`, `set-pin`, `write-config-example`, `write-secrets-example` |
+
+argparse can only print subcommands as one flat list in registration order,
+so pass `help=argparse.SUPPRESS` to `add_subparsers` and build the grouped
+list into the parser's description, with `RawDescriptionHelpFormatter`:
+the name padded to the longest, then the summary each `add_parser(help=...)`
+gave, wrapped to 79 columns with a hanging indent. Give `add_subparsers`
+`prog="plexdo"` and the parser `usage="%(prog)s [global options] <command>
+[arguments]"`; without the first, every command's usage line repeats the
+top-level usage. Summaries are one sentence, in the imperative, short
+enough to fit their line. Positional metavars are upper case (`USER`,
+`LIBRARY`, `PLAYLIST`, `NAME`, `QUERY`, `PATH`) except `ratingKey`, which is
+spelled as Plex spells it.
+
+After registration, `cli._tidy_command_help` goes over every command: it
+sorts the `global options` group last, since a parent's groups otherwise
+come before the groups a command adds, and, where a command set no `usage`
+of its own, formats one from the command's own actions and appends
+`[global options]`, so nine inherited flags do not bury the two that
+matter. Both reach into argparse's protected attributes, which has no
+public way to do either; keep that in the one function.
+
+`playlist-build` and `playlist-copy` take a flag that decides what their
+positional arguments mean, which argparse cannot express. They collect the
+positionals unnamed, set `check_arguments` with `set_defaults` to a
+callable taking the namespace, and `cli.parse_arguments(parser, argv)`,
+which `main` uses in place of `parse_args`, runs it: the callable names the
+arguments for the mode (`args.user_id`, `args.name`, `args.rating_keys`,
+...) or calls `parser.error`, exit 2. That happens before anything connects
+and before user titles are resolved, so `resolve_user_arguments` finds
+`user_id` where it expects it. Each has a hand-written multi-line `usage`
+and a description saying what each mode takes.
+
 ## COMMANDS
 
 ### Listing and searching
 
-- `list-libraries` - columns `id`, `type`, `title`; writes the libraries cache.
-- `list-titles LIBRARY [--album A]` - registered with
-  `aliases=["list-library"]`. argparse reports whichever spelling was typed,
-  so `COMMANDS` needs an entry for both, giving one more registry entry
-  than there are commands; the smoke test floor must allow for it. Table
-  columns are
+- `libraries-list` - columns `id`, `type`, `title`; writes the libraries cache.
+- `library-list LIBRARY [--album A]` - table columns are
   `ratingKey`, `title`, `releaseDate`, `rating`, `studio`; a machine-readable
   format carries every listed field and, for a show library, nests each show's
   episodes under a `seasons` object keyed by season name. Always cache the
   minimal `ratingKey`/`title` rows whatever the caller asked to see.
-- `list-albums LIBRARY` (`commands/albums.py`) - the albums of a music
+- `albums-list LIBRARY` (`commands/albums.py`) - the albums of a music
   (section type `artist`) or photo library; any other type exits 1. Music
   albums come from `section.albums()`. A photo library is walked depth
   first from `section.all()`, opening each album with one
@@ -925,13 +988,13 @@ touched.
   album's played running time (played items in full, items in progress up
   to their resume point) over the total of its playable items. `viewOffset`
   is likewise null unless in progress.
-- `list-album RATINGKEY` (also `commands/albums.py`) - one album, by
+- `album-list RATINGKEY` (also `commands/albums.py`) - one album, by
   `fetch_item` and one `/children` fetch. Refused with exit 1 unless the
   item is a Directory whose `type` is `album` (music) or `photo` (a photo
   album; a photo shares the type but not the TAG), since shows, seasons,
   and artists are Directories too. Nested photo albums are split off,
   logged at INFO, and counted in the table summary as `nested albums`, not
-  listed. JSON and YAML output the same `album_record` as `list-albums`;
+  listed. JSON and YAML output the same `album_record` as `albums-list`;
   CSV and CLIXML output its `contents` alone. A table prints the album as a
   metadata block with only the keys that apply (`ratingKey`, `artist`,
   `title`, `year`, `items`, `nested albums`, `length`, `state`, `played` as
@@ -941,18 +1004,18 @@ touched.
   some track's artist differs from the album's), `length`, then, unless the
   album holds photos alone, `state`, `progress` ("3:20 / 9:46 (34.1%)" for
   an item in progress, else empty), and `last played` as a date.
-- `list-show RATINGKEY [--m3u P] [-p PREFIX]` - fails fast if not a `Show`.
-- `list-users` - `id`, `type`, `title`, `username`, `email`. `account_type`
+- `show-list RATINGKEY [--m3u P] [-p PREFIX]` - fails fast if not a `Show`.
+- `users-list` - `id`, `type`, `title`, `username`, `email`. `account_type`
   returns managed/home/friend/shared. plexapi exposes `restricted` as the raw
   XML **string**, so `"0"` is truthy and a naive check labels every account
   managed.
-- `list-playlists USER`, `list-playlist USER PLAYLIST [--m3u P] [-p PREFIX]`.
+- `playlists-list USER`, `playlist-list USER PLAYLIST [--m3u P] [-p PREFIX]`.
 - `show-metadata RATINGKEY` - type-specific builders via `_METADATA_BUILDERS`
   keyed on `item.type`, plus the file paths. A table names a lone file `file`
   and numbers several `file 1`, `file 2`; other formats carry a `files` list.
 - `search USER QUERY [--media-type T] [--library-id L]` - per-library failures
   log a warning and continue.
-- `find-missing SHOW [-l LIBRARY] [-A] [-s SEASONS] [--include-specials]` -
+- `missing-find SHOW [-l LIBRARY] [-A] [-s SEASONS] [--include-specials]` -
   names one show by default, resolved through `resolve_identifier`. `-A`
   sweeps every show and refuses a SHOW argument; `-s` takes one number or a
   comma list and applies only to a single show. For each season the run starts
@@ -966,30 +1029,34 @@ touched.
 
 ### Building and copying
 
-- `build-interleaved NAME RATINGKEY...` - round-robin across shows.
-- `build-chronological NAME RATINGKEY...` - sorted by air date. A missing date
-  is estimated from neighbours in the same season: collect up to 6 either
-  side, require at least 3 known dates (so at least 2 intervals), take the
-  median interval, estimate from latest-previous `+median` and earliest-next
-  `-median`, averaging when both exist, and prompt only when that is
-  impossible. A film with no date has no neighbours, so it is prompted for
-  directly. `prompt_for_date` takes **any** item: name an episode by show,
-  season, and episode, with `??` for a number Plex lacks rather than `00`,
-  which would read as a real episode 0, and anything else by title and year.
-  It once read episode-only attributes and crashed on every undated film.
-  Running out of input is a `sys.exit` naming the item, not an `EOFError`.
-- `build-randomize USER SOURCE DEST` - Fisher-Yates via `secrets.randbelow`.
-- `build-concatenated USER NAME PLAYLIST... [-U]` - joins the sources
-  end to end, keeping the order within each and the order they were named in.
-  Read **every** source before writing anything, so naming a source as the
-  destination works under `--overwrite`: the items are already in memory when
-  the old playlist goes. Duplicates are kept by default - a concatenation is
-  faithful, and Plex permits a repeat - while `-U/--unique` keeps only an
-  item's first appearance, matched on ratingKey rather than title, and
-  reports how many it skipped. Warn about an empty source rather than
-  passing over it: a typo that resolved to the wrong playlist looks exactly
-  like a playlist that happens to be empty.
-- `build-merge USER NAME FIRST SECOND [--ratio A:B] [-s] [-U]` - mixes two
+- `playlist-build (-I | -C) NAME RATINGKEY...`,
+  `playlist-build -R USER SOURCE DEST`,
+  `playlist-build -A USER PLAYLIST RATINGKEY...` - one command, four modes,
+  as a required mutually exclusive group of `store_const` flags writing
+  `dest="mode"`. The positionals are `first` and `rest` (`nargs="+"`), both
+  shown as `ARG`, so that an option between the first argument and the
+  others still parses; `_check_build` names them for the mode. The wrong
+  count for the mode, or a ratingKey that is not an integer, is a usage
+  error, exit 2, as is `-A` with any of `-o`, `-u`, `-a`, `--m3u`, and
+  `-p`, which only make sense for a playlist being created. `-A` is
+  `--append`; `-a` stays `--all-users`.
+  - `-I/--interleaved` - round-robin across shows.
+  - `-C/--chronological` - sorted by air date. A missing date
+    is estimated from neighbours in the same season: collect up to 6 either
+    side, require at least 3 known dates (so at least 2 intervals), take the
+    median interval, estimate from latest-previous `+median` and
+    earliest-next `-median`, averaging when both exist, and prompt only when
+    that is impossible. A film with no date has no neighbours, so it is
+    prompted for directly. `prompt_for_date` takes **any** item: name an
+    episode by show, season, and episode, with `??` for a number Plex lacks
+    rather than `00`, which would read as a real episode 0, and anything
+    else by title and year. It once read episode-only attributes and crashed
+    on every undated film. Running out of input is a `sys.exit` naming the
+    item, not an `EOFError`.
+  - `-R/--randomize` - Fisher-Yates via `secrets.randbelow`.
+  - `-A/--append` - fetches every ratingKey as the user sees the server,
+    exits 1 if any is not found, previews, then adds them in one call.
+- `merge-build USER NAME FIRST SECOND [--ratio A:B] [-s] [-U]` - mixes two
   playlists in turn, A items from FIRST then B from SECOND, default 1:1,
   each keeping its own order. Parse the ratio in argparse (`type=`), so a
   bad one is a usage error, exit 2: two ASCII whole numbers above 0 joined
@@ -1002,24 +1069,30 @@ touched.
   nothing. Repeats are kept; `-U/--unique` passes over an item already
   taken, by ratingKey, and the next item of the same side takes its place,
   so the ratio holds, and under `-s` a side left with only repeats has run
-  out. `-U`, not `-u`: every build command's `-u` is `--user`.
-  `build-concatenated` takes the same `-U`; `-s` means nothing there, since
-  it reads every source to the end. Read both sources through the same
-  helper as `build-concatenated`, before writing anything, so either may be
-  the destination under `--overwrite`; an empty side is warned about the
-  same way.
-- `copy-playlist-all-users USER PLAYLIST` - skips the source user, prints the
-  item list **once** before the loop and passes `preview=False` thereafter,
-  then one line per user (`created`, `replaced`, `skipped`, `failed`) printed
-  as it completes. Because the caller surfaces the skip reason, the message
-  inside `copy_playlist_to` is `LOG.info`, not a warning that would duplicate
-  every skip on stderr.
-- `copy-playlist-to-user USER PLAYLIST USER DEST` - a table shows the item
-  list then the outcome line; a machine-readable format shows the outcome
-  record **alone**, as `copy-playlist-all-users` does, because two documents
-  on one stream parse as neither.
-- `append-playlist USER PLAYLIST RATINGKEY...`, `remove-playlist USER PLAYLIST`.
-- `clean-playlist USER PLAYLIST [--include-partial]` - removes the watched
+  out. `-U`, not `-u`: `-u` is `--user`, as on `playlist-build`. Read both
+  sources before writing anything, so either may be the destination under
+  `--overwrite`: the items are already in memory when the old playlist
+  goes. Warn about an empty side rather than passing over it: a typo that
+  resolved to the wrong playlist looks exactly like a playlist that happens
+  to be empty.
+- `playlist-copy -A USER PLAYLIST [-o]`,
+  `playlist-copy -T USER PLAYLIST TO_USER DEST [-o]` - one command, two
+  modes, as a required mutually exclusive group writing `dest="copy_to"`.
+  The positionals are `source_user_id`, `source_playlist`, and `target`
+  (`nargs="*"`); `_check_copy` requires none for `-A` and exactly two for
+  `-T`, naming them `user_id` and `dest`, and anything else is a usage
+  error, exit 2.
+  - `-A/--all` - skips the source user, prints the
+    item list **once** before the loop and passes `preview=False`
+    thereafter, then one line per user (`created`, `replaced`, `skipped`,
+    `failed`) printed as it completes. Because the caller surfaces the skip
+    reason, the message inside `copy_playlist_to` is `LOG.info`, not a
+    warning that would duplicate every skip on stderr.
+  - `-T/--to` - a table shows the item list then the outcome line; a
+    machine-readable format shows the outcome record **alone**, as `-A`
+    does, because two documents on one stream parse as neither.
+- `playlist-remove USER PLAYLIST`.
+- `playlist-clean USER PLAYLIST [--include-partial]` - removes the watched
   entries and leaves the rest in their existing order. Preview first, then one
   `removeItems` call per entry so the loop is paced like any other per-item
   loop; the playlist item IDs come from the listing plexapi already holds, so
@@ -1034,12 +1107,13 @@ touched.
 
 #### Who a built playlist is for
 
-All five build commands take `-u/--user` and `-a/--all-users`, registered
-through `fanout.add_user_target_arguments` as a mutually exclusive group -
-writing the pair out on each parser is what trips `duplicate-code`. Without
-either, the playlist goes where it always did: the account the items came
-from, which is the admin server for the two that take rating keys and the
-source user's server for the three that take playlists. `deliver_playlist`
+`playlist-build`, except under `-A`, and `merge-build` take `-u/--user` and
+`-a/--all-users`, registered through `fanout.add_user_target_arguments` as a
+mutually exclusive group - writing the pair out on each parser is what trips
+`duplicate-code`. Without either, the playlist goes to the account the items
+came from, which is the admin server for `-I` and `-C`, which take rating
+keys, and the source user's server for `-R` and `merge-build`, which take
+playlists. `deliver_playlist`
 takes both servers for exactly that reason. `-a` targets
 `accounts.user_roster`, which **includes the admin** at id 0, because the
 admin is a user of the server too.
@@ -1047,7 +1121,7 @@ admin is a user of the server too.
 `fanout.run_per_user` holds the loop: print the item list once, then run a
 per-user action and print its one-line outcome as it completes, so a long run
 shows progress; in a machine-readable format emit one record per user instead,
-since one document cannot carry both. `copy-playlist-all-users` uses the same
+since one document cannot carry both. `playlist-copy --all` uses the same
 loop with its own action and its own target list - the accounts a playlist is
 shared with rather than the roster - so the loop is not written twice.
 
@@ -1059,7 +1133,7 @@ others left.
 
 ### Watched state
 
-`copy-watched USER USER [-1] [-l LIBRARY] [-t KEY] [--unwatch]`.
+`show-watched-cp USER USER [-1] [-l LIBRARY] [-t KEY] [--unwatch]`.
 `_select_winner(first, second, unwatch)` returns `(winner, loser)` or None:
 
 | situation | default | `--unwatch` |
@@ -1078,7 +1152,7 @@ plexapi renamed these methods, so call through a helper trying both spellings
 (`markPlayed`/`markWatched`, `markUnplayed`/`markUnwatched`) and read played
 state from `isPlayed`, then `isWatched`, then `viewCount`. That read and the
 resume-point read are `titles.item_is_played` and `titles.item_view_offset`,
-because `clean-playlist` needs the same two and the rules must not be written
+because `playlist-clean` needs the same two and the rules must not be written
 twice. All three attributes default to a bool or a number rather than None, so
 reading them does not satisfy plexapi's reload condition.
 
@@ -1088,13 +1162,15 @@ Watch state lives on leaf items: map `movie`->`movie`, `show`->`episode`,
 
 ### Exporting
 
-- `export-playlist USER PLAYLIST PATH`, `export-titles LIBRARY PATH
+- `playlist-export USER PLAYLIST PATH`, `titles-export LIBRARY PATH
   [--sort alpha|date|random] [--album A]`.
 - M3U carries Plex server filesystem paths, `#EXTINF` seconds from
   `duration`/1000 with `-1` fallback, and skips items with no path.
 - Photo libraries export a self-contained Spotlight.js gallery. **No Plex HTTP
   URLs anywhere in it**: both `href` and `src` are server filesystem paths.
-- `-p/--prefix` on all eight export commands, registered through
+- `-p/--prefix` on every command that exports (`playlist-list`, `show-list`,
+  `playlist-export`, `titles-export`, `playlist-build`, `merge-build`),
+  registered through
   `paths.add_prefix_argument` - repeating the help text inline trips
   `duplicate-code`. `mapper_for(plex, args)` returns `identity` without a
   prefix, so the default costs no extra call. The prefix replaces the
@@ -1353,6 +1429,26 @@ command would not repeat them and trip `duplicate-code`.
   prints the exact template, which needs `RawDescriptionHelpFormatter` for the
   epilog's newlines; that same formatter stops argparse wrapping the
   description, so pre-wrap it with `textwrap.fill(..., width=78)`.
+- `write-secrets-example [-o]` - writes `constants.SECRETS_EXAMPLE` to the
+  path `plex: secrets_file` names, after `expanduser`, creating its
+  directory. **When `secrets_file` is not set, write nothing**: say so on
+  stderr, naming the config path, and print the example to stdout, exit 0.
+  A missing config file sets nothing, so it takes that path too rather than
+  the "Config not found" exit; read the file with `parse_config` directly,
+  not `load_config`. The default secrets path is deliberately not used:
+  only a path the user chose is written to. An existing file is refused
+  without `-o/--overwrite`, before `--dry-run` as for the config, because
+  it may hold the only copy of a saved password or PIN. Create the file
+  with `os.open(..., O_CREAT | O_EXCL, 0o600)`, unlinking an old one first
+  under `-o`, so it is never readable by anyone else, even for a moment,
+  and an overwritten file does not keep looser permissions. The example is
+  JSON as `FileStore` writes it (`indent=2`, sorted keys): `tokens`,
+  `passwords`, and `pins`, each with one placeholder entry, and a
+  `_comment` entry, a list of short lines, saying every value is a
+  placeholder. JSON has no comments; `FileStore` reads only the kinds it
+  is asked for and writes back every entry it loaded, so the note is
+  harmless and survives a later save. Its `--help` prints the exact
+  example in the epilog. Needs no server.
 
 ## ERROR HANDLING
 
@@ -1416,7 +1512,19 @@ numeric ratingKey.
   skipping options that consume a value. Guard the background refresh on the
   binary existing: fish reports an unknown command *before* redirection
   applies, scribbling on the prompt mid-completion.
-- **PowerShell** - `Register-ArgumentCompleter -Native`. Needs no external
+- For `playlist-build` and `playlist-copy`, every script first finds the mode
+  flag among the words already typed, and completes each positional as that
+  mode defines it: with `-I` or `-C` a name then rating keys; with `-R` a
+  user, then that user's playlists; with `-A` on `playlist-build` a user,
+  that user's playlists, then rating keys; with `-T` on `playlist-copy` the
+  receiving user third. With no mode typed yet, nothing says what an
+  argument is, so bash offers the mode flags and the others offer only
+  options. In zsh, hold option specs that use `{-o,--overwrite}` braces in
+  **arrays**: a scalar assignment does not expand the braces, and the spec
+  reaches `_arguments` malformed and is silently never offered.
+- **PowerShell** - `Register-ArgumentCompleter -Native`. Compare the mode
+  flags with `-cin`: PowerShell's `-in` ignores case, and `-a` and `-A` are
+  different options. Needs no external
   interpreter: `ConvertFrom-Json` reads the cache. Return `CompletionResult`
   objects so the ID is inserted and the title shows as a tooltip. Two traps
   that parse cleanly and fail at runtime: a range of `0..-1` **wraps** and
@@ -1426,7 +1534,8 @@ numeric ratingKey.
 ## MAN PAGE
 
 `man/plexdo.1`, in roff, mirrored into `src/plexdo/data/`. Documents every
-command, the configuration and token formats, exit status, environment, files,
+command, under the same five headings and in the same order as `--help`,
+and the configuration and token formats, exit status, environment, files,
 and worked examples, and passes `groff -man -Tutf8 -ww -z` with no warnings.
 
 Escapes that silently corrupt copy-pasteable examples: a literal backslash is
@@ -1453,9 +1562,16 @@ double-width characters, the ASCII fallback, and fitting to a budget;
 identifier resolution including the ID-versus-title collision; the overwrite
 guard performing **no** server calls when it refuses; watched-state selection
 in both directions and that an undated state never wins; which playlist entries
-`clean-playlist` drops, and that it numbers them by their place in the
-playlist rather than within the removal list; that concatenation preserves the
-order given and that `--unique` matches on ratingKey; that a per-user create
+`playlist-clean` drops, and that it numbers them by their place in the
+playlist rather than within the removal list; that a merge keeps each side's
+order and that `--unique` matches on ratingKey; that every command is in
+exactly one help group, that `--help` lists them grouped and sorted, and that
+the old names are refused; that each `playlist-build` and `playlist-copy`
+mode names its arguments, and that the wrong count, a missing or second mode
+flag, and `--append` with a creating option all exit 2; that
+`write-secrets-example` prints rather than writes when `secrets_file` is not
+set, refuses an existing file, writes mode 0600, and that its example loads
+through `FileStore` with its note surviving a save; that a per-user create
 reports a taken name instead of exiting and performs no call when it does, and
 that a fan-out records an unreachable user and an unexpected failure and keeps
 going; where `wait` puts its end point for every combination of marker,
@@ -1507,9 +1623,10 @@ because unknown and zero are different things.
   packaged mirrors, and that no source file contains non-ASCII. Editing the
   source copy and forgetting the mirror ships a stale asset in the wheel.
 - `smoke` imports the package, builds the full parser, and asserts every
-  module in `MODULES` still exposes `register()` and `COMMANDS`. pylint scores
+  module in `MODULES` still exposes `register()` and `COMMANDS`, and that
+  the commands registered are exactly those in `GROUPS`. pylint scores
   a module 10.00/10 even when an edit has truncated that tail, which breaks
-  every command in it.
+  every command in it; a count to compare against would only go stale.
 
 The Makefile also provides `install`, `uninstall`, `develop`, `reinstall`,
 `install-man`, `uninstall-man`, `install-completion` and its four per-shell
@@ -1556,8 +1673,9 @@ version cannot be undone. Strip a leading `v` before comparing.
 ## COMMAND PAGES
 
 Beside the roff overview, every command has a detailed page in scdoc source
-format: `man/plexdo-COMMAND.1.scd`, one per command, with `list-library`
-documented in the `list-titles` page as the alias it is, and
+format: `man/plexdo-COMMAND.1.scd`, one per command, so `playlist-build`
+and `playlist-copy` each have one page covering every mode, with a `MODES`
+section and each argument marked with the modes that take it, and
 `man/plexdo-conventions.7.scd` for what every command shares - the global
 options, how users, libraries, playlists, items, and sessions are named,
 output formats, path rewriting, pacing, exit status, files, and
@@ -1596,7 +1714,7 @@ and SEE ALSO. GLOBAL OPTIONS says what **each** global flag does for that
 particular command - "no effect" is an answer, and `--dry-run` writing a
 file anyway is worth saying. OPTION INTERACTIONS covers every conflict and
 dependency, whether argparse enforces it (`-u`/`-a`) or the handler does
-(`find-missing -A` with SHOW, `wait --now` without `-r`). Document what the
+(`missing-find -A` with SHOW, `wait --now` without `-r`). Document what the
 code does, checked against it, not what a help string implies. Sample tables
 are real output from `print_table` with an ASCII console, never hand-drawn.
 

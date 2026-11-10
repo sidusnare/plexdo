@@ -12,7 +12,7 @@ import textwrap
 import requests
 from plexapi.server import PlexServer
 
-from plexdo.arguments import add_library_argument
+from plexdo.arguments import add_library_argument, add_rating_key_argument
 from plexdo.console import output_format
 from plexdo.constants import LOG
 from plexdo.titles import display_title, fetch_item
@@ -73,7 +73,7 @@ def cmd_read(plex: PlexServer, args: argparse.Namespace) -> None:
     if len(item.media) > 1 or len(parts) > 1:
         LOG.warning(
             "Multiple media/parts found; streaming first part only. "
-            "Use list-show or show-metadata to inspect."
+            "Use show-list or show-metadata to inspect."
         )
 
     part = parts[0]
@@ -100,10 +100,7 @@ def register(
     parser = sub.add_parser(
         "read",
         parents=parents,
-        help=(
-            "Stream a media file to stdout. Pipe into a player: "
-            "plexdo read <lib> <key> | mpv -"
-        ),
+        help="Stream a media file to stdout, to pipe into a player.",
         description=textwrap.fill(
             "Stream a media file to standard output, for piping into a player "
             "or redirecting to a file. Quitting the player early is not an "
@@ -129,11 +126,7 @@ def register(
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     add_library_argument(parser)
-    parser.add_argument(
-        "rating_key",
-        type=int,
-        help="Item ratingKey (int). Obtain with list-titles or list-show.",
-    )
+    add_rating_key_argument(parser)
 
 
 COMMANDS = {"read": cmd_read}

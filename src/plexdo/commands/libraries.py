@@ -167,16 +167,15 @@ def register(
 ) -> None:
     """Register the library-related subparsers."""
     sub.add_parser(
-        "list-libraries",
+        "libraries-list",
         parents=parents,
-        help="List all Plex libraries (id, type, title).",
+        help="List the server's libraries.",
     )
 
     p_lt = sub.add_parser(
-        "list-titles",
+        "library-list",
         parents=parents,
-        aliases=["list-library"],
-        help="List titles in a library.",
+        help="List the titles in a library.",
         description=textwrap.fill(
             "List the titles in a library. Table output shows the rating key, "
             "title, release date, rating, and studio. A machine-readable "
@@ -196,25 +195,23 @@ def register(
     )
 
     p_ls = sub.add_parser(
-        "list-show",
+        "show-list",
         parents=parents,
-        help=(
-            "List all episodes in a show (skipping specials), with optional "
-            "M3U export."
-        ),
+        help="List a show's episodes; optionally export an M3U.",
     )
     p_ls.add_argument(
         "rating_key",
+        metavar="ratingKey",
         type=int,
-        help="Show ratingKey (int). Obtain with list-titles.",
+        help="Show ratingKey (int). Obtain with library-list.",
     )
     add_m3u_argument(p_ls)
     add_prefix_argument(p_ls)
 
     p_et = sub.add_parser(
-        "export-titles",
+        "titles-export",
         parents=parents,
-        help="Export an entire library to an M3U file or photo gallery.",
+        help="Export a library to an M3U file or photo gallery.",
     )
     add_library_argument(p_et)
     p_et.add_argument(
@@ -246,13 +243,10 @@ def register(
 
 
 COMMANDS = {
-    "list-libraries": cmd_list_libraries,
-    "list-titles": cmd_list_titles,
-    # argparse reports whichever spelling was typed, so the alias needs its
-    # own entry for dispatch to find a handler.
-    "list-library": cmd_list_titles,
-    "list-show": cmd_list_show,
-    "export-titles": cmd_export_titles,
+    "libraries-list": cmd_list_libraries,
+    "library-list": cmd_list_titles,
+    "show-list": cmd_list_show,
+    "titles-export": cmd_export_titles,
 }
 
 REQUIRES_PLEX = frozenset(COMMANDS)

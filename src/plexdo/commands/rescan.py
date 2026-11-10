@@ -86,10 +86,7 @@ def register(
     parser = sub.add_parser(
         "rescan",
         parents=parents,
-        help=(
-            "Trigger a library rescan, with optional status view or "
-            "flush-and-rescan."
-        ),
+        help="Rescan libraries, or show the scans under way.",
     )
     parser.add_argument(
         "library_id",
@@ -98,7 +95,7 @@ def register(
         default=None,
         help=(
             "Library ID (int) or title (str). Obtain both with "
-            "list-libraries. Required unless -s / --status is used."
+            "libraries-list. Required unless -s / --status is used."
         ),
     )
     parser.add_argument(

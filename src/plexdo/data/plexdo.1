@@ -4,7 +4,7 @@
 .\" Man page for plexdo (plexdo).
 .\" Edit alongside AI.prompt.txt. The version and date on the .TH line are
 .\" written by tools/derive.py from pyproject.toml; do not edit them here.
-.TH PLEXDO 1 "2026-10-29" "plexdo 2.1.0rc1" "User Commands"
+.TH PLEXDO 1 "2026-11-10" "plexdo 3.0.0rc1" "User Commands"
 .
 .SH NAME
 plexdo \- command\-line interface for Plex Media Server
@@ -124,45 +124,24 @@ Header row plus one row per record, with newline line endings.
 PowerShell CLIXML with typed properties, for \fBImport\-Clixml\fR.
 .
 .SH COMMANDS
-.SS Listing and searching
+The commands are listed here as
+.B plexdo \-\-help
+lists them: grouped by what they act on, and by name within each group.
+Most are named for what they act on, then what they do to it.
+.SS Libraries and titles
 .TP
-.B list\-libraries
-List every library with its ID, type, and title.
-.TP
-.BI list\-titles " library " [ \-\-album " ALBUM" ]
-.RB ( list\-library
-is an alias.)
-List the titles in a library. Table output shows the rating key, title,
-release date, rating, and studio; a machine\-readable format carries every
-field the server returned for each item, and for a show library nests each
-show\(aqs episodes under a
-.B seasons
-object keyed by season name. Nested objects such as media and their parts are
-expanded, so a file name is at
-.BR media[].parts[].file ,
-and the paths are repeated in a top\-level
-.B files
-list for convenience. Note that
-.B sourceURI
-is not a file name: it is the remote server URI of an item in someone else\(aqs
-playlist, and is null for anything on your own server. \fB\-\-album\fR restricts a photo library to one
-album and is ignored elsewhere.
-.TP
-.BI list\-album " ratingKey"
+.BI album\-list " ratingKey"
 Show one music or photo album: the album, with its played state and
 progress, then a row per track, photo, or clip, with its state and, when in
 progress, its resume point, length, and percentage, as
 .BR "3:20 / 9:46 (34.1%)" .
 JSON and YAML carry the same record
-.B list\-albums
+.B albums\-list
 gives for each album; CSV and CLIXML, which cannot nest, carry one row per
 item. Albums nested in a photo album are left out, and counted. Anything but
 an album is refused.
 .TP
-.BI list\-show " ratingKey " [ \-\-m3u " PATH" ]
-List every episode of a show, skipping specials.
-.TP
-.BI list\-albums " library"
+.BI albums\-list " library"
 List the albums in a music or photo library, nested photo albums included.
 Table output shows each album\(aqs rating key, artist (music only), title,
 year, item count, and how many items you have played. A machine\-readable
@@ -182,207 +161,28 @@ and any photo library, which must be opened to find nested albums, cost one
 per album. Photos have no played state, so theirs is null. Other library
 types are refused.
 .TP
-.BI list\-users
-List users with their ID, account type (\fBmanaged\fR, \fBhome\fR,
-\fBfriend\fR, \fBshared\fR), title, username, and email.
+.B libraries\-list
+List every library with its ID, type, and title.
 .TP
-.BI list\-playlists " user"
-List a user\(aqs playlists.
-.TP
-.BI list\-playlist " user playlist " [ \-\-m3u " PATH" ]
-List the items in one playlist, named or by ratingKey.
-.TP
-.BI show\-metadata " ratingKey"
-Show full metadata for one item, with fields varying by media type, including
-the server\-side path of every file backing it. A table names a lone file
-.BR file ,
-and numbers them when there are several; a machine\-readable format carries
-them as a
+.BI library\-list " library " [ \-\-album " ALBUM" ]
+List the titles in a library. Table output shows the rating key, title,
+release date, rating, and studio; a machine\-readable format carries every
+field the server returned for each item, and for a show library nests each
+show\(aqs episodes under a
+.B seasons
+object keyed by season name. Nested objects such as media and their parts are
+expanded, so a file name is at
+.BR media[].parts[].file ,
+and the paths are repeated in a top\-level
 .B files
-list. Shows and seasons have no media of their own, so they list none: those
-files belong to the episodes.
-.TP
-.BI search " user query " [ \-\-media\-type " TYPE" "] [" \-\-library\-id " LIBRARY" ]
-Search as the given user. \fITYPE\fR is one of \fBmovie\fR, \fBshow\fR,
-\fBepisode\fR, \fBtrack\fR, \fBphoto\fR, \fBalbum\fR, \fBartist\fR. A library
-that cannot be searched is warned about and skipped rather than aborting.
-.
-.SS Building playlists
-Playlists are always constructed fully in memory, validated, previewed, and
-then created in exactly one API call.
-.B \-\-dry\-run
-stops after the preview.
-.TP
-.BI build\-interleaved " name ratingKey ..."
-Round\-robin the episodes of several shows into one playlist.
-.TP
-.BI build\-chronological " name ratingKey ..."
-Order shows and movies by original air date. An episode with no date is
-estimated from the median interval between its neighbours in the same season,
-and you are prompted only when that is impossible. A film with no release date
-is prompted for too. Without a terminal to answer on, the command stops naming
-the item that needs a date.
-.TP
-.BI build\-randomize " user source dest"
-Shuffle a playlist into a new one, using
-.BR secrets (3)
-rather than a predictable generator.
-.TP
-.BI build\-concatenated " user name playlist ... " [ \-U ]
-Join several playlists end to end into one new playlist, keeping the order
-within each and the order they were named in. Every source is read before
-anything is written, so a source may also be the destination when
-.BR \-o ", " \-\-overwrite
-is given.
-.BR \-U ", " \-\-unique
-skips an item an earlier playlist already contributed; without it the result is
-a faithful concatenation, repeats and all, which is what Plex permits. An empty
-source is reported and contributes nothing.
-.TP
-.BI build\-merge " user name first second " [ \-\-ratio " A:B" "] [" \-s "] [" \-U ]
-Mix two playlists into one new playlist, taking
-.I A
-items from the first, then
-.I B
-from the second, in turn; the default ratio is 1:1. Each keeps its own order,
-and once one runs out the rest of the other follows;
-.BR \-s ", " \-\-stop\-short
-stops there instead.
-.BR \-U ", " \-\-unique
-skips an item already taken, and the next takes its place. As with
-.BR build\-concatenated ,
-both are read before anything is written, so either may also be the
-destination.
-.PP
-All five accept
-.BR \-o ", " \-\-overwrite ,
-.BI \-\-m3u " PATH",
-.BR \-p ", " \-\-prefix ,
-and the two target options below.
-.TP
-.BI \-u " USER" \fR,\fP " " \-\-user " USER"
-Create the playlist for this user rather than for the account the items came
-from. Accepts a user ID or a user title.
-.TP
-.BR \-a ", " \-\-all\-users
-Create the playlist for every user on the server, the admin account included.
-Mutually exclusive with
-.BR \-u .
-.PP
-With either option the item list is printed once and each user then produces a
-single line giving its outcome:
-\fBcreated\fR, \fBreplaced\fR, \fBskipped\fR, or \fBfailed\fR. Lines appear as
-each user completes, so a long run shows progress. A user the server will not
-act for, and a user whose name is already taken, are both reported and the run
-carries on; neither ends it. In a machine\-readable format the outcomes are
-emitted as one record per user instead of the item list.
-.
-.SS Copying and modifying
-.TP
-.BI copy\-playlist\-all\-users " source_user source_playlist " [ \-o ]
-Copy a playlist to every managed user, skipping the source user. The item list
-is printed once, then each user produces a single line giving its outcome:
-\fBcreated\fR, \fBreplaced\fR, \fBskipped\fR, or \fBfailed\fR. A failure for one
-user does not end the run. In a machine\-readable format the outcomes are
-emitted as one record per user instead.
-.TP
-.BI copy\-playlist\-to\-user " source_user source_playlist user dest " [ \-o ]
-Copy a playlist to one user.
-.TP
-.BI append\-playlist " user playlist ratingKey ..."
-Append items to an existing playlist.
-.TP
-.BI clean\-playlist " user playlist " [ \-\-include\-partial ]
-Remove the watched items from a playlist, leaving the rest in their existing
-order. The entries to be dropped are previewed first, numbered by their place
-in the playlist as it stands.
-.BI \-\-include\-partial
-also drops items that are only part\-played; by default a resume point is left
-alone, since it is what you are in the middle of watching. A smart playlist is
-refused, its contents being defined by a filter rather than by its entries.
-.TP
-.BI remove\-playlist " user playlist"
-Delete a playlist.
-.PP
-Without
-.BR \-\-overwrite ,
-a copy whose name is taken falls back to appending
-.RB \(dq " admin copy" \(dq;
-if that is taken too the target is skipped with a warning and nothing is
-created or deleted.
-.
-.SS Watched state
-.TP
-.BI copy\-watched " user_a user_b " [ \-1 "] [" \-l " LIBRARY" "] [" \-t " KEY" "] [" \-\-unwatch ]
-Synchronise watched state and resume points between two users.
-.RS
-.PP
-By default the more recent \fBlastViewedAt\fR wins. With
-.B \-\-unwatch
-an item unwatched for either user becomes unwatched for both, and where both
-have progress the earliest \fBlastViewedAt\fR wins instead.
-.TP
-.BR \-1 ", " \-\-one\-way
-Only write to the second user; never modify the first.
-.TP
-.BR \-l ", " \-\-library " \fILIBRARY\fR"
-Restrict to one library.
-.TP
-.BR \-t ", " \-\-title " \fIKEY\fR"
-Restrict to one item, by ratingKey.
-.RE
-.PP
-Preview a full\-library run with
-.B \-\-dry\-run
-first: it compares every item both users can see.
-.
-.SS Exporting
-.TP
-.BI export\-playlist " user playlist path"
-Write a playlist to an M3U file.
-.TP
-.BI export\-titles " library path " [ \-\-sort " ORDER" "] [" \-\-album " ALBUM" ]
-Write a whole library to an M3U file, or to a self\-contained HTML gallery for
-a photo library. \fIORDER\fR is \fBalpha\fR (default), \fBdate\fR, or
-\fBrandom\fR.
-.PP
-M3U files hold the Plex server\(aqs own filesystem paths, not HTTP URLs.
-.BR \-p ", " \-\-prefix
-replaces the server\-side library root with another, for reading the export
-where the media is mounted differently; separators follow the prefix, so a
-Windows prefix produces backslashes. Because the library \fIroot\fR is what is
-replaced, one prefix maps every library to the same place: export libraries
-separately if they are mounted apart.
-.
-.SS Streaming
-.TP
-.BI read " library ratingKey"
-Stream a media file to standard output, for piping into a player or
-redirecting to a file. Quitting the player early is not an error.
-.RS
-.PP
-.EX
-plexdo read 3 12345 | mpv \-
-plexdo read 3 12345 > episode.mkv
-.EE
-.PP
-On Linux with a display attached but no desktop environment,
-.BR mpv (1)
-can draw straight to the console through the kernel modesetting driver, so
-playback needs neither X nor Wayland:
-.PP
-.EX
-plexdo read 3 12345 | mpv \-\-vo=drm \-
-.EE
-.PP
-Run that from a virtual terminal rather than a terminal emulator, and make
-sure your user can reach the DRM device, usually by being in the
-.B video
-group.
-.RE
+list for convenience. Note that
+.B sourceURI
+is not a file name: it is the remote server URI of an item in someone else\(aqs
+playlist, and is null for anything on your own server. \fB\-\-album\fR restricts a photo library to one
+album and is ignored elsewhere.
 .
 .TP
-.BI find\-missing " SHOW " [ \-l " LIBRARY" "] [" \-A "] [" \-s " SEASONS" "] [" \-\-include\-specials ]
+.BI missing\-find " SHOW " [ \-l " LIBRARY" "] [" \-A "] [" \-s " SEASONS" "] [" \-\-include\-specials ]
 Report the episode numbers missing between the start of a season and its
 highest episode.
 .I SHOW
@@ -413,25 +213,250 @@ Also check season 0 when no season is named. Specials are numbered
 irregularly, so this is off by default.
 .RE
 .
-.SS Server management
 .TP
-.BI rescan " [library] " [ \-s "] [" \-n ]
-Trigger a library scan for new files.
-.B \-s
-.RB ( \-\-status )
-lists the server's background activity instead, library scans among it, and
-needs no library.
-.B \-n
-.RB ( \-\-now )
-cancels pending scans on every library first.
+.BI search " user query " [ \-\-media\-type " TYPE" "] [" \-\-library\-id " LIBRARY" ]
+Search as the given user. \fITYPE\fR is one of \fBmovie\fR, \fBshow\fR,
+\fBepisode\fR, \fBtrack\fR, \fBphoto\fR, \fBalbum\fR, \fBartist\fR. A library
+that cannot be searched is warned about and skipped rather than aborting.
 .TP
-.BI status " " [ \-\-section " SECTION" ]
-Report server identity, active sessions (with the sessionKey, library,
-ratingKey, and the file the player has open), shared users, system accounts,
-reachable addresses, scans in progress, other background activity, and
-scheduled tasks. A section that cannot be read is warned about and left empty
-rather than losing the whole report. \fB\-\-format csv\fR and
-\fB\-\-format clixml\fR are flat and require \fB\-\-section\fR.
+.BI show\-list " ratingKey " [ \-\-m3u " PATH" ]
+List every episode of a show, skipping specials.
+.TP
+.BI show\-metadata " ratingKey"
+Show full metadata for one item, with fields varying by media type, including
+the server\-side path of every file backing it. A table names a lone file
+.BR file ,
+and numbers them when there are several; a machine\-readable format carries
+them as a
+.B files
+list. Shows and seasons have no media of their own, so they list none: those
+files belong to the episodes.
+.TP
+.BI titles\-export " library path " [ \-\-sort " ORDER" "] [" \-\-album " ALBUM" ]
+Write a whole library to an M3U file, or to a self\-contained HTML gallery for
+a photo library. \fIORDER\fR is \fBalpha\fR (default), \fBdate\fR, or
+\fBrandom\fR.
+.
+.SS Playlists
+A new playlist is always constructed fully in memory, validated, previewed,
+and then created in exactly one API call.
+.B \-\-dry\-run
+stops after the preview.
+.TP
+.BI merge\-build " user name first second " [ \-\-ratio " A:B" "] [" \-s "] [" \-U ]
+Mix two playlists into one new playlist, taking
+.I A
+items from the first, then
+.I B
+from the second, in turn; the default ratio is 1:1. Each keeps its own order,
+and once one runs out the rest of the other follows;
+.BR \-s ", " \-\-stop\-short
+stops there instead.
+.BR \-U ", " \-\-unique
+skips an item already taken, and the next takes its place. Both are read
+before anything is written, so either may also be the destination.
+.TP
+.BR playlist\-build " (" \-I " | " \-C ") \fIname ratingKey\fR ..."
+.TQ
+.BI "playlist\-build \-R" " user source dest"
+.TQ
+.BI "playlist\-build \-A" " user playlist ratingKey ..."
+Build a playlist, or add to one. Exactly one of the four flags says how, and
+with it what the arguments are.
+.RS
+.TP
+.BR \-I ", " \-\-interleaved
+Round\-robin the episodes of several shows into the new playlist
+.IR name .
+.TP
+.BR \-C ", " \-\-chronological
+Order shows and movies by original air date. An episode with no date is
+estimated from the median interval between its neighbours in the same season,
+and you are prompted only when that is impossible. A film with no release date
+is prompted for too. Without a terminal to answer on, the command stops naming
+the item that needs a date.
+.TP
+.BR \-R ", " \-\-randomize
+Shuffle the playlist
+.I source
+into the new playlist
+.IR dest ,
+using
+.BR secrets (3)
+rather than a predictable generator.
+.TP
+.BR \-A ", " \-\-append
+Append items to the existing playlist
+.IR playlist .
+Nothing is created, so none of the options below apply, and giving one is an
+error.
+.RE
+.TP
+.BI playlist\-clean " user playlist " [ \-\-include\-partial ]
+Remove the watched items from a playlist, leaving the rest in their existing
+order. The entries to be dropped are previewed first, numbered by their place
+in the playlist as it stands.
+.BI \-\-include\-partial
+also drops items that are only part\-played; by default a resume point is left
+alone, since it is what you are in the middle of watching. A smart playlist is
+refused, its contents being defined by a filter rather than by its entries.
+.TP
+.BI "playlist\-copy \-A" " user playlist " [ \-o ]
+.TQ
+.BI "playlist\-copy \-T" " user playlist to_user dest " [ \-o ]
+Copy a user\(aqs playlist to other accounts. Exactly one of the two flags
+says to whom.
+.RS
+.TP
+.BR \-A ", " \-\-all
+Copy to every user the server is shared with, skipping the source user. The
+item list is printed once, then each user produces a single line giving its
+outcome:
+\fBcreated\fR, \fBreplaced\fR, \fBskipped\fR, or \fBfailed\fR. A failure for one
+user does not end the run. In a machine\-readable format the outcomes are
+emitted as one record per user instead.
+.TP
+.BR \-T ", " \-\-to
+Copy to the one user
+.IR to_user ,
+as the playlist
+.IR dest .
+.RE
+.IP
+Without
+.BR \-o ", " \-\-overwrite ,
+a copy whose name is taken falls back to appending
+.RB \(dq " admin copy" \(dq;
+if that is taken too the target is skipped with a warning and nothing is
+created or deleted.
+.TP
+.BI playlist\-export " user playlist path"
+Write a playlist to an M3U file.
+.TP
+.BI playlist\-list " user playlist " [ \-\-m3u " PATH" ]
+List the items in one playlist, named or by ratingKey.
+.TP
+.BI playlist\-remove " user playlist"
+Delete a playlist.
+.TP
+.BI playlists\-list " user"
+List a user\(aqs playlists.
+.PP
+.B merge\-build
+and
+.BR playlist\-build ,
+except with
+.BR \-A ,
+accept
+.BR \-o ", " \-\-overwrite ,
+.BI \-\-m3u " PATH",
+.BR \-p ", " \-\-prefix ,
+and the two target options below.
+.TP
+.BI \-u " USER" \fR,\fP " " \-\-user " USER"
+Create the playlist for this user rather than for the account the items came
+from. Accepts a user ID or a user title.
+.TP
+.BR \-a ", " \-\-all\-users
+Create the playlist for every user on the server, the admin account included.
+Mutually exclusive with
+.BR \-u .
+.PP
+With either option the item list is printed once and each user then produces a
+single line giving its outcome:
+\fBcreated\fR, \fBreplaced\fR, \fBskipped\fR, or \fBfailed\fR. Lines appear as
+each user completes, so a long run shows progress. A user the server will not
+act for, and a user whose name is already taken, are both reported and the run
+carries on; neither ends it. In a machine\-readable format the outcomes are
+emitted as one record per user instead of the item list.
+.PP
+M3U files hold the Plex server\(aqs own filesystem paths, not HTTP URLs.
+.BR \-p ", " \-\-prefix
+replaces the server\-side library root with another, for reading the export
+where the media is mounted differently; separators follow the prefix, so a
+Windows prefix produces backslashes. Because the library \fIroot\fR is what is
+replaced, one prefix maps every library to the same place: export libraries
+separately if they are mounted apart.
+.
+.SS Playback and watched state
+.TP
+.BI player\-remote\-play " host ratingKey " [ \-\-port " PORT" "] [" \-\-player\-user " USER" "] [" \-\-server\-url " URL" ]
+Connect to a player directly and tell it to start playing an item at once,
+replacing whatever it was playing. A
+.I host
+that is a name is resolved here, and only the address is sent, since some
+players refuse a Host header carrying a name as a defence against DNS
+rebinding; each address the name has is tried until a player answers on
+.BR \-\-port ,
+or, without it, on the port the player gives when asked over GDM, or on
+the ports the common Plex apps use. The command is sent as
+.BR plexdo \(aqs
+own account when that is the server\(aqs admin or is signed in to the
+player, otherwise as an account from a per\-user configuration section
+that is signed in to it, and otherwise as
+.BR plexdo \(aqs
+own anyway, with a warning.
+.B \-\-player\-user
+names the account signed in to the player instead, by plex.tv user id,
+username, or email, or a managed user\(aqs name; it must be
+.BR plexdo \(aqs
+own account, a member of its Plex Home, switched into without a password,
+or have a per\-user configuration section, and is an error otherwise. The player is told to fetch from whichever of
+the server\(aqs addresses is most like its own: the configured URL and every
+direct address plex.tv lists are ranked by family, then by private or global
+scope, then by the longest shared prefix. Loopback, link\-local, and relayed
+addresses never qualify.
+.B \-\-server\-url
+gives the address outright instead.
+.TP
+.BI read " library ratingKey"
+Stream a media file to standard output, for piping into a player or
+redirecting to a file. Quitting the player early is not an error.
+.RS
+.PP
+.EX
+plexdo read 3 12345 | mpv \-
+plexdo read 3 12345 > episode.mkv
+.EE
+.PP
+On Linux with a display attached but no desktop environment,
+.BR mpv (1)
+can draw straight to the console through the kernel modesetting driver, so
+playback needs neither X nor Wayland:
+.PP
+.EX
+plexdo read 3 12345 | mpv \-\-vo=drm \-
+.EE
+.PP
+Run that from a virtual terminal rather than a terminal emulator, and make
+sure your user can reach the DRM device, usually by being in the
+.B video
+group.
+.RE
+.
+.TP
+.BI show\-watched\-cp " user_a user_b " [ \-1 "] [" \-l " LIBRARY" "] [" \-t " KEY" "] [" \-\-unwatch ]
+Synchronise watched state and resume points between two users.
+.RS
+.PP
+By default the more recent \fBlastViewedAt\fR wins. With
+.B \-\-unwatch
+an item unwatched for either user becomes unwatched for both, and where both
+have progress the earliest \fBlastViewedAt\fR wins instead.
+.TP
+.BR \-1 ", " \-\-one\-way
+Only write to the second user; never modify the first.
+.TP
+.BR \-l ", " \-\-library " \fILIBRARY\fR"
+Restrict to one library.
+.TP
+.BR \-t ", " \-\-title " \fIKEY\fR"
+Restrict to one item, by ratingKey.
+.RE
+.IP
+Preview a full\-library run with
+.B \-\-dry\-run
+first: it compares every item both users can see.
 .TP
 .BI wait " " [ \-s " KEY" "] [" \-r " KEY" "] [" \-a "] [" \-i " SECONDS" "] [" \-\-fast\-interval " SECONDS" "] [" \-\-no\-credits "] [" \-\-offset " SECONDS" "] [" \-\-paused " SECONDS" "] [" \-\-now ]
 Sleep until a session\(aqs current play is over, then exit 0. By default the
@@ -497,37 +522,32 @@ With
 .BR \-r :
 if the video is not playing, exit 0 at once rather than waiting for it.
 .RE
-.TP
-.BI player\-remote\-play " host ratingKey " [ \-\-port " PORT" "] [" \-\-player\-user " USER" "] [" \-\-server\-url " URL" ]
-Connect to a player directly and tell it to start playing an item at once,
-replacing whatever it was playing. A
-.I host
-that is a name is resolved here, and only the address is sent, since some
-players refuse a Host header carrying a name as a defence against DNS
-rebinding; each address the name has is tried until a player answers on
-.BR \-\-port ,
-or, without it, on the port the player gives when asked over GDM, or on
-the ports the common Plex apps use. The command is sent as
-.BR plexdo \(aqs
-own account when that is the server\(aqs admin or is signed in to the
-player, otherwise as an account from a per\-user configuration section
-that is signed in to it, and otherwise as
-.BR plexdo \(aqs
-own anyway, with a warning.
-.B \-\-player\-user
-names the account signed in to the player instead, by plex.tv user id,
-username, or email, or a managed user\(aqs name; it must be
-.BR plexdo \(aqs
-own account, a member of its Plex Home, switched into without a password,
-or have a per\-user configuration section, and is an error otherwise. The player is told to fetch from whichever of
-the server\(aqs addresses is most like its own: the configured URL and every
-direct address plex.tv lists are ranked by family, then by private or global
-scope, then by the longest shared prefix. Loopback, link\-local, and relayed
-addresses never qualify.
-.B \-\-server\-url
-gives the address outright instead.
 .
-.SS Setup
+.SS Server
+.TP
+.BI rescan " [library] " [ \-s "] [" \-n ]
+Trigger a library scan for new files.
+.B \-s
+.RB ( \-\-status )
+lists the server's background activity instead, library scans among it, and
+needs no library.
+.B \-n
+.RB ( \-\-now )
+cancels pending scans on every library first.
+.TP
+.BI status " " [ \-\-section " SECTION" ]
+Report server identity, active sessions (with the sessionKey, library,
+ratingKey, and the file the player has open), shared users, system accounts,
+reachable addresses, scans in progress, other background activity, and
+scheduled tasks. A section that cannot be read is warned about and left empty
+rather than losing the whole report. \fB\-\-format csv\fR and
+\fB\-\-format clixml\fR are flat and require \fB\-\-section\fR.
+.TP
+.B users\-list
+List users with their ID, account type (\fBmanaged\fR, \fBhome\fR,
+\fBfriend\fR, \fBshared\fR), title, username, and email.
+.
+.SS Account and configuration
 .TP
 .BI login " " [ \-u " USER" "] [" \-p " PASS" "] [" \-\-save\-password "] [" \-c " CODE" "] [" \-2 ]
 Authenticate against plex.tv and save the token in the system keyring.
@@ -564,6 +584,19 @@ is given, and
 writes nothing.
 .B \-\-help
 prints the exact template that would be written.
+.TP
+.BI write\-secrets\-example " " [ \-o ]
+Write an example secrets file, with a placeholder entry for each kind of
+secret, to the path
+.B plex: secrets_file
+names, readable by your account alone. When that option is not set, nothing
+is written: standard error says so, and the example is printed to standard
+output. An existing file is refused unless
+.BR \-o ,
+.BR \-\-overwrite
+is given, since it may hold real secrets.
+.B \-\-help
+prints the exact example.
 .
 .SH CONFIGURATION
 Read from
@@ -663,6 +696,10 @@ uses that file always, for a machine whose keyring is locked when plexdo runs,
 as under cron, and silences the warning; set to
 .BR keyring ,
 the keyring is insisted on.
+.B plexdo write\-secrets\-example
+writes an example of the file, or prints one when
+.B plex: secrets_file
+is not set.
 .PP
 When a command meets a 401 for a user, three sources are tried in turn: the
 server\-scoped token the admin can mint, a token already saved, and a fresh
@@ -772,27 +809,27 @@ plexdo login
 List libraries, then the titles in one of them by name:
 .PP
 .EX
-plexdo list\-libraries
-plexdo list\-titles "TV Shows"
+plexdo libraries\-list
+plexdo library\-list "TV Shows"
 .EE
 .PP
 Build a playlist interleaving two shows, replacing any existing one:
 .PP
 .EX
-plexdo build\-interleaved "Mixed Run" 101 202 \-\-overwrite
+plexdo playlist\-build \-I "Mixed Run" 101 202 \-\-overwrite
 .EE
 .PP
 Preview a watched\-state sync before running it for real:
 .PP
 .EX
-plexdo \-\-dry\-run copy\-watched Alice Bob
-plexdo copy\-watched Alice Bob \-\-one\-way
+plexdo \-\-dry\-run show\-watched\-cp Alice Bob
+plexdo show\-watched\-cp Alice Bob \-\-one\-way
 .EE
 .PP
 Export a library for a client that mounts the media elsewhere:
 .PP
 .EX
-plexdo export\-titles "TV Shows" ~/tv.m3u \-\-prefix \(aq\e\eNAS\emedia\(aq
+plexdo titles\-export "TV Shows" ~/tv.m3u \-\-prefix \(aq\e\eNAS\emedia\(aq
 .EE
 .PP
 Stream an episode into a player:
@@ -822,7 +859,7 @@ plexdo logout
 Machine\-readable output:
 .PP
 .EX
-plexdo \-\-json list\-users | jq \(aq.[] | select(.type == "home")\(aq
+plexdo \-\-json users\-list | jq \(aq.[] | select(.type == "home")\(aq
 plexdo status \-\-section sessions \-f csv
 .EE
 .

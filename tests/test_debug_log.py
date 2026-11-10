@@ -200,8 +200,8 @@ def debug_log(root_handlers, tmp_path, monkeypatch):
 
 def test_a_request_is_logged_timed_and_redacted(debug_log):
     original = requests.Session.send
-    with profiling.profiled(True, "list-users"):
-        with profiling.span("command:list-users"):
+    with profiling.profiled(True, "users-list"):
+        with profiling.span("command:users-list"):
             session_with(FakeAdapter()).get(
                 "http://plex.lan:32400/accounts",
                 headers={"X-Plex-Token": "header-token-123"},
@@ -217,7 +217,7 @@ def test_a_request_is_logged_timed_and_redacted(debug_log):
     assert re.search(r"status=200 reason=\"OK\" wait_ns=\d+ ", got)
     assert "bytes=17 type=text/xml" in got
     span = next(line for line in lines_of(debug_log) if " span " in line)
-    assert "name=command:list-users" in span
+    assert "name=command:users-list" in span
     assert "api_calls=1" in span
     end = next(line for line in lines_of(debug_log) if " run end " in line)
     assert "status=0" in end and "api_calls=1" in end

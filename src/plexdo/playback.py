@@ -246,7 +246,7 @@ def add_play_arguments(parser: Any) -> None:
         metavar="ratingKey",
         help=(
             "The item to play (int): a film, episode, show, season, track, "
-            "album, photo, or playlist. Obtain with list-titles or search."
+            "album, photo, or playlist. Obtain with library-list or search."
         ),
     )
     parser.add_argument(

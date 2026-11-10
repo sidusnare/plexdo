@@ -77,7 +77,7 @@ the last two ignoring case. It names, in this order:
 - *plexdo*'s own account, when it matches that account's id, username, or
   email, or is *0* and *plexdo*'s account is the server's admin, as *0*
   means the admin to every other command;
-- a member of *plexdo*'s Plex Home, as *plexdo-list-users*(1) shows with
+- a member of *plexdo*'s Plex Home, as *plexdo-users-list*(1) shows with
   the type *home* or *managed*. A managed user has no username or email,
   so it is named by its id or the name it is shown by. *plexdo* switches
   into the member through plex.tv, as the user switcher in a Plex app
@@ -158,8 +158,8 @@ _HOST_
 
 _ratingKey_
 	What to play: a film, episode, show, season, track, album, photo, or
-	playlist, as *plexdo-list-titles*(1), *plexdo-search*(1), or
-	*plexdo-list-playlists*(1) report it. A show, season, album, or
+	playlist, as *plexdo-library-list*(1), *plexdo-search*(1), or
+	*plexdo-playlists-list*(1) report it. A show, season, album, or
 	playlist plays from its start.
 
 # OPTIONS
@@ -172,7 +172,7 @@ _ratingKey_
 
 *--player-user* _USER_
 	The account signed in to the player, to send the command as: a plex.tv
-	user id, as *plexdo-list-users*(1) shows it, a username, or an email
+	user id, as *plexdo-users-list*(1) shows it, a username, or an email
 	address, or a managed user's name. It must be *plexdo*'s own account, a
 	member of its Plex Home, or have a *users* entry in the
 	configuration. See *Which account sends it*.
@@ -338,7 +338,7 @@ plexdo player-remote-play livingroom-tv.lan "$key"
 ```
 
 Send as a managed user of the Plex Home, signed in on the TV, by the
-name *plexdo-list-users*(1) shows:
+name *plexdo-users-list*(1) shows:
 
 ```
 plexdo player-remote-play livingroom-tv.lan 881 --player-user Clare

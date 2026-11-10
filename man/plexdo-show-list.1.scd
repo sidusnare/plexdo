@@ -1,15 +1,15 @@
-plexdo-list-show(1) "plexdo" "User Commands"
+plexdo-show-list(1) "plexdo" "User Commands"
 ; SPDX-FileCopyrightText: 2026 SidusNare
 ; SPDX-License-Identifier: GPL-3.0-or-later
 ; SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 # NAME
 
-plexdo-list-show - list the episodes of a show, optionally writing an M3U
+plexdo-show-list - list the episodes of a show, optionally writing an M3U
 
 # SYNOPSIS
 
-*plexdo list-show* _ratingKey_ [*--m3u* _PATH_ [*-p* _PREFIX_]]
+*plexdo show-list* _ratingKey_ [*--m3u* _PATH_ [*-p* _PREFIX_]]
 \[_GLOBAL OPTIONS_]
 
 # DESCRIPTION
@@ -24,7 +24,7 @@ directly.
 # ARGUMENTS
 
 _ratingKey_
-	The show's ratingKey, as *plexdo-list-titles*(1) or *plexdo-search*(1)
+	The show's ratingKey, as *plexdo-library-list*(1) or *plexdo-search*(1)
 	report it. It must be a show: an episode, season, or film is an error.
 
 # OPTIONS
@@ -102,13 +102,13 @@ item. See *plexdo-conventions*(7).
 List the episodes of a show:
 
 ```
-plexdo list-show 4102
+plexdo show-list 4102
 ```
 
 List them and write an M3U of the server's own paths at the same time:
 
 ```
-plexdo list-show 4102 --m3u ~/the-wire.m3u
+plexdo show-list 4102 --m3u ~/the-wire.m3u
 ```
 
 Write an M3U for a Windows machine that reaches the media through a share.
@@ -117,16 +117,16 @@ episode at _/srv/media/tv/The Wire/S01E01.mkv_ is written as
 _\\\\NAS\\tv\\The Wire\\S01E01.mkv_:
 
 ```
-plexdo list-show 4102 --m3u the-wire.m3u -p '\\\\NAS\\tv'
+plexdo show-list 4102 --m3u the-wire.m3u -p '\\\\NAS\\tv'
 ```
 
 Count a show's episodes, specials excepted:
 
 ```
-plexdo list-show 4102 --json | jq length
+plexdo show-list 4102 --json | jq length
 ```
 
 # SEE ALSO
 
-*plexdo-list-titles*(1), *plexdo-export-titles*(1), *plexdo-find-missing*(1),
-*plexdo-build-interleaved*(1), *plexdo-conventions*(7), *plexdo*(1)
+*plexdo-library-list*(1), *plexdo-titles-export*(1), *plexdo-missing-find*(1),
+*plexdo-playlist-build*(1), *plexdo-conventions*(7), *plexdo*(1)

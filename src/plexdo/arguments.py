@@ -14,7 +14,7 @@ def add_user_argument(parser: argparse.ArgumentParser) -> None:
         metavar="USER",
         help=(
             "User ID (int) or user title (str); use 0 for the admin account. "
-            "Obtain both with list-users."
+            "Obtain both with users-list."
         ),
     )
 
@@ -26,7 +26,7 @@ def add_library_argument(parser: argparse.ArgumentParser) -> None:
         metavar="LIBRARY",
         help=(
             "Library ID (int) or library title (str). Obtain both with "
-            "list-libraries."
+            "libraries-list."
         ),
     )
 
@@ -43,29 +43,31 @@ def add_m3u_argument(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def add_overwrite_argument(parser: argparse.ArgumentParser) -> None:
-    """Add -o/--overwrite, replacing a playlist of the same name."""
+def add_overwrite_argument(
+    parser: argparse.ArgumentParser,
+    help_text: str = (
+        "Replace an existing playlist of the same name instead of failing."
+    ),
+) -> None:
+    """Add -o/--overwrite: replace what is already there, as help_text says."""
     parser.add_argument(
         "-o",
         "--overwrite",
         action="store_true",
         default=False,
-        help=(
-            "Replace an existing playlist of the same name instead of failing."
-        ),
+        help=help_text,
     )
 
 
-def add_rating_keys_argument(
-    parser: argparse.ArgumentParser, help_text: str
+def add_rating_key_argument(
+    parser: argparse.ArgumentParser,
+    help_text: str = (
+        "Item ratingKey (int). Obtain with library-list or show-list."
+    ),
 ) -> None:
-    """Add the ratingKey... positional: one or more items, by ratingKey."""
+    """Add the ratingKey positional: one item, by ratingKey."""
     parser.add_argument(
-        "rating_keys",
-        nargs="+",
-        type=int,
-        metavar="ratingKey",
-        help=help_text,
+        "rating_key", metavar="ratingKey", type=int, help=help_text
     )
 
 

@@ -59,7 +59,7 @@ class Unknown:
         raise NotFound(f"no item {key}")
 
 
-# --- build-chronological asks for a missing date, film or episode --------
+# --- playlist-build -C asks for a missing date, film or episode --------
 
 
 def test_a_film_without_a_date_is_asked_for_one(monkeypatch):
@@ -105,7 +105,7 @@ def test_the_template_keeps_its_users_heading():
     prose = " ".join(line.lstrip("# ") for line in CONFIG_EXAMPLE.splitlines())
     assert (
         "Other plex.tv accounts plexdo may act as, keyed by user id as "
-        "`plexdo list-users` shows it."
+        "`plexdo users-list` shows it."
     ) in prose
 
 
@@ -161,7 +161,7 @@ def test_a_new_config_is_written_private(config):
         assert config.stat().st_mode & 0o777 == 0o600
 
 
-# --- find-missing keeps machine-readable output parseable -----------------
+# --- missing-find keeps machine-readable output parseable -----------------
 
 
 def find_missing_args(fmt):
@@ -187,7 +187,7 @@ def test_no_gaps_is_still_a_sentence_in_a_table(monkeypatch, capsys):
     assert capsys.readouterr().out.strip() == "No gaps found."
 
 
-# --- copy-playlist-to-user emits one document ------------------------------
+# --- playlist-copy --to emits one document ----------------------------------
 
 
 class Source:
@@ -208,12 +208,13 @@ def test_copy_to_user_is_a_single_json_document(monkeypatch, capsys):
         format="json",
         dry_run=False,
         overwrite=False,
+        copy_to="one",
         source_user_id=0,
         source_playlist="Movie Night",
         user_id=7,
         dest="Movie Night",
     )
-    copy.cmd_copy_playlist_to_user(None, args)
+    copy.cmd_playlist_copy(None, args)
     record = json.loads(capsys.readouterr().out)
     assert (record["status"], record["playlist"]) == ("created", "Movie Night")
     assert [(name, len(items)) for name, items in target.created] == [

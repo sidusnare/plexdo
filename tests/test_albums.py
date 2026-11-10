@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
-"""list-albums and list-album: albums, contents, played state, progress."""
+"""albums-list and album-list: albums, contents, played state, progress."""
 
 import datetime
 import json
@@ -378,11 +378,11 @@ def test_the_command_takes_a_library_by_id_or_title():
     from plexdo.cli import build_parser
 
     parser = build_parser()
-    assert parser.parse_args(["list-albums", "Music"]).library_id == "Music"
-    assert parser.parse_args(["list-albums", "4", "--json"]).format == "json"
+    assert parser.parse_args(["albums-list", "Music"]).library_id == "Music"
+    assert parser.parse_args(["albums-list", "4", "--json"]).format == "json"
 
 
-# --- list-album -----------------------------------------------------------
+# --- album-list -----------------------------------------------------------
 
 
 class ItemPlex:
@@ -479,7 +479,7 @@ def test_nested_photo_albums_are_not_contents(capsys):
     record = show(album, capsys)
     assert [c["title"] for c in record["contents"]] == ["a"]
     summary = album_summary(record, 1)
-    assert summary["nested albums"] == "1, listed by list-albums"
+    assert summary["nested albums"] == "1, listed by albums-list"
 
 
 def test_the_summary_shows_only_what_applies():
@@ -555,6 +555,6 @@ def test_list_album_takes_a_rating_key():
     from plexdo.cli import build_parser
 
     parser = build_parser()
-    assert parser.parse_args(["list-album", "100"]).rating_key == 100
+    assert parser.parse_args(["album-list", "100"]).rating_key == 100
     with pytest.raises(SystemExit):
-        parser.parse_args(["list-album", "Record"])
+        parser.parse_args(["album-list", "Record"])

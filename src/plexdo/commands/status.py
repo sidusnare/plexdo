@@ -258,10 +258,7 @@ def register(
     parser = sub.add_parser(
         "status",
         parents=parents,
-        help=(
-            "Show server identity, sessions, users, scans, and background "
-            "tasks."
-        ),
+        help="Show the server's sessions, users, scans, and tasks.",
     )
     parser.add_argument(
         "--section",

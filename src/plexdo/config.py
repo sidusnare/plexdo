@@ -185,7 +185,7 @@ def parse_config(text: str) -> Config:
         if not user_id.isdigit():
             sys.exit(
                 f"users: {key!r} in {CONFIG_PATH} is not a user id; "
-                "use the numeric id plexdo list-users shows."
+                "use the numeric id plexdo users-list shows."
             )
         users[user_id] = _options(entry, _USER_OPTIONS, f"users: {user_id}")
     return {"plex": plex, "users": users}

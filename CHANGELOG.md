@@ -12,17 +12,83 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.0.0-rc.1] - 2026-11-10
+
+The first release candidate for 3.0.0. On PyPI this version is
+`3.0.0rc1`, the PEP 440 spelling of the same pre-release. It takes the
+place of 2.1.0, which stopped at its release candidate: everything in
+2.1.0-rc.1 is here, under the new command names.
+
+### Changed
+
+- **Breaking:** commands are now named for what they act on, then what they
+  do to it. The old names are gone, not kept as aliases, so scripts and
+  shell history need updating:
+
+  | Before | Now |
+  | --- | --- |
+  | `list-libraries` | `libraries-list` |
+  | `list-titles`, `list-library` | `library-list` |
+  | `list-show` | `show-list` |
+  | `export-titles` | `titles-export` |
+  | `find-missing` | `missing-find` |
+  | `list-users` | `users-list` |
+  | `list-playlists` | `playlists-list` |
+  | `list-playlist` | `playlist-list` |
+  | `export-playlist` | `playlist-export` |
+  | `remove-playlist` | `playlist-remove` |
+  | `clean-playlist` | `playlist-clean` |
+  | `build-interleaved` | `playlist-build --interleaved` (`-I`) |
+  | `build-chronological` | `playlist-build --chronological` (`-C`) |
+  | `build-randomize` | `playlist-build --randomize` (`-R`) |
+  | `append-playlist` | `playlist-build --append` (`-A`) |
+  | `build-merge` | `merge-build` |
+  | `copy-playlist-all-users` | `playlist-copy --all` (`-A`) |
+  | `copy-playlist-to-user` | `playlist-copy --to` (`-T`) |
+  | `copy-watched` | `show-watched-cp` |
+
+  `search`, `show-metadata`, `read`, `rescan`, `status`, `wait`,
+  `player-remote-play`, `login`, `logout`, `set-pin`, and
+  `write-config-example` keep their names.
+- `playlist-build` and `playlist-copy` take the arguments the commands they
+  replace took, after a flag saying which of them is meant; exactly one such
+  flag is required. `playlist-build --append` changes a playlist where it
+  is, so it refuses `-o`, `-u`, `-a`, `--m3u`, and `-p`.
+- `plexdo --help` lists the commands in five groups, sorted by name within
+  each, in place of one flat list in no particular order. Each command's
+  `--help` lists the global options in a group of their own, sorted and
+  last, and its usage line names the command's own arguments followed by
+  `[global options]` instead of spelling all nine out. Summaries and
+  argument names are consistent across commands.
+
 ### Added
 
-- `list-albums LIBRARY` lists the albums of a music or photo library, nested
+- `write-secrets-example [-o]` writes an example secrets file, with a
+  placeholder entry for each kind of secret, to the path `plex:
+  secrets_file` names, readable by your account alone. When `secrets_file`
+  is not set, nothing is written: stderr says so, and the example is printed
+  to stdout. An existing file is replaced only with `-o/--overwrite`.
+- `albums-list LIBRARY` lists the albums of a music or photo library, nested
   photo albums included, with how many items each holds and how many have
   been played. A machine-readable format adds each album's played state and
   progress, and its contents: every track, photo, or clip with its own
   played state, view count, last-played time, and, when part way through,
   its resume point and progress.
-- `list-album RATINGKEY` shows one album: the album with its played state
+- `album-list RATINGKEY` shows one album: the album with its played state
   and progress, then each track, photo, or clip, with its own state and,
   when part way through, its resume point, length, and percentage.
+
+### Removed
+
+- **Breaking:** `build-concatenated`. `merge-build` mixes two playlists into
+  one, and `playlist-build --append` adds items to one.
+- **Breaking:** `list-titles`, whose alias `list-library` became
+  `library-list`, the one name for it now.
+
+### Fixed
+
+- zsh completion offers `-p`/`--prefix` again: its option had been written
+  in a form zsh does not expand, so it was never offered.
 
 ## [2.1.0-rc.1] - 2026-10-29
 
@@ -618,7 +684,8 @@ multi-user token handling, watched-state synchronisation, a status report,
 photo galleries, YAML/CSV/CLIXML output, shell completions for bash, zsh, and
 fish, a manual page, and packaging for PyPI. See the commit history.
 
-[Unreleased]: https://github.com/sidusnare/plexdo/compare/v2.1.0-rc.1...HEAD
+[Unreleased]: https://github.com/sidusnare/plexdo/compare/v3.0.0-rc.1...HEAD
+[3.0.0-rc.1]: https://github.com/sidusnare/plexdo/compare/v2.1.0-rc.1...v3.0.0-rc.1
 [2.1.0-rc.1]: https://github.com/sidusnare/plexdo/compare/v2.0.3...v2.1.0-rc.1
 [2.0.3]: https://github.com/sidusnare/plexdo/compare/v2.0.2...v2.0.3
 [2.0.2]: https://github.com/sidusnare/plexdo/compare/v2.0.1...v2.0.2

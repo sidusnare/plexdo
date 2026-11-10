@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
-"""list-albums and list-album: albums, what is in them, and what is played.
+"""albums-list and album-list: albums, what is in them, and what is played.
 
-list-albums covers every album of a music or photo library, list-album one
+albums-list covers every album of a music or photo library, album-list one
 album, item by item.
 
 Played state is the connected account's own, as Plex keeps it per user. An
@@ -259,7 +259,7 @@ def cmd_list_albums(plex: PlexServer, args: argparse.Namespace) -> None:
     if section.type not in (_MUSIC, _PHOTO):
         sys.exit(
             f"Library '{section.title}' is a {section.type} library; "
-            "list-albums takes a music or photo library."
+            "albums-list takes a music or photo library."
         )
     music = section.type == _MUSIC
     table = output_format(args) == "table"
@@ -298,7 +298,7 @@ def _position_text(progress: Record) -> str:
 
 
 def album_summary(record: Record, nested: int) -> Record:
-    """The album itself, as list-album's table shows it above its items.
+    """The album itself, as album-list's table shows it above its items.
 
     Only what applies is shown: no artist for a photo album, and no played
     state for one holding photos alone.
@@ -311,7 +311,7 @@ def album_summary(record: Record, nested: int) -> Record:
         summary["year"] = record["year"]
     summary["items"] = record["items"]
     if nested:
-        summary["nested albums"] = f"{nested}, listed by list-albums"
+        summary["nested albums"] = f"{nested}, listed by albums-list"
     if record["duration"]:
         summary["length"] = format_duration(record["duration"])
     if record["state"] is not None:
@@ -327,7 +327,7 @@ def album_summary(record: Record, nested: int) -> Record:
 
 
 def item_rows(record: Record) -> list[Record]:
-    """list-album's table: one row per item, with the columns that apply.
+    """album-list's table: one row per item, with the columns that apply.
 
     The track number carries the disc as well, as 2-03, only when the album
     spans several. The artist column appears only when some track's artist
@@ -365,7 +365,7 @@ def cmd_list_album(plex: PlexServer, args: argparse.Namespace) -> None:
     """Show one album's contents, with each item's played state and progress.
 
     A table shows the album, then its items. JSON and YAML carry the same
-    record list-albums gives for each album; CSV and CLIXML, which cannot
+    record albums-list gives for each album; CSV and CLIXML, which cannot
     nest, carry the item records alone.
     """
     album = fetch_item(plex, args.rating_key)
@@ -373,7 +373,7 @@ def cmd_list_album(plex: PlexServer, args: argparse.Namespace) -> None:
     if not _is_album(album) or kind not in _ALBUM_TYPES:
         sys.exit(
             f"ratingKey {args.rating_key} is not an album (it is a "
-            f"{kind or type(album).__name__}); list-albums lists the albums "
+            f"{kind or type(album).__name__}); albums-list lists the albums "
             "of a library."
         )
     children = _children(album)
@@ -381,7 +381,7 @@ def cmd_list_album(plex: PlexServer, args: argparse.Namespace) -> None:
     nested = len(children) - len(contents)
     if nested:
         LOG.info(
-            "%d album(s) nested in '%s' are not listed here; list-albums "
+            "%d album(s) nested in '%s' are not listed here; albums-list "
             "lists them.",
             nested,
             vars(album).get("title"),
@@ -406,9 +406,9 @@ def register(
     sub: "argparse._SubParsersAction",
     parents: "list[argparse.ArgumentParser]",
 ) -> None:
-    """Register the list-albums and list-album subparsers."""
+    """Register the albums-list and album-list subparsers."""
     parser = sub.add_parser(
-        "list-albums",
+        "albums-list",
         parents=parents,
         help="List the albums in a music or photo library.",
         description=textwrap.fill(
@@ -426,7 +426,7 @@ def register(
     add_library_argument(parser)
 
     single = sub.add_parser(
-        "list-album",
+        "album-list",
         parents=parents,
         help="Show one album's contents, played state, and progress.",
         description=textwrap.fill(
@@ -443,10 +443,10 @@ def register(
         "rating_key",
         type=int,
         metavar="ratingKey",
-        help="The album's ratingKey (int). Obtain with list-albums.",
+        help="The album's ratingKey (int). Obtain with albums-list.",
     )
 
 
-COMMANDS = {"list-albums": cmd_list_albums, "list-album": cmd_list_album}
+COMMANDS = {"albums-list": cmd_list_albums, "album-list": cmd_list_album}
 
 REQUIRES_PLEX = frozenset(COMMANDS)

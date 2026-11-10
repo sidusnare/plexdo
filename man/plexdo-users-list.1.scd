@@ -1,15 +1,15 @@
-plexdo-list-users(1) "plexdo" "User Commands"
+plexdo-users-list(1) "plexdo" "User Commands"
 ; SPDX-FileCopyrightText: 2026 SidusNare
 ; SPDX-License-Identifier: GPL-3.0-or-later
 ; SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 # NAME
 
-plexdo-list-users - list the users the server is shared with
+plexdo-users-list - list the users the server is shared with
 
 # SYNOPSIS
 
-*plexdo list-users* [_GLOBAL OPTIONS_]
+*plexdo users-list* [_GLOBAL OPTIONS_]
 
 # DESCRIPTION
 
@@ -89,7 +89,7 @@ cannot be reached. See *plexdo-conventions*(7).
 List the users:
 
 ```
-$ plexdo list-users
+$ plexdo users-list
 +----+---------+-------+
 | id | type    | title |
 +----+---------+-------+
@@ -102,17 +102,17 @@ $ plexdo list-users
 The IDs and titles work interchangeably wherever a user is named:
 
 ```
-plexdo list-playlists 7
-plexdo list-playlists Alice
+plexdo playlists-list 7
+plexdo playlists-list Alice
 ```
 
 List only the managed accounts:
 
 ```
-plexdo list-users --json | jq -r '.[] | select(.type == "managed") | .title'
+plexdo users-list --json | jq -r '.[] | select(.type == "managed") | .title'
 ```
 
 # SEE ALSO
 
-*plexdo-status*(1), *plexdo-list-playlists*(1), *plexdo-copy-watched*(1),
+*plexdo-status*(1), *plexdo-playlists-list*(1), *plexdo-show-watched-cp*(1),
 *plexdo-conventions*(7), *plexdo*(1)

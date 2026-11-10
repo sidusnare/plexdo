@@ -9,8 +9,10 @@ import datetime
 import re
 import sys
 from collections.abc import Iterator, Sequence
+from functools import partial
 from typing import NamedTuple
 
+from plexapi.exceptions import NotFound
 from plexapi.playlist import Playlist
 from plexapi.server import PlexServer
 from plexapi.video import Episode, Movie, Show
@@ -24,9 +26,9 @@ from plexdo.airdates import (
 from plexdo.arguments import (
     add_m3u_argument,
     add_overwrite_argument,
-    add_rating_keys_argument,
     add_user_argument,
 )
+from plexdo.console import output
 from plexdo.constants import LOG, MediaItem
 from plexdo.convert import parse_date
 from plexdo.fanout import add_user_target_arguments, deliver_playlist
@@ -35,6 +37,7 @@ from plexdo.paths import add_prefix_argument, mapper_for
 from plexdo.playlists import resolve_playlist
 from plexdo.throttle import paced
 from plexdo.titles import (
+    display_title,
     fetch_item,
     fetch_show,
     non_special_episodes,
@@ -56,7 +59,7 @@ def _round_robin(episode_lists: list[list[Episode]]) -> Iterator[Episode]:
             queues.remove(q)
 
 
-def cmd_build_interleaved(plex: PlexServer, args: argparse.Namespace) -> None:
+def _build_interleaved(plex: PlexServer, args: argparse.Namespace) -> None:
     """Build a round-robin interleaved playlist from multiple shows."""
     rating_keys = [int(k) for k in args.rating_keys]
     episode_lists: list[list[Episode]] = []
@@ -120,7 +123,7 @@ def _build_chronological_items(
     return dated_items
 
 
-def cmd_build_chronological(plex: PlexServer, args: argparse.Namespace) -> None:
+def _build_chronological(plex: PlexServer, args: argparse.Namespace) -> None:
     """Build a date-sorted playlist from shows and/or movies."""
     rating_keys = [int(k) for k in args.rating_keys]
     dated_items = _build_chronological_items(plex, rating_keys)
@@ -134,7 +137,7 @@ def cmd_build_chronological(plex: PlexServer, args: argparse.Namespace) -> None:
         write_m3u(items, args.m3u, mapper_for(plex, args))
 
 
-def cmd_build_randomize(plex: PlexServer, args: argparse.Namespace) -> None:
+def _build_randomize(plex: PlexServer, args: argparse.Namespace) -> None:
     """Randomize a playlist and save to a new destination playlist."""
     user_plex = server_for_user(plex, args.user_id)
     src: Playlist = resolve_playlist(user_plex, args.source)
@@ -147,6 +150,42 @@ def cmd_build_randomize(plex: PlexServer, args: argparse.Namespace) -> None:
 
     if args.m3u:
         write_m3u(randomized, args.m3u, mapper_for(user_plex, args))
+
+
+def _append(plex: PlexServer, args: argparse.Namespace) -> None:
+    """Append one or more items to an existing playlist."""
+    user_plex = server_for_user(plex, args.user_id)
+    playlist: Playlist = resolve_playlist(user_plex, args.playlist)
+
+    rating_keys = [int(k) for k in args.rating_keys]
+    new_items: list[MediaItem] = []
+    for rk in rating_keys:
+        try:
+            new_items.append(user_plex.fetchItem(rk))
+        except NotFound:
+            sys.exit(f"ratingKey not found: {rk}")
+
+    if not new_items:
+        sys.exit("No items to append.")
+
+    LOG.info("Appending %d item(s) to '%s'", len(new_items), args.playlist)
+
+    preview_rows = [
+        {
+            "index": i + 1,
+            "ratingKey": int(item.ratingKey),
+            "title": display_title(item),
+        }
+        for i, item in enumerate(new_items)
+    ]
+    output(preview_rows, args)
+
+    if args.dry_run:
+        LOG.info("--dry-run: skipping append.")
+        return
+
+    playlist.addItems(new_items)
+    LOG.info("Appended %d item(s) to '%s'.", len(new_items), args.playlist)
 
 
 def _collect_sources(
@@ -170,51 +209,6 @@ def _collect_sources(
             LOG.warning("Playlist '%s' is empty; it contributes nothing.", name)
         sources.append((name, part))
     return sources
-
-
-def _concatenate(
-    sources: Sequence[tuple[str, list[MediaItem]]], unique: bool
-) -> list[MediaItem]:
-    """Join the sources end to end, preserving the order within each.
-
-    With *unique*, an item already added is skipped rather than repeated; a
-    ratingKey identifies the item, so the same episode reached through two
-    playlists becomes one entry. Without it the result is a faithful
-    concatenation, duplicates and all, which is what Plex itself allows.
-    """
-    items: list[MediaItem] = []
-    seen: set[int] = set()
-    for _, part in sources:
-        for item in part:
-            key = int(item.ratingKey)
-            if unique and key in seen:
-                continue
-            seen.add(key)
-            items.append(item)
-    return items
-
-
-def cmd_build_concatenated(plex: PlexServer, args: argparse.Namespace) -> None:
-    """Build one playlist from several others, joined end to end."""
-    user_plex = server_for_user(plex, args.user_id)
-
-    # Every source is read before anything is written, so naming a source as
-    # the destination and passing --overwrite still works: the items are
-    # already in memory by the time the old playlist is removed.
-    sources = _collect_sources(user_plex, args.playlists, args)
-    items = _concatenate(sources, args.unique)
-
-    total = sum(len(part) for _, part in sources)
-    if args.unique and len(items) < total:
-        LOG.info("--unique: skipped %d repeated item(s).", total - len(items))
-    LOG.info(
-        "Concatenated %d playlist(s) into %d item(s)", len(sources), len(items)
-    )
-
-    deliver_playlist(plex, user_plex, args.name, items, args)
-
-    if args.m3u:
-        write_m3u(items, args.m3u, mapper_for(user_plex, args))
 
 
 def _parse_ratio(text: str) -> tuple[int, int]:
@@ -287,8 +281,7 @@ def _merge(
     result ends with the last turn both took part in.
 
     Repeats are kept, as Plex allows. With *unique* an item already taken
-    is passed over, as in build-concatenated, and the next one takes its
-    place, so the ratio still holds.
+    is passed over and the next one takes its place, so the ratio still holds.
     """
     sources = (first, second)
     starts = [0, 0]
@@ -325,7 +318,8 @@ def cmd_build_merge(plex: PlexServer, args: argparse.Namespace) -> None:
     user_plex = server_for_user(plex, args.user_id)
 
     # Both sources are read before anything is written, so either may be the
-    # destination under --overwrite, as with build-concatenated.
+    # destination under --overwrite: the items are already in memory by the
+    # time the old playlist is removed.
     sources = _collect_sources(user_plex, [args.first, args.second], args)
     first, second = sources[0][1], sources[1][1]
     merged = _merge(
@@ -372,106 +366,179 @@ def cmd_build_merge(plex: PlexServer, args: argparse.Namespace) -> None:
         write_m3u(items, args.m3u, mapper_for(user_plex, args))
 
 
+# What each playlist-build mode takes, for its usage and its errors.
+_MODES = {
+    "interleaved": "NAME ratingKey [ratingKey ...]",
+    "chronological": "NAME ratingKey [ratingKey ...]",
+    "randomize": "USER SOURCE DEST",
+    "append": "USER PLAYLIST ratingKey [ratingKey ...]",
+}
+
+_BUILD_USAGE = """%(prog)s (-I | -C) NAME ratingKey [ratingKey ...] [options]
+       %(prog)s -R USER SOURCE DEST [options]
+       %(prog)s -A USER PLAYLIST ratingKey [ratingKey ...]"""
+
+_BUILD_DESCRIPTION = """\
+Build a playlist, or add to one. Exactly one of -I, -C, -R, and -A says how,
+and what the arguments are:
+
+  -I, -C  NAME is the new playlist; each ratingKey is a show (-C also takes
+          movies), as library-list shows it.
+  -R      USER owns the playlist SOURCE, which is shuffled into the new
+          playlist DEST.
+  -A      USER owns PLAYLIST; each ratingKey is an item to add to its end,
+          as library-list or show-list shows it.
+
+USER is a user ID or title, 0 for the admin account (see users-list).
+SOURCE and PLAYLIST are a playlist name or ratingKey (see playlists-list).
+-A changes an existing playlist, so it takes none of -o, -u, -a, --m3u,
+and -p."""
+
+
+def _rating_keys(
+    parser: argparse.ArgumentParser, words: list[str]
+) -> list[int]:
+    """The ratingKey operands as integers; a bad one is a usage error."""
+    keys = []
+    for word in words:
+        try:
+            keys.append(int(word))
+        except ValueError:
+            parser.error(f"argument ratingKey: invalid int value: {word!r}")
+    return keys
+
+
+def _check_build(
+    parser: argparse.ArgumentParser, args: argparse.Namespace
+) -> None:
+    """Name playlist-build's operands for its mode, or exit 2.
+
+    The four modes take different arguments, so the parser collects them
+    unnamed and this gives each its place: argparse cannot make what a
+    positional means depend on a flag.
+    """
+    words = [args.first, *args.rest]
+    mode = args.mode
+    expected = f"--{mode} takes {_MODES[mode]}"
+    if mode == "randomize":
+        if len(words) != 3:
+            parser.error(f"{expected}; got {len(words)} argument(s)")
+        args.user_id, args.source, args.dest = words
+        return
+    if mode == "append":
+        if len(words) < 3:
+            parser.error(f"{expected}; got {len(words)} argument(s)")
+        unused = [
+            flag
+            for flag, given in (
+                ("--overwrite", args.overwrite),
+                ("--m3u", args.m3u),
+                ("--prefix", args.prefix),
+                ("--user", args.dest_user_id is not None),
+                ("--all-users", args.all_users),
+            )
+            if given
+        ]
+        if unused:
+            parser.error(
+                f"{', '.join(unused)} cannot be used with --append, which "
+                "adds to a playlist where it is"
+            )
+        args.user_id, args.playlist = words[:2]
+        args.rating_keys = _rating_keys(parser, words[2:])
+        return
+    args.name = words[0]
+    args.rating_keys = _rating_keys(parser, words[1:])
+
+
+_BUILDERS = {
+    "interleaved": _build_interleaved,
+    "chronological": _build_chronological,
+    "randomize": _build_randomize,
+    "append": _append,
+}
+
+
+def cmd_playlist_build(plex: PlexServer, args: argparse.Namespace) -> None:
+    """Build a playlist, or append to one, the way the mode flag says."""
+    _BUILDERS[args.mode](plex, args)
+
+
+def _register_build(
+    sub: "argparse._SubParsersAction",
+    parents: "list[argparse.ArgumentParser]",
+) -> None:
+    """Register playlist-build."""
+    parser = sub.add_parser(
+        "playlist-build",
+        parents=parents,
+        help="Build a playlist, or add items to one.",
+        usage=_BUILD_USAGE,
+        description=_BUILD_DESCRIPTION,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.set_defaults(check_arguments=partial(_check_build, parser))
+
+    how = parser.add_argument_group("how to build (exactly one)")
+    mode = how.add_mutually_exclusive_group(required=True)
+    for short, name, text in (
+        ("-I", "interleaved", "Take one episode from each show in turn."),
+        (
+            "-C",
+            "chronological",
+            "Sort the episodes and movies by original air date.",
+        ),
+        ("-R", "randomize", "Shuffle an existing playlist into a new one."),
+        ("-A", "append", "Add items to the end of an existing playlist."),
+    ):
+        mode.add_argument(
+            short,
+            f"--{name}",
+            dest="mode",
+            action="store_const",
+            const=name,
+            help=text,
+        )
+
+    parser.add_argument(
+        "first",
+        metavar="ARG",
+        help="The mode's arguments, in the order the usage shows.",
+    )
+    parser.add_argument(
+        "rest", nargs="+", metavar="ARG", help=argparse.SUPPRESS
+    )
+
+    made = parser.add_argument_group("the new playlist (not with -A)")
+    add_overwrite_argument(made)
+    add_user_target_arguments(made)
+    add_m3u_argument(made)
+    add_prefix_argument(made)
+
+
 def register(
     sub: "argparse._SubParsersAction",
     parents: "list[argparse.ArgumentParser]",
 ) -> None:
     """Register the playlist building subparsers."""
-    p_bi = sub.add_parser(
-        "build-interleaved",
-        parents=parents,
-        help="Round-robin interleaved playlist from multiple shows.",
-    )
-    p_bi.add_argument("name", help="Name for the new playlist (str).")
-    add_rating_keys_argument(
-        p_bi,
-        "One or more Show ratingKeys (int). Obtain with list-titles.",
-    )
-    add_overwrite_argument(p_bi)
-    add_m3u_argument(p_bi)
-    add_prefix_argument(p_bi)
-    add_user_target_arguments(p_bi)
-
-    p_bc = sub.add_parser(
-        "build-chronological",
-        parents=parents,
-        help="Date-sorted playlist from shows and/or movies.",
-    )
-    p_bc.add_argument("name", help="Name for the new playlist (str).")
-    add_rating_keys_argument(
-        p_bc,
-        ("One or more Show/Movie ratingKeys (int). Obtain with list-titles."),
-    )
-    add_overwrite_argument(p_bc)
-    add_m3u_argument(p_bc)
-    add_prefix_argument(p_bc)
-    add_user_target_arguments(p_bc)
-
-    p_br = sub.add_parser(
-        "build-randomize",
-        parents=parents,
-        help="Randomize a source playlist into a new destination playlist.",
-    )
-    add_user_argument(p_br)
-    p_br.add_argument(
-        "source",
-        help=(
-            "Playlist name (str) or ratingKey (int). Obtain either with "
-            "list-playlists."
-        ),
-    )
-    p_br.add_argument("dest", help="Destination playlist title (str).")
-    add_overwrite_argument(p_br)
-    add_m3u_argument(p_br)
-    add_prefix_argument(p_br)
-    add_user_target_arguments(p_br)
-
-    p_bn = sub.add_parser(
-        "build-concatenated",
-        parents=parents,
-        help="Join several playlists end to end into one new playlist.",
-    )
-    add_user_argument(p_bn)
-    p_bn.add_argument("name", help="Name for the new playlist (str).")
-    p_bn.add_argument(
-        "playlists",
-        nargs="+",
-        metavar="PLAYLIST",
-        help=(
-            "The playlists to join, in the order they should appear. "
-            "Playlist name (str) or ratingKey (int). Obtain either with "
-            "list-playlists."
-        ),
-    )
-    p_bn.add_argument(
-        "-U",
-        "--unique",
-        action="store_true",
-        default=False,
-        help=(
-            "Skip an item an earlier playlist already contributed, so a "
-            "title appearing in two of them is listed once."
-        ),
-    )
-    add_overwrite_argument(p_bn)
-    add_m3u_argument(p_bn)
-    add_prefix_argument(p_bn)
-    add_user_target_arguments(p_bn)
+    _register_build(sub, parents)
 
     p_bm = sub.add_parser(
-        "build-merge",
+        "merge-build",
         parents=parents,
-        help="Mix two playlists into one new playlist at a ratio.",
+        help="Mix two playlists into a new one at a ratio.",
     )
     add_user_argument(p_bm)
-    p_bm.add_argument("name", help="Name for the new playlist (str).")
+    p_bm.add_argument(
+        "name", metavar="NAME", help="Name for the new playlist (str)."
+    )
     for which in ("first", "second"):
         p_bm.add_argument(
             which,
             metavar=which.upper(),
             help=(
                 f"The {which} playlist to mix. Playlist name (str) or "
-                "ratingKey (int). Obtain either with list-playlists."
+                "ratingKey (int). Obtain either with playlists-list."
             ),
         )
     p_bm.add_argument(
@@ -512,11 +579,8 @@ def register(
 
 
 COMMANDS = {
-    "build-interleaved": cmd_build_interleaved,
-    "build-chronological": cmd_build_chronological,
-    "build-randomize": cmd_build_randomize,
-    "build-concatenated": cmd_build_concatenated,
-    "build-merge": cmd_build_merge,
+    "merge-build": cmd_build_merge,
+    "playlist-build": cmd_playlist_build,
 }
 
 REQUIRES_PLEX = frozenset(COMMANDS)

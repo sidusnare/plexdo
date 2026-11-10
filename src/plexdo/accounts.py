@@ -24,7 +24,7 @@ class UserAccessError(RuntimeError):
     """The server refused to act on behalf of a user.
 
     Deliberately an ordinary Exception rather than a sys.exit: it must be
-    catchable so copy-playlist-all-users can skip one inaccessible user and
+    catchable so playlist-copy --all can skip one inaccessible user and
     carry on down the list. cli.main turns it into a clean exit for the
     single-user commands.
 
@@ -306,7 +306,7 @@ def user_roster(plex: PlexServer) -> list[tuple[int, str]]:
 
 def resolve_user_identifier(roster: list[tuple[int, str]], value: Any) -> int:
     """Resolve a numeric user ID or a user title to a numeric user ID."""
-    return resolve_identifier(roster, value, "user", "list-users")
+    return resolve_identifier(roster, value, "user", "users-list")
 
 
 def resolve_user_arguments(

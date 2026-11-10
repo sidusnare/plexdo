@@ -34,12 +34,12 @@ def register(
 ) -> None:
     """Register the user listing subparser."""
     sub.add_parser(
-        "list-users",
+        "users-list",
         parents=parents,
-        help="List all managed/home users (id, type, title).",
+        help="List the server's users.",
     )
 
 
-COMMANDS = {"list-users": cmd_list_users}
+COMMANDS = {"users-list": cmd_list_users}
 
 REQUIRES_PLEX = frozenset(COMMANDS)

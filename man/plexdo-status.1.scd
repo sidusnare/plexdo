@@ -47,7 +47,7 @@ access cannot reach.
 
 *users*
 	The users the server is shared with: *id*, *type*, *title*,
-	*username*, and *email*. *plexdo-list-users*(1) gives the first three.
+	*username*, and *email*. *plexdo-users-list*(1) gives the first three.
 
 *accounts*
 	The accounts the server itself knows, which is not the same list: *id*,
@@ -157,5 +157,5 @@ fi
 
 # SEE ALSO
 
-*plexdo-wait*(1), *plexdo-rescan*(1), *plexdo-list-users*(1),
+*plexdo-wait*(1), *plexdo-rescan*(1), *plexdo-users-list*(1),
 *plexdo-conventions*(7), *plexdo*(1)

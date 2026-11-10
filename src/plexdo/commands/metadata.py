@@ -11,6 +11,7 @@ from plexapi.audio import Track
 from plexapi.server import PlexServer
 from plexapi.video import Episode, Movie, Show
 
+from plexdo.arguments import add_rating_key_argument
 from plexdo.console import clean_text, output, output_format
 from plexdo.convert import format_duration
 from plexdo.records import file_paths
@@ -135,13 +136,9 @@ def register(
     parser = sub.add_parser(
         "show-metadata",
         parents=parents,
-        help="Display metadata for a single item by ratingKey.",
+        help="Show the metadata of one item, by ratingKey.",
     )
-    parser.add_argument(
-        "rating_key",
-        type=int,
-        help="Item ratingKey (int). Obtain with list-titles or list-show.",
-    )
+    add_rating_key_argument(parser)
 
 
 COMMANDS = {"show-metadata": cmd_show_metadata}

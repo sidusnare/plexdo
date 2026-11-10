@@ -1,15 +1,15 @@
-plexdo-list-albums(1) "plexdo" "User Commands"
+plexdo-albums-list(1) "plexdo" "User Commands"
 ; SPDX-FileCopyrightText: 2026 SidusNare
 ; SPDX-License-Identifier: GPL-3.0-or-later
 ; SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 # NAME
 
-plexdo-list-albums - list the albums in a library, with what you have played
+plexdo-albums-list - list the albums in a library, with what you have played
 
 # SYNOPSIS
 
-*plexdo list-albums* _LIBRARY_ [_GLOBAL OPTIONS_]
+*plexdo albums-list* _LIBRARY_ [_GLOBAL OPTIONS_]
 
 # DESCRIPTION
 
@@ -30,7 +30,7 @@ state of the account plexdo is connected as.
 
 _LIBRARY_
 	The library to list, by numeric ID or by title, as
-	*plexdo-list-libraries*(1) shows them. See *plexdo-conventions*(7) for
+	*plexdo-libraries-list*(1) shows them. See *plexdo-conventions*(7) for
 	how a title is matched.
 
 # PLAYED STATE
@@ -182,19 +182,19 @@ List the albums of a music library, with how many tracks of each have been
 played:
 
 ```
-plexdo list-albums Music
+plexdo albums-list Music
 ```
 
 Every album with its tracks and their played state, as JSON:
 
 ```
-plexdo list-albums Music --json > albums.json
+plexdo albums-list Music --json > albums.json
 ```
 
 The albums part way through, and how far:
 
 ```
-plexdo list-albums Music --json |
+plexdo albums-list Music --json |
     jq -r '.[] | select(.state == "in progress") |
         "\\(.progress)%  \\(.artist) - \\(.title)"'
 ```
@@ -202,7 +202,7 @@ plexdo list-albums Music --json |
 Every track with a resume point, and where it is:
 
 ```
-plexdo list-albums Music --json |
+plexdo albums-list Music --json |
     jq -r '.[].contents[] | select(.viewOffset) |
         "\\(.title): \\(.viewOffset / 1000 | floor)s (\\(.progress)%)"'
 ```
@@ -210,11 +210,11 @@ plexdo list-albums Music --json |
 The albums of a photo library, nested ones included:
 
 ```
-plexdo list-albums Photos
+plexdo albums-list Photos
 ```
 
 # SEE ALSO
 
-*plexdo-list-album*(1), *plexdo-list-libraries*(1), *plexdo-list-titles*(1),
-*plexdo-copy-watched*(1), *plexdo-show-metadata*(1), *plexdo-conventions*(7),
+*plexdo-album-list*(1), *plexdo-libraries-list*(1), *plexdo-library-list*(1),
+*plexdo-show-watched-cp*(1), *plexdo-show-metadata*(1), *plexdo-conventions*(7),
 *plexdo*(1)

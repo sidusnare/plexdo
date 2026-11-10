@@ -47,7 +47,7 @@ def resolve_library_identifier(
     roster: list[tuple[int, str]], value: Any
 ) -> int:
     """Resolve a numeric library ID or a library title to a numeric ID."""
-    return resolve_identifier(roster, value, "library", "list-libraries")
+    return resolve_identifier(roster, value, "library", "libraries-list")
 
 
 def resolve_library_arguments(

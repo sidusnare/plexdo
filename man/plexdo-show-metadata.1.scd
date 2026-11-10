@@ -18,14 +18,14 @@ else with a ratingKey, along with the server-side path of every file behind
 it. The fields depend on what kind of item it is; see *OUTPUT*.
 
 For a whole library's worth of fields at once, a machine-readable format of
-*plexdo-list-titles*(1) carries more, but this command is the way to see one
+*plexdo-library-list*(1) carries more, but this command is the way to see one
 item completely.
 
 # ARGUMENTS
 
 _ratingKey_
-	The item, by ratingKey, as *plexdo-list-titles*(1),
-	*plexdo-list-show*(1), or *plexdo-search*(1) report it.
+	The item, by ratingKey, as *plexdo-library-list*(1),
+	*plexdo-show-list*(1), or *plexdo-search*(1) report it.
 
 # OPTIONS
 
@@ -145,5 +145,5 @@ ls -l "$(plexdo show-metadata 4180 --json | jq -r '.files[0]')"
 
 # SEE ALSO
 
-*plexdo-list-titles*(1), *plexdo-search*(1), *plexdo-read*(1),
+*plexdo-library-list*(1), *plexdo-search*(1), *plexdo-read*(1),
 *plexdo-conventions*(7), *plexdo*(1)

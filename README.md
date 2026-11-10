@@ -50,7 +50,7 @@ same program.
 ```bash
 plexdo write-config-example        # writes ~/.config/plexdo/config.yaml
 plexdo login                       # prompts, saves a token in the keyring
-plexdo list-libraries
+plexdo libraries-list
 ```
 
 `write-config-example --help` prints the exact template it would write. It
@@ -110,11 +110,17 @@ A password is saved only if you ask: `plexdo login --save-password` keeps it
 beside the token, so plexdo can sign in again by itself once the token stops
 working. A password or PIN in the configuration file is ignored, with a warning.
 
+`plexdo write-secrets-example` writes an example of the secrets file, with a
+placeholder entry of each kind, to the path `secrets_file` names in the
+configuration, readable by your account alone; an existing file is replaced
+only with `-o/--overwrite`. When `secrets_file` is not set, nothing is
+written: stderr says so, and the example is printed to stdout instead.
+
 ### Multiple users
 
 A Plex server refuses an admin-issued token for a user it has shared nothing
 with, so acting on that user needs their own login. Add an entry for them under
-`users`, keyed by their user ID (from `plexdo list-users`), and sign them in
+`users`, keyed by their user ID (from `plexdo users-list`), and sign them in
 once:
 
 ```yaml
@@ -146,10 +152,22 @@ second run can finish, and the exit status is 1.
 
 ## Commands
 
+Most commands are named for what they act on, then what they do to it:
+`playlist-list`, `playlist-export`, `library-list`. `plexdo --help` lists
+them in these groups, sorted by name within each:
+
+| Group | Commands |
+| --- | --- |
+| Libraries and titles | `album-list`, `albums-list`, `libraries-list`, `library-list`, `missing-find`, `search`, `show-list`, `show-metadata`, `titles-export` |
+| Playlists | `merge-build`, `playlist-build`, `playlist-clean`, `playlist-copy`, `playlist-export`, `playlist-list`, `playlist-remove`, `playlists-list` |
+| Playback and watched state | `player-remote-play`, `read`, `show-watched-cp`, `wait` |
+| Server | `rescan`, `status`, `users-list` |
+| Account and configuration | `login`, `logout`, `set-pin`, `write-config-example`, `write-secrets-example` |
+
 Every command accepts `-f/--format`, `-v/--verbose`, `--debug`,
 `--debug-log PATH`, `--dry-run`, and `-V/--version`, and they may be given
-either before or after the command name - `plexdo --json list-users` and
-`plexdo list-users --json` are equivalent. Logging always goes to stderr, or
+either before or after the command name - `plexdo --json users-list` and
+`plexdo users-list --json` are equivalent. Logging always goes to stderr, or
 the debug log, so machine-readable output on stdout is safe to pipe.
 
 ### Debug log
@@ -166,7 +184,7 @@ and beside the debug logging the file records:
 - at the end, totals for the run and cProfile's tables of function run times.
 
 ```bash
-plexdo list-playlists 0 --debug-log ~/plexdo-debug.log
+plexdo playlists-list 0 --debug-log ~/plexdo-debug.log
 grep ' plexdo.http: recv ' ~/plexdo-debug.log    # every response and its wait
 ```
 
@@ -178,11 +196,11 @@ private.
 ### Output formats
 
 ```bash
-plexdo list-libraries                  # aligned table (default)
-plexdo list-libraries --json           # shorthand for -f json
-plexdo -f yaml list-libraries
-plexdo list-titles 3 -f csv > titles.csv
-plexdo list-users -f clixml            # PowerShell Import-Clixml
+plexdo libraries-list                  # aligned table (default)
+plexdo libraries-list --json           # shorthand for -f json
+plexdo -f yaml libraries-list
+plexdo library-list 3 -f csv > titles.csv
+plexdo users-list -f clixml            # PowerShell Import-Clixml
 ```
 
 | format | notes |
@@ -202,9 +220,9 @@ an ellipsis so a row stays on one line, and `--verbose` reports which columns
 were narrowed.
 
 ```bash
-plexdo list-titles "TV Shows"           # fitted to the terminal
-plexdo -W list-titles "TV Shows"        # every character, however wide
-plexdo list-titles "TV Shows" > out.txt # redirected output is never truncated
+plexdo library-list "TV Shows"           # fitted to the terminal
+plexdo -W library-list "TV Shows"        # every character, however wide
+plexdo library-list "TV Shows" > out.txt # redirected output is never truncated
 ```
 
 Redirected output keeps every character, so piping to a file or to `grep` is
@@ -219,8 +237,8 @@ large run does not flood the server or trip its rate limiting. Smaller runs
 are never paced.
 
 ```bash
-plexdo --throttle 0 find-missing      # as fast as the server will answer
-plexdo --throttle 1 find-missing      # gentler on a Raspberry Pi
+plexdo --throttle 0 missing-find      # as fast as the server will answer
+plexdo --throttle 1 missing-find      # gentler on a Raspberry Pi
 ```
 
 When pacing kicks in it says so, with the expected duration:
@@ -231,12 +249,12 @@ or --throttle 0 to disable.
 ```
 
 Anywhere a **library** is required you may pass either the numeric library ID
-or its title, so `plexdo list-titles 3` and `plexdo list-titles "TV Shows"`
+or its title, so `plexdo library-list 3` and `plexdo library-list "TV Shows"`
 are equivalent. The same applies to `--library-id` on `search` and `-l` on
-`copy-watched`.
+`show-watched-cp`.
 
 Anywhere a user is required you may pass either the numeric user ID or the
-user's title, so `plexdo list-playlists 7` and `plexdo list-playlists Alice`
+user's title, so `plexdo playlists-list 7` and `plexdo playlists-list Alice`
 are equivalent. `0` always means the admin account. Titles match exactly first,
 then case-insensitively. If a value is simultaneously one user's ID and another
 user's title the ID wins, with a warning naming the user that was skipped; if
@@ -247,25 +265,25 @@ identical rules apply to library IDs and titles.
 
 | Command | Purpose |
 | --- | --- |
-| `list-libraries` | Library IDs, types, and titles |
-| `list-titles <library> [--album A]` | Titles in a library (alias: `list-library`) |
-| `list-albums <library>` | Albums in a music or photo library, with played state |
-| `list-album <rating_key>` | One album's tracks, photos, or clips, and how far through each you are |
-| `find-missing <show> [-l L] [-A] [-s N,N]` | Seasons with gaps in their episode numbering |
-| `list-show <rating_key> [--m3u P]` | Every episode of a show, specials skipped |
-| `list-users` | User IDs, account types, and titles |
-| `list-playlists <user_id>` | A user's playlists |
-| `list-playlist <user_id> <playlist\|ratingKey> [--m3u P]` | Items in one playlist |
+| `libraries-list` | Library IDs, types, and titles |
+| `library-list <library> [--album A]` | Titles in a library |
+| `albums-list <library>` | Albums in a music or photo library, with played state |
+| `album-list <rating_key>` | One album's tracks, photos, or clips, and how far through each you are |
+| `missing-find <show> [-l L] [-A] [-s N,N]` | Seasons with gaps in their episode numbering |
+| `show-list <rating_key> [--m3u P]` | Every episode of a show, specials skipped |
+| `users-list` | User IDs, account types, and titles |
+| `playlists-list <user_id>` | A user's playlists |
+| `playlist-list <user_id> <playlist\|ratingKey> [--m3u P]` | Items in one playlist |
 | `show-metadata <rating_key>` | Full metadata for one item, including its file paths |
 | `search <user_id> <query> [--media-type T] [--library-id N]` | Search as a given user |
 
-`list-titles` shows the rating key, title, release date, rating, and studio as
+`library-list` shows the rating key, title, release date, rating, and studio as
 a table. A machine-readable format carries **every field the server returned**
 for each item, and for a show library nests each show's episodes under a
 `seasons` object:
 
 ```bash
-plexdo list-titles "TV Shows" -f json | jq '.[0].seasons | keys'
+plexdo library-list "TV Shows" -f json | jq '.[0].seasons | keys'
 ```
 
 Nested objects such as media and their parts are expanded rather than printed
@@ -273,7 +291,7 @@ as object references, so a file name is at `media[].parts[].file`, and the
 paths are repeated in a top-level `files` list:
 
 ```bash
-plexdo list-titles Movies -f json | jq -r '.[].files[]'
+plexdo library-list Movies -f json | jq -r '.[].files[]'
 ```
 
 Note that `sourceURI` is **not** a file name. It is the remote server URI of an
@@ -284,7 +302,7 @@ the route to the full picture for a single item.
 
 ### Albums
 
-`list-albums` lists the albums of a music or photo library, nested photo
+`albums-list` lists the albums of a music or photo library, nested photo
 albums included. The table shows how many items each album holds and how
 many have been played. A machine-readable format adds each album's played
 state (`played`, `in progress`, or `unplayed`) and its contents, every
@@ -295,8 +313,8 @@ running time has been played. Photos have no played state, so theirs is
 null.
 
 ```bash
-plexdo list-albums Music                    # one row per album
-plexdo list-albums Music --json |           # albums part way through
+plexdo albums-list Music                    # one row per album
+plexdo albums-list Music --json |           # albums part way through
     jq -r '.[] | select(.state == "in progress") | "\(.progress)% \(.title)"'
 ```
 
@@ -304,7 +322,7 @@ Played state is the connected account's own. The music table costs one
 request; the other formats, and any photo library, open each album, one
 request apiece, paced like the other per-item walks.
 
-`list-album` shows a single album by its rating key: the album with its
+`album-list` shows a single album by its rating key: the album with its
 state and progress, then one row per item. An item in progress shows its
 resume point, length, and percentage:
 
@@ -315,18 +333,18 @@ resume point, length, and percentage:
 | 3 | 4130      | 3     | Blue in Green      | 5:37   | unplayed    |                     |
 ```
 
-JSON and YAML carry the same record `list-albums` gives for each album; CSV
+JSON and YAML carry the same record `albums-list` gives for each album; CSV
 and CLIXML, which cannot nest, carry one row per item.
 
 ### Finding gaps
 
 ```bash
-plexdo find-missing "Breaking Bad"          # one show, by title
-plexdo find-missing 1234                    # or by ratingKey
-plexdo find-missing "The Wire" -s 1,3       # only these seasons
-plexdo find-missing "The Wire" -l "TV Shows"
-plexdo find-missing -A                      # every show, every library
-plexdo find-missing -A -l "TV Shows"        # every show in one library
+plexdo missing-find "Breaking Bad"          # one show, by title
+plexdo missing-find 1234                    # or by ratingKey
+plexdo missing-find "The Wire" -s 1,3       # only these seasons
+plexdo missing-find "The Wire" -l "TV Shows"
+plexdo missing-find -A                      # every show, every library
+plexdo missing-find -A -l "TV Shows"        # every show in one library
 ```
 
 Reports the episode numbers missing between the start of a season and its
@@ -347,12 +365,22 @@ default because specials are numbered irregularly, though naming it with
 ### Building playlists
 
 ```bash
-plexdo build-interleaved "Mixed Run" 101 202       # round-robin across shows
-plexdo build-chronological "By Air Date" 101 202   # date-sorted, shows and movies
-plexdo build-randomize 0 "Source" "Shuffled"       # secrets-backed shuffle
-plexdo build-concatenated 0 "All" "Part 1" "Part 2"  # joined end to end
-plexdo build-merge 0 "Mixed" "Shows" "Films" --ratio 2:1  # two shows per film
+plexdo playlist-build -I "Mixed Run" 101 202       # round-robin across shows
+plexdo playlist-build -C "By Air Date" 101 202     # date-sorted, shows and movies
+plexdo playlist-build -R 0 "Source" "Shuffled"     # secrets-backed shuffle
+plexdo playlist-build -A 0 "Mix" 55 56 57          # add items to a playlist
+plexdo merge-build 0 "Mixed" "Shows" "Films" --ratio 2:1  # two shows per film
 ```
+
+`playlist-build` takes exactly one flag saying how to build, and with it what
+the arguments are:
+
+| Flag | Arguments | Builds |
+| --- | --- | --- |
+| `-I/--interleaved` | `NAME ratingKey...` | One episode of each show in turn |
+| `-C/--chronological` | `NAME ratingKey...` | Shows and movies by original air date |
+| `-R/--randomize` | `USER SOURCE DEST` | A shuffle of an existing playlist |
+| `-A/--append` | `USER PLAYLIST ratingKey...` | Nothing new: adds items to an existing playlist |
 
 Playlists are always built fully in memory, validated, previewed, and then
 created in exactly one API call. `--dry-run` stops after the preview.
@@ -363,49 +391,40 @@ ratingKey** interchangeably. Every command that creates one takes
 the existing playlist and the new one untouched; with it the existing playlist
 is removed and replaced.
 
-`build-chronological` estimates missing air dates from the median interval
-between neighbouring episodes in the same season, and prompts only when that is
+`-C` estimates missing air dates from the median interval between
+neighbouring episodes in the same season, and prompts only when that is
 impossible. A film with no release date is prompted for too. Without a
 terminal to answer on, it stops and names the item that needs a date.
 
-`build-concatenated` joins playlists end to end, keeping the order within each
-and the order they were named in. Every source is read before anything is
-written, so a source may also be the destination:
+`-A` changes a playlist where it is, so it takes none of `-o`, `-u`, `-a`,
+`--m3u`, and `-p`. Every ratingKey is looked up first, and nothing is added
+unless all of them are found. Note the case: `-A` is `--append`, and `-a` is
+`--all-users`.
 
-```bash
-plexdo build-concatenated 0 "Mix" "Mix" "New Finds" -o   # append one to another
-```
-
-Duplicates are kept by default, since a plain concatenation is faithful and
-Plex permits a repeat; `-U/--unique` keeps only an item's first appearance,
-matching on ratingKey rather than title, and reports how many it skipped. An
-empty source is reported and contributes nothing - a typo that resolved to the
-wrong playlist otherwise looks exactly like a playlist that happens to be
-empty.
-
-`build-merge` mixes two playlists, taking items from each in turn at
+`merge-build` mixes two playlists, taking items from each in turn at
 `--ratio A:B`: A from the first, then B from the second. The default, 1:1,
 alternates them. Each keeps its own order, and once one runs out the rest of
 the other follows, so nothing is left out; `--verbose` says how many items
 that is. `-s/--stop-short` stops there instead, so the whole result keeps the
 ratio. `-U/--unique` skips an item already taken, and the next item of the
-same playlist takes its place. Like `build-concatenated`, it reads both
-playlists before writing, so either may also be the destination:
+same playlist takes its place. It reads both playlists before writing, so
+either may also be the destination:
 
 ```bash
-plexdo build-merge 0 "Mix" "Mix" "New Finds" --ratio 3:1 -o  # one new in four
-plexdo build-merge 0 "Weekend" Shows Films --ratio 2:1 -s -U  # ends with a film
+plexdo merge-build 0 "Mix" "Mix" "New Finds" --ratio 3:1 -o  # one new in four
+plexdo merge-build 0 "Weekend" Shows Films --ratio 2:1 -s -U  # ends with a film
 ```
 
 #### Who the playlist is built for
 
-All five build commands take `-u/--user` and `-a/--all-users`. Without either,
-the playlist lands where it always has: on the account the items came from.
+`merge-build` and `playlist-build`, except with `-A`, take `-u/--user` and
+`-a/--all-users`. Without either, the playlist lands on the account the
+items came from.
 
 ```bash
-plexdo build-interleaved "Mixed Run" 101 202 -u 7    # just for user 7
-plexdo build-interleaved "Mixed Run" 101 202 -u Bob  # a title works too
-plexdo build-interleaved "Mixed Run" 101 202 -a      # for everyone
+plexdo playlist-build -I "Mixed Run" 101 202 -u 7    # just for user 7
+plexdo playlist-build -I "Mixed Run" 101 202 -u Bob  # a title works too
+plexdo playlist-build -I "Mixed Run" 101 202 -a      # for everyone
 ```
 
 With either flag the item list is printed once, and then one line per user as
@@ -437,14 +456,13 @@ and `-a` are mutually exclusive.
 ### Copying and modifying
 
 ```bash
-plexdo copy-playlist-to-user 0 "Mix" 7 "Mix" -o
-plexdo copy-playlist-all-users 0 "Mix"          # skips the source user
-plexdo append-playlist 0 "Mix" 55 56 57
-plexdo clean-playlist 0 "Mix"                   # drop what has been watched
-plexdo remove-playlist 0 "Mix"
+plexdo playlist-copy -T 0 "Mix" 7 "Mix" -o      # to one user
+plexdo playlist-copy -A 0 "Mix"                 # to all; skips the source user
+plexdo playlist-clean 0 "Mix"                   # drop what has been watched
+plexdo playlist-remove 0 "Mix"
 ```
 
-`clean-playlist` removes the watched entries and leaves the rest in their
+`playlist-clean` removes the watched entries and leaves the rest in their
 existing order. It previews what it will drop, numbered by each entry's place
 in the playlist as it stands, so the list lines up with what Plex shows rather
 than renumbering around the gaps:
@@ -466,11 +484,14 @@ entries - and `--dry-run` stops after the preview.
 
 A user with no libraries shared to them cannot be acted on, even by the server
 admin - Plex scopes each token to what that user can see. Commands targeting
-one such user stop with an explanation; `copy-playlist-all-users` skips them
+one such user stop with an explanation; `playlist-copy --all` skips them
 with a one-line warning and carries on.
 
-`copy-playlist-all-users` prints the item list once and then one line per
-user, since the list is identical for everyone:
+`playlist-copy` takes exactly one of `-A/--all`, copying to every user the
+server is shared with under the playlist's own title, and `-T/--to`, which
+takes two more arguments: the user to copy to, and the title for the copy.
+`-A` prints the item list once and then one line per user, since the list is
+identical for everyone:
 
 ```text
 Movie Night (3 items)
@@ -494,10 +515,10 @@ Without `-o/--overwrite`, a copy that collides with both `Mix` and
 ### Watched-state sync
 
 ```bash
-plexdo copy-watched 7 9 --dry-run     # always preview a full-library sync first
-plexdo copy-watched 7 9 -1            # one-way: only user 9 is modified
-plexdo copy-watched 7 9 -l 3          # a single library
-plexdo copy-watched 7 9 --unwatch     # propagate unwatched instead
+plexdo show-watched-cp 7 9 --dry-run     # always preview a full-library sync first
+plexdo show-watched-cp 7 9 -1            # one-way: only user 9 is modified
+plexdo show-watched-cp 7 9 -l 3          # a single library
+plexdo show-watched-cp 7 9 --unwatch     # propagate unwatched instead
 ```
 
 By default the most recent `lastViewedAt` wins. With `--unwatch`, an item
@@ -507,9 +528,9 @@ the earliest `lastViewedAt` wins.
 ### Exporting
 
 ```bash
-plexdo export-playlist 0 "Mix" ~/mix.m3u
-plexdo export-titles 3 ~/movies.m3u --sort date
-plexdo export-titles 5 ~/photos.html --album "Iceland 2019"
+plexdo playlist-export 0 "Mix" ~/mix.m3u
+plexdo titles-export 3 ~/movies.m3u --sort date
+plexdo titles-export 5 ~/photos.html --album "Iceland 2019"
 ```
 
 M3U files contain **Plex server filesystem paths**, not HTTP URLs, so they are
@@ -521,9 +542,9 @@ point, a Windows drive letter - `-p/--prefix` swaps the server's library root
 for one that makes sense there:
 
 ```bash
-plexdo export-titles 3 ~/tv.m3u --prefix '\\NAS\media'
-plexdo export-playlist 0 "Mix" ~/mix.m3u -p /Volumes/plex
-plexdo export-titles 5 ~/photos.html -p smb://nas/pix
+plexdo titles-export 3 ~/tv.m3u --prefix '\\NAS\media'
+plexdo playlist-export 0 "Mix" ~/mix.m3u -p /Volumes/plex
+plexdo titles-export 5 ~/photos.html -p smb://nas/pix
 ```
 
 ```text
@@ -534,7 +555,8 @@ Separators follow the prefix, so a Windows prefix produces backslashes. Note
 that the *library root* is what gets replaced, so one prefix maps every
 library onto the same place; export each library separately if they are
 mounted apart. A file below no known library root is appended whole, with one
-warning. `--prefix` applies to `--m3u` on the build and list commands too, and
+warning. `--prefix` applies to `--m3u` on `playlist-build`, `merge-build`,
+`playlist-list`, and `show-list` too, and
 to the photo gallery. Without it, exports keep the server's own paths.
 
 ### Streaming
@@ -689,10 +711,10 @@ everywhere else), a member of plexdo's Plex Home, or have a `users` entry
 signed in once with `plexdo login --username`; anything else is an error
 rather than a quiet fallback to another account.
 
-A Home member, including a managed user, which `list-users` shows as `home` or
+A Home member, including a managed user, which `users-list` shows as `home` or
 `managed`, needs no password: plexdo switches into it through plex.tv, as a
 Plex app's user switcher does. A managed user has no username or email, so name
-it by id or by the name `list-users` shows:
+it by id or by the name `users-list` shows:
 
 ```bash
 plexdo player-remote-play livingroom-tv.lan 881 --player-user Clare
@@ -808,8 +830,9 @@ src/plexdo/
 └── ...
 ```
 
-Adding a command means adding a module under `commands/` and listing it in
-`commands/__init__.py`; `cli.py` needs no change.
+Adding a command means adding a module under `commands/`, listing it in
+`commands/__init__.py`, and naming the command in one of the `GROUPS` there,
+which is where `--help` gets its grouping; `cli.py` needs no change.
 
 ## Development
 

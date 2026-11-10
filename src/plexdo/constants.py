@@ -262,7 +262,7 @@ def config_text(
     parts.append(
         _comment(
             "Other plex.tv accounts plexdo may act as, keyed by user id",
-            "as `plexdo list-users` shows it. An entry lets a per-user",
+            "as `plexdo users-list` shows it. An entry lets a per-user",
             "command reach a user the server shares nothing with, and",
             "lets player-remote-play send as the account signed in to a",
             "player. Sign each in once with",
@@ -278,3 +278,27 @@ def config_text(
 
 # Template written by `write-config-example` and echoed by its --help output.
 CONFIG_EXAMPLE = config_text()
+
+
+# What write-secrets-example writes: the three kinds the secret store files,
+# each with one placeholder entry. JSON has no comments, so the note is an
+# entry of its own, a list to keep its lines short; plexdo reads only the
+# kinds it knows and keeps the rest.
+SECRETS_EXAMPLE = (
+    json.dumps(
+        {
+            "_comment": [
+                "Example plexdo secrets file: every value is a placeholder.",
+                "Replace each with a real one, or delete this file and let",
+                "plexdo login, plexdo login --save-password, and plexdo",
+                "set-pin write it. Keep it readable by your account alone.",
+            ],
+            "passwords": {"you@example.com": "your-plex.tv-password"},
+            "pins": {"12345678": "0000"},
+            "tokens": {"you@example.com": "your-plex.tv-token"},
+        },
+        indent=2,
+        sort_keys=True,
+    )
+    + "\n"
+)

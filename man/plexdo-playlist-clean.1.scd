@@ -1,15 +1,15 @@
-plexdo-clean-playlist(1) "plexdo" "User Commands"
+plexdo-playlist-clean(1) "plexdo" "User Commands"
 ; SPDX-FileCopyrightText: 2026 SidusNare
 ; SPDX-License-Identifier: GPL-3.0-or-later
 ; SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 # NAME
 
-plexdo-clean-playlist - remove the watched items from a playlist
+plexdo-playlist-clean - remove the watched items from a playlist
 
 # SYNOPSIS
 
-*plexdo clean-playlist* _USER_ _PLAYLIST_ [*--include-partial*]
+*plexdo playlist-clean* _USER_ _PLAYLIST_ [*--include-partial*]
 \[_GLOBAL OPTIONS_]
 
 # DESCRIPTION
@@ -111,32 +111,32 @@ nothing shared and cannot be acted on. See *plexdo-conventions*(7).
 See what would go, then clean the playlist:
 
 ```
-$ plexdo clean-playlist 0 "The Wire" --dry-run
+$ plexdo playlist-clean 0 "The Wire" --dry-run
 +-------+-----------+-----------------------+--------+
 | index | ratingKey | title                 | state  |
 +-------+-----------+-----------------------+--------+
 | 1     | 4180      | The Wire - The Target | played |
 | 4     | 4183      | The Wire - Old Cases  | played |
 +-------+-----------+-----------------------+--------+
-$ plexdo clean-playlist 0 "The Wire"
+$ plexdo playlist-clean 0 "The Wire"
 ```
 
 Clean another user's playlist by their own viewing, removing what they are
 part way through as well:
 
 ```
-plexdo clean-playlist Alice "Road Trip" --include-partial
+plexdo playlist-clean Alice "Road Trip" --include-partial
 ```
 
 Clean every playlist a user has. A smart playlist among them is refused and
 the loop moves on:
 
 ```
-plexdo list-playlists Alice --json | jq -r '.[].ratingKey' |
-    while read -r key; do plexdo clean-playlist Alice "$key"; done
+plexdo playlists-list Alice --json | jq -r '.[].ratingKey' |
+    while read -r key; do plexdo playlist-clean Alice "$key"; done
 ```
 
 # SEE ALSO
 
-*plexdo-list-playlist*(1), *plexdo-append-playlist*(1),
-*plexdo-copy-watched*(1), *plexdo-conventions*(7), *plexdo*(1)
+*plexdo-playlist-list*(1), *plexdo-playlist-build*(1),
+*plexdo-show-watched-cp*(1), *plexdo-conventions*(7), *plexdo*(1)

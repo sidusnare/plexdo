@@ -263,15 +263,15 @@ def register(
     sub: "argparse._SubParsersAction",
     parents: "list[argparse.ArgumentParser]",
 ) -> None:
-    """Register the copy-watched subparser."""
+    """Register the show-watched-cp subparser."""
     uid_help = (
         "user ID (int) or user title (str); use 0 for the admin account. "
-        "Obtain both with list-users."
+        "Obtain both with users-list."
     )
     parser = sub.add_parser(
-        "copy-watched",
+        "show-watched-cp",
         parents=parents,
-        help="Synchronise watched state and resume points between two users.",
+        help="Sync watched state and resume points of two users.",
     )
     parser.add_argument("user_a", metavar="USER", help=f"First {uid_help}")
     parser.add_argument("user_b", metavar="USER", help=f"Second {uid_help}")
@@ -291,7 +291,7 @@ def register(
         metavar="LIBRARY",
         help=(
             "Restrict to one library, by ID or title. Obtain both with "
-            "list-libraries."
+            "libraries-list."
         ),
     )
     add_rating_key_option(
@@ -299,7 +299,7 @@ def register(
         "-t",
         "--title",
         help_text=(
-            "Restrict to a single item ratingKey. Obtain with list-titles or "
+            "Restrict to a single item ratingKey. Obtain with library-list or "
             "search."
         ),
     )
@@ -315,6 +315,6 @@ def register(
     )
 
 
-COMMANDS = {"copy-watched": cmd_copy_watched}
+COMMANDS = {"show-watched-cp": cmd_copy_watched}
 
 REQUIRES_PLEX = frozenset(COMMANDS)

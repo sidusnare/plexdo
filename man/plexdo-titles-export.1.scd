@@ -1,15 +1,15 @@
-plexdo-export-titles(1) "plexdo" "User Commands"
+plexdo-titles-export(1) "plexdo" "User Commands"
 ; SPDX-FileCopyrightText: 2026 SidusNare
 ; SPDX-License-Identifier: GPL-3.0-or-later
 ; SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 # NAME
 
-plexdo-export-titles - export a whole library to an M3U file or photo gallery
+plexdo-titles-export - export a whole library to an M3U file or photo gallery
 
 # SYNOPSIS
 
-*plexdo export-titles* _LIBRARY_ _PATH_ [*--sort* *alpha*|*date*|*random*]
+*plexdo titles-export* _LIBRARY_ _PATH_ [*--sort* *alpha*|*date*|*random*]
 \[*--album* _ALBUM_] [*-p* _PREFIX_] [_GLOBAL OPTIONS_]
 
 # DESCRIPTION
@@ -138,43 +138,43 @@ album that does not exist. See *plexdo-conventions*(7).
 Export every episode of every show, alphabetically by show:
 
 ```
-plexdo export-titles "TV Shows" ~/tv.m3u
+plexdo titles-export "TV Shows" ~/tv.m3u
 ```
 
 Export the films in release order:
 
 ```
-plexdo export-titles Movies ~/movies.m3u --sort date
+plexdo titles-export Movies ~/movies.m3u --sort date
 ```
 
 A shuffled film playlist for a player on a machine that mounts the library
 at _/mnt/media/movies_ rather than the server's _/srv/media/movies_:
 
 ```
-plexdo export-titles Movies shuffle.m3u --sort random -p /mnt/media/movies
+plexdo titles-export Movies shuffle.m3u --sort random -p /mnt/media/movies
 ```
 
 The same for a Windows player reaching the library through a share; note
 the quoting, which keeps the backslashes intact:
 
 ```
-plexdo export-titles Movies movies.m3u --prefix '\\\\NAS\\movies'
+plexdo titles-export Movies movies.m3u --prefix '\\\\NAS\\movies'
 ```
 
 Turn one photo album into a gallery, oldest photo first:
 
 ```
-plexdo export-titles Photos ~/summer.html --album "Summer 2024" --sort date
+plexdo titles-export Photos ~/summer.html --album "Summer 2024" --sort date
 ```
 
 A gallery of the whole photo library, with the paths rewritten so a browser
 on another machine can open the files from its own mount:
 
 ```
-plexdo export-titles Photos photos.html -p /mnt/photos
+plexdo titles-export Photos photos.html -p /mnt/photos
 ```
 
 # SEE ALSO
 
-*plexdo-list-titles*(1), *plexdo-list-show*(1), *plexdo-export-playlist*(1),
+*plexdo-library-list*(1), *plexdo-show-list*(1), *plexdo-playlist-export*(1),
 *plexdo-conventions*(7), *plexdo*(1)

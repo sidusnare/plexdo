@@ -1,15 +1,15 @@
-plexdo-list-playlists(1) "plexdo" "User Commands"
+plexdo-playlists-list(1) "plexdo" "User Commands"
 ; SPDX-FileCopyrightText: 2026 SidusNare
 ; SPDX-License-Identifier: GPL-3.0-or-later
 ; SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 # NAME
 
-plexdo-list-playlists - list a user's playlists
+plexdo-playlists-list - list a user's playlists
 
 # SYNOPSIS
 
-*plexdo list-playlists* _USER_ [_GLOBAL OPTIONS_]
+*plexdo playlists-list* _USER_ [_GLOBAL OPTIONS_]
 
 # DESCRIPTION
 
@@ -84,7 +84,7 @@ cannot be acted on. See *plexdo-conventions*(7).
 List the admin account's playlists:
 
 ```
-$ plexdo list-playlists 0
+$ plexdo playlists-list 0
 +-----------+-------------+-------+
 | ratingKey | title       | items |
 +-----------+-------------+-------+
@@ -96,17 +96,17 @@ $ plexdo list-playlists 0
 List another user's, by title:
 
 ```
-plexdo list-playlists Alice
+plexdo playlists-list Alice
 ```
 
 Find the ratingKey of a playlist by title, for a script:
 
 ```
-plexdo list-playlists 0 --json |
+plexdo playlists-list 0 --json |
     jq '.[] | select(.title == "Movie Night") | .ratingKey'
 ```
 
 # SEE ALSO
 
-*plexdo-list-playlist*(1), *plexdo-export-playlist*(1),
-*plexdo-copy-playlist-to-user*(1), *plexdo-conventions*(7), *plexdo*(1)
+*plexdo-playlist-list*(1), *plexdo-playlist-export*(1),
+*plexdo-playlist-copy*(1), *plexdo-conventions*(7), *plexdo*(1)

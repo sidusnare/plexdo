@@ -9,6 +9,7 @@ import getpass
 import os
 import sys
 import textwrap
+from pathlib import Path
 from typing import Any
 
 from plexapi.exceptions import BadRequest, PlexApiException, Unauthorized
@@ -17,10 +18,16 @@ from plexapi.server import PlexServer
 from requests import RequestException
 
 from plexdo import secret_store
-from plexdo.config import Config, config_optional, load_config
+from plexdo.arguments import add_overwrite_argument
+from plexdo.config import Config, config_optional, load_config, parse_config
 from plexdo.connection import server_url
 from plexdo.console import output, output_format
-from plexdo.constants import CONFIG_EXAMPLE, CONFIG_PATH, LOG
+from plexdo.constants import (
+    CONFIG_EXAMPLE,
+    CONFIG_PATH,
+    LOG,
+    SECRETS_EXAMPLE,
+)
 from plexdo.security import hide_in_logs
 from plexdo.tokens import (
     ADMIN_KEY,
@@ -325,6 +332,68 @@ def cmd_write_config_example(
     print(f"Config example written to: {CONFIG_PATH}")
 
 
+def _configured_secrets_file() -> Path | None:
+    """The path plex: secrets_file names, or None when it is not set.
+
+    A missing configuration file sets nothing, so it reads as not set
+    rather than as the error it is to the commands that need a server.
+    """
+    if not CONFIG_PATH.exists():
+        return None
+    try:
+        text = CONFIG_PATH.read_text(encoding="utf-8")
+    except OSError as exc:
+        sys.exit(f"Could not read {CONFIG_PATH}: {exc}")
+    configured = config_optional(parse_config(text), "secrets_file")
+    return Path(configured).expanduser() if configured else None
+
+
+def cmd_write_secrets_example(
+    _plex: PlexServer | None, args: argparse.Namespace
+) -> None:
+    """Write an example secrets file where plex: secrets_file says.
+
+    With no secrets_file configured there is nowhere the user chose to put
+    it, so the example goes to stdout and stderr says why.
+    """
+    path = _configured_secrets_file()
+    if path is None:
+        print(
+            f"plex: secrets_file is not set in {CONFIG_PATH}, so nothing "
+            "has been written; the example follows on standard output.",
+            file=sys.stderr,
+        )
+        print(SECRETS_EXAMPLE, end="")
+        return
+
+    existing = path.exists()
+    if existing and not args.overwrite:
+        # Checked before --dry-run too, so a rehearsal fails where the real
+        # run would. The file may hold the only copy of real secrets.
+        sys.exit(
+            f"A secrets file already exists at {path}. Nothing has been "
+            "written.\nRe-run with --overwrite to replace it, and every "
+            "secret in it, with the example."
+        )
+    if args.dry_run:
+        action = "replace the existing file" if existing else "create it"
+        print(
+            f"--dry-run: would write the example to {path} ({action}).",
+            file=sys.stderr,
+        )
+        return
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # Created private rather than tightened after: a user who fills it in
+    # is filling in a file that was never readable by anyone else.
+    if existing:
+        path.unlink()
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(SECRETS_EXAMPLE)
+    print(f"Secrets example written to: {path}")
+
+
 def register(
     sub: "argparse._SubParsersAction",
     parents: "list[argparse.ArgumentParser]",
@@ -333,10 +402,7 @@ def register(
     p_login = sub.add_parser(
         "login",
         parents=parents,
-        help=(
-            "Authenticate with plex.tv and save the token to the system "
-            "keyring."
-        ),
+        help="Sign in to plex.tv and save the token.",
     )
     p_login.add_argument(
         "-u",
@@ -388,7 +454,7 @@ def register(
     p_logout = sub.add_parser(
         "logout",
         parents=parents,
-        help="Sign out of plex.tv and remove the saved tokens and passwords.",
+        help="Sign out of plex.tv; remove saved tokens and passwords.",
     )
     p_logout.add_argument(
         "-u",
@@ -404,7 +470,7 @@ def register(
     p_pin = sub.add_parser(
         "set-pin",
         parents=parents,
-        help="Save or remove a Plex Home member's PIN in the system keyring.",
+        help="Save or remove a Plex Home member's PIN.",
     )
     p_pin.add_argument(
         "user_id",
@@ -412,7 +478,7 @@ def register(
         metavar="USER_ID",
         help=(
             "The plex.tv user id of the Plex Home member (int), as "
-            "list-users shows it. The PIN is prompted for."
+            "users-list shows it. The PIN is prompted for."
         ),
     )
     p_pin.add_argument(
@@ -425,7 +491,7 @@ def register(
     p_wce = sub.add_parser(
         "write-config-example",
         parents=parents,
-        help="Write a template config file.",
+        help="Write a template configuration file.",
         description=textwrap.fill(
             f"Write a template config file to {CONFIG_PATH} with mode 0600, "
             "creating parent directories as needed. An existing file at that "
@@ -438,12 +504,36 @@ def register(
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    p_wce.add_argument(
-        "-o",
-        "--overwrite",
-        action="store_true",
-        default=False,
-        help="Replace an existing config file instead of refusing to.",
+    add_overwrite_argument(
+        p_wce,
+        "Replace an existing config file instead of refusing to.",
+    )
+
+    p_wse = sub.add_parser(
+        "write-secrets-example",
+        parents=parents,
+        help="Write an example secrets file, or print it.",
+        description=textwrap.fill(
+            "Write an example secrets file to the path plex: secrets_file "
+            f"names in {CONFIG_PATH}, with mode 0600, creating parent "
+            "directories as needed. An existing file at that path is only "
+            "replaced when --overwrite is given. When secrets_file is not "
+            "set, nothing is written: the example is printed to standard "
+            "output, and standard error says so.",
+            width=78,
+        ),
+        epilog=(
+            "example that would be written:\n\n"
+            + textwrap.indent(SECRETS_EXAMPLE, "  ")
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    add_overwrite_argument(
+        p_wse,
+        (
+            "Replace an existing secrets file, and every secret in it, "
+            "instead of refusing to."
+        ),
     )
 
 
@@ -452,9 +542,10 @@ COMMANDS = {
     "logout": cmd_logout,
     "set-pin": cmd_set_pin,
     "write-config-example": cmd_write_config_example,
+    "write-secrets-example": cmd_write_secrets_example,
 }
 
-# login and write-config-example run before a token necessarily exists,
+# login and the two write-*-example commands run before a token exists,
 # logout must still work once the server will no longer accept one, and
 # set-pin only touches the secret store.
 REQUIRES_PLEX: frozenset = frozenset()

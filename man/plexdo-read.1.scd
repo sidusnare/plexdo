@@ -34,7 +34,7 @@ _LIBRARY_
 	streaming the wrong thing from a mistyped ratingKey.
 
 _ratingKey_
-	The item to stream, as *plexdo-list-titles*(1), *plexdo-list-show*(1),
+	The item to stream, as *plexdo-library-list*(1), *plexdo-show-list*(1),
 	or *plexdo-search*(1) report it. It must be something with a file: an
 	episode, film, track, or photo, not a show or season.
 
@@ -129,5 +129,5 @@ plexdo read Movies 881 --dry-run
 
 # SEE ALSO
 
-*plexdo-show-metadata*(1), *plexdo-list-show*(1), *mpv*(1),
+*plexdo-show-metadata*(1), *plexdo-show-list*(1), *mpv*(1),
 *plexdo-conventions*(7), *plexdo*(1)

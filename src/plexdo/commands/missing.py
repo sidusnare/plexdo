@@ -128,7 +128,7 @@ def resolve_show(
             for show in section.all()
         )
     key = resolve_identifier(
-        roster, identifier, "show", "list-titles <library>"
+        roster, identifier, "show", "library-list <library>"
     )
     show = fetch_item(plex, key)
     if not isinstance(show, Show):
@@ -199,11 +199,11 @@ def register(
     sub: "argparse._SubParsersAction",
     parents: "list[argparse.ArgumentParser]",
 ) -> None:
-    """Register the find-missing subparser."""
+    """Register the missing-find subparser."""
     parser = sub.add_parser(
-        "find-missing",
+        "missing-find",
         parents=parents,
-        help="Find gaps in the episode numbering of a show's seasons.",
+        help="Find gaps in the episode numbering of a show.",
         description=textwrap.fill(
             "Report the episode numbers missing between the start of a "
             "season and its highest episode. Names one show by default; -A "
@@ -221,7 +221,7 @@ def register(
         default=None,
         help=(
             "Show title (str) or ratingKey (int) to check. Obtain either with "
-            "list-titles. Omit only when using -A."
+            "library-list. Omit only when using -A."
         ),
     )
     parser.add_argument(
@@ -232,7 +232,7 @@ def register(
         default=None,
         help=(
             "Library ID (int) or title (str) to look in. Obtain both with "
-            "list-libraries. Narrows the search for SHOW, or the sweep for -A."
+            "libraries-list. Narrows the search for SHOW, or the sweep for -A."
         ),
     )
     parser.add_argument(
@@ -265,6 +265,6 @@ def register(
     )
 
 
-COMMANDS = {"find-missing": cmd_find_missing}
+COMMANDS = {"missing-find": cmd_find_missing}
 
 REQUIRES_PLEX = frozenset(COMMANDS)

@@ -22,10 +22,11 @@
 
 import argparse
 import sys
+import textwrap
 
 from plexdo import __version__
 from plexdo.accounts import UserAccessError, resolve_user_arguments
-from plexdo.commands import build_registry, register_all
+from plexdo.commands import GROUPS, build_registry, register_all
 from plexdo.config import cached_config
 from plexdo.connection import connect_plex
 from plexdo.formats import OUTPUT_FORMATS
@@ -48,9 +49,37 @@ def _add_global_flags(
     onto the main one, so ordinary ``False`` defaults would clobber a flag
     that was given before the subcommand. With SUPPRESS the attribute only
     exists when the flag was actually passed, so either position works.
+
+    The flags sit in a group of their own, sorted by name, so a command's
+    help lists them apart from the options that are the command's alone.
     """
     default = argparse.SUPPRESS if suppress else False
-    parser.add_argument(
+    group = parser.add_argument_group(_GLOBAL_GROUP)
+    group.add_argument(
+        "--debug",
+        action="store_true",
+        default=default,
+        help="Print detailed internal logs to stderr.",
+    )
+    group.add_argument(
+        "--debug-log",
+        metavar="PATH",
+        default=argparse.SUPPRESS if suppress else None,
+        help=(
+            "Append detailed internal logs to PATH instead of printing them, "
+            "each line starting with a Unix timestamp in nanoseconds, with "
+            "profiling: phase and function run times, HTTP requests and "
+            "their waits, and CPU and memory use. Secrets are redacted."
+        ),
+    )
+    group.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=default,
+        dest="dry_run",
+        help="Show what would happen without mutating Plex.",
+    )
+    group.add_argument(
         "-f",
         "--format",
         dest="format",
@@ -64,7 +93,7 @@ def _add_global_flags(
     )
     # A convenience alias writing to the same destination as --format, so
     # there is only ever one attribute for a command to consult.
-    parser.add_argument(
+    group.add_argument(
         "--json",
         dest="format",
         action="store_const",
@@ -72,18 +101,7 @@ def _add_global_flags(
         default=argparse.SUPPRESS,
         help="Shorthand for --format json.",
     )
-    parser.add_argument(
-        "-W",
-        "--wide",
-        action="store_true",
-        default=default,
-        help=(
-            "Do not shrink table columns to the terminal width. By default "
-            "the widest column is truncated so a row fits on one line; "
-            "redirected output is never truncated."
-        ),
-    )
-    parser.add_argument(
+    group.add_argument(
         "--throttle",
         type=float,
         metavar="SECONDS",
@@ -94,43 +112,30 @@ def _add_global_flags(
             f"(default: {DEFAULT_THROTTLE}). Use 0 to disable."
         ),
     )
-    parser.add_argument(
-        "-V",
-        "--version",
-        action="version",
-        version=f"plexdo {__version__}",
-        help="Show the installed version and exit.",
-    )
-    parser.add_argument(
+    group.add_argument(
         "-v",
         "--verbose",
         action="store_true",
         default=default,
         help="Print high-level progress to stderr.",
     )
-    parser.add_argument(
-        "--debug",
+    group.add_argument(
+        "-V",
+        "--version",
+        action="version",
+        version=f"plexdo {__version__}",
+        help="Show the installed version and exit.",
+    )
+    group.add_argument(
+        "-W",
+        "--wide",
         action="store_true",
         default=default,
-        help="Print detailed internal logs to stderr.",
-    )
-    parser.add_argument(
-        "--debug-log",
-        metavar="PATH",
-        default=argparse.SUPPRESS if suppress else None,
         help=(
-            "Append detailed internal logs to PATH instead of printing them, "
-            "each line starting with a Unix timestamp in nanoseconds, with "
-            "profiling: phase and function run times, HTTP requests and "
-            "their waits, and CPU and memory use. Secrets are redacted."
+            "Do not shrink table columns to the terminal width. By default "
+            "the widest column is truncated so a row fits on one line; "
+            "redirected output is never truncated."
         ),
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        default=default,
-        dest="dry_run",
-        help="Show what would happen without mutating Plex.",
     )
 
 
@@ -141,32 +146,133 @@ def _global_flags_parent() -> argparse.ArgumentParser:
     return parent
 
 
+_GLOBAL_GROUP = "global options"
+
+# The width the hand-laid parts of --help are wrapped to.
+_HELP_WIDTH = 79
+
+
+def _is_global_group(
+    group: "argparse._ArgumentGroup",  # pylint: disable=protected-access
+) -> bool:
+    """Whether a help group is the one holding the global flags."""
+    return group.title == _GLOBAL_GROUP
+
+
+def _tidy_command_help(command: argparse.ArgumentParser) -> None:
+    """Keep the global flags from crowding one command's help.
+
+    They are inherited from a parent, which lists them ahead of the groups
+    a command adds for its own and spells all of them out in its usage.
+    Here their group goes last, and the usage names the command's own
+    arguments followed by "[global options]".
+    """
+    # argparse offers no public way to reorder groups or to leave actions
+    # out of the usage, so this reaches into the parser it was handed.
+    # pylint: disable=protected-access
+    command._action_groups.sort(key=_is_global_group)
+    if command.usage is not None:
+        return
+    shared = {
+        id(action)
+        for group in command._action_groups
+        if _is_global_group(group)
+        for action in group._group_actions
+    }
+    formatter = command._get_formatter()
+    formatter.add_usage(
+        None,
+        [action for action in command._actions if id(action) not in shared],
+        command._mutually_exclusive_groups,
+    )
+    # The formatter wrapped it to follow "usage: ", which argparse puts
+    # back in front of a usage it is given.
+    lead = "usage: "
+    usage = formatter.format_help().strip().removeprefix(lead)
+    last = usage.rsplit("\n", 1)[-1]
+    first_line = "\n" not in usage
+    room = _HELP_WIDTH - len(last) - (len(lead) if first_line else 0)
+    note = "[global options]"
+    if len(note) < room:
+        command.usage = f"{usage} {note}"
+    else:
+        indent = " " * (len(lead) + len(command.prog) + 1)
+        command.usage = f"{usage}\n{indent}{note}"
+
+
+def _command_list(summaries: dict[str, str]) -> str:
+    """The commands for --help: grouped, sorted, one summary each."""
+    width = max(len(name) for name in summaries) + 2
+    lines = []
+    for title, names in GROUPS:
+        lines += ["", f"{title}:"]
+        for name in sorted(names):
+            lines.append(
+                textwrap.fill(
+                    summaries[name],
+                    width=_HELP_WIDTH,
+                    initial_indent=f"  {name:<{width}}",
+                    subsequent_indent=" " * (width + 2),
+                )
+            )
+    return "\n".join(lines)
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Construct and return the top-level argument parser."""
     parser = argparse.ArgumentParser(
         prog="plexdo",
-        description=(
-            f"Interact with a Plex Media Server via plexapi.  (version "
-            f"{__version__})"
-        ),
+        usage="%(prog)s [global options] <command> [arguments]",
         epilog=(
-            "Global flags (-f/--format, --json, -v/--verbose, --debug, "
-            "--debug-log, --dry-run, -V/--version) may be given either before "
-            "or after the command name."
+            "Run `plexdo <command> --help` for a command's arguments. The "
+            "global options may be\ngiven before or after the command name."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    _add_global_flags(parser)
     parents: list[argparse.ArgumentParser] = [_global_flags_parent()]
-    sub = parser.add_subparsers(dest="command", metavar="<command>")
+    # The list argparse would print is flat and in registration order, so
+    # it is suppressed and the description carries a grouped one instead.
+    sub = parser.add_subparsers(
+        prog="plexdo",
+        dest="command",
+        metavar="<command>",
+        help=argparse.SUPPRESS,
+    )
     register_all(sub, parents)
+    for command in sub.choices.values():
+        _tidy_command_help(command)
+    summaries = {
+        action.dest: action.help or ""
+        for action in sub._get_subactions()  # pylint: disable=protected-access
+    }
+    parser.description = (
+        f"plexdo {__version__} - a command-line interface for Plex Media "
+        "Server.\n" + _command_list(summaries)
+    )
+    _add_global_flags(parser)
     return parser
+
+
+def parse_arguments(
+    parser: argparse.ArgumentParser, argv: list[str] | None = None
+) -> argparse.Namespace:
+    """Parse the command line, exiting 2 on a usage error.
+
+    A command whose arguments depend on one of its flags registers a
+    check_arguments callable, run here to name them or to refuse them, so
+    that happens before anything connects to the server.
+    """
+    args = parser.parse_args(argv)
+    check = getattr(args, "check_arguments", None)
+    if check is not None:
+        check(args)
+    return args
 
 
 def main(argv: list[str] | None = None) -> None:
     """Entry point for the ``plexdo`` console script."""
     parser = build_parser()
-    args = parser.parse_args(argv)
+    args = parse_arguments(parser, argv)
 
     if args.command is None:
         parser.print_help()

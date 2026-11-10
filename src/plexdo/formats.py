@@ -6,7 +6,7 @@
 
 Every renderer accepts either a list of records or a single record, so that a
 command emitting one object (``show-metadata``, ``login``) and a command
-emitting many (``list-titles``) can share one code path.
+emitting many (``library-list``) can share one code path.
 """
 
 import csv

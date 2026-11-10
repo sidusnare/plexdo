@@ -122,7 +122,7 @@ Set up *plexdo* for the first time:
 plexdo write-config-example
 ${EDITOR:-vi} ~/.config/plexdo/config.yaml
 plexdo login
-plexdo list-libraries
+plexdo libraries-list
 ```
 
 Read the template without writing it:
@@ -146,4 +146,5 @@ plexdo write-config-example --overwrite
 
 # SEE ALSO
 
-*plexdo-login*(1), *plexdo-conventions*(7), *plexdo*(1)
+*plexdo-write-secrets-example*(1), *plexdo-login*(1),
+*plexdo-conventions*(7), *plexdo*(1)

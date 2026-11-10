@@ -12,7 +12,7 @@
 #
 # man/plexdo-wait.1.scd becomes OUTPUT_DIR/plexdo-wait.md, the wiki page
 # plexdo-wait; the section number is dropped, since no two pages share a
-# name. A reference such as plexdo-list-users(1) becomes a link to that
+# name. A reference such as plexdo-users-list(1) becomes a link to that
 # page, and a reference to a page that does not exist is an error rather
 # than a broken link.
 #

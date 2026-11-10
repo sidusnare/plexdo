@@ -609,7 +609,7 @@ def register(
     parser = sub.add_parser(
         "player-remote-play",
         parents=parents,
-        help="Connect to a player directly and tell it to play an item.",
+        help="Tell a player, reached directly, to play an item.",
     )
     parser.add_argument(
         "host",

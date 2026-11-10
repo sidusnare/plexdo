@@ -97,11 +97,12 @@ def register(
     parser = sub.add_parser(
         "search",
         parents=parents,
-        help="Search Plex for titles matching a query string.",
+        help="Search for titles matching a query.",
     )
     add_user_argument(parser)
     parser.add_argument(
         "query",
+        metavar="QUERY",
         help="Search string (str). Plex performs a prefix/substring match.",
     )
     parser.add_argument(
@@ -122,7 +123,7 @@ def register(
         metavar="LIBRARY",
         help=(
             "Restrict search to one library, by ID or title. Obtain both "
-            "with list-libraries."
+            "with libraries-list."
         ),
     )
 

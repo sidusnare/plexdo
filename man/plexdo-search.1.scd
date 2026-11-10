@@ -133,5 +133,5 @@ plexdo show-metadata "$key"
 
 # SEE ALSO
 
-*plexdo-list-titles*(1), *plexdo-show-metadata*(1), *plexdo-list-users*(1),
+*plexdo-library-list*(1), *plexdo-show-metadata*(1), *plexdo-users-list*(1),
 *plexdo-conventions*(7), *plexdo*(1)

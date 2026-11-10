@@ -28,40 +28,35 @@ $script:PlexdoValueOptions = @(
 )
 
 $script:PlexdoCommands = [ordered]@{
-    'list-libraries'          = 'List all Plex libraries'
-    'list-titles'             = 'List titles in a library'
-    'list-library'            = 'List titles in a library (alias for list-titles)'
-    'list-albums'             = 'List the albums in a music or photo library'
-    'list-album'              = 'Show one album with its played state and progress'
-    'list-show'               = 'List all episodes in a show'
-    'export-titles'           = 'Export a library to M3U or an HTML gallery'
-    'search'                  = 'Search Plex for titles matching a query'
-    'list-users'              = 'List all managed/home users'
-    'list-playlists'          = 'List playlists for a user'
-    'list-playlist'           = 'List items in a specific playlist'
-    'export-playlist'         = 'Export a playlist to an M3U file'
-    'clean-playlist'          = 'Remove watched items from a playlist'
-    'remove-playlist'         = 'Delete a playlist from a user'
-    'append-playlist'         = 'Append items to an existing playlist'
-    'show-metadata'           = 'Display metadata for a single item'
-    'read'                    = 'Stream a media file to stdout'
-    'rescan'                  = 'Trigger a library rescan or show scan status'
-    'status'                  = 'Show server identity, sessions, users, and tasks'
-    'wait'                    = 'Sleep until a session''s current play is over'
-    'player-remote-play'      = 'Connect to a player directly and tell it to play an item'
-    'find-missing'            = 'Find gaps in episode numbering across every show'
-    'build-interleaved'       = 'Round-robin playlist from shows'
-    'build-chronological'     = 'Date-sorted playlist from shows and movies'
-    'build-randomize'         = 'Randomize a playlist into a new one'
-    'build-concatenated'      = 'Join several playlists end to end into one'
-    'build-merge'             = 'Mix two playlists into one at a ratio'
-    'copy-playlist-all-users' = 'Copy a playlist to all managed users'
-    'copy-playlist-to-user'   = 'Copy a playlist to a specific user'
-    'copy-watched'            = 'Synchronise watched state between two users'
-    'login'                   = 'Authenticate with plex.tv and save a token'
-    'logout'                  = 'Sign out of plex.tv and remove the saved tokens'
-    'set-pin'                 = 'Save or remove a Plex Home PIN in the keyring'
-    'write-config-example'    = 'Write a template config file'
+    'album-list'            = 'Show one album with its played state and progress'
+    'albums-list'           = 'List the albums in a music or photo library'
+    'libraries-list'        = 'List the server''s libraries'
+    'library-list'          = 'List the titles in a library'
+    'login'                 = 'Sign in to plex.tv and save the token'
+    'logout'                = 'Sign out of plex.tv and remove the saved tokens'
+    'merge-build'           = 'Mix two playlists into a new one at a ratio'
+    'missing-find'          = 'Find gaps in the episode numbering of a show'
+    'player-remote-play'    = 'Tell a player, reached directly, to play an item'
+    'playlist-build'        = 'Build a playlist, or add items to one'
+    'playlist-clean'        = 'Remove the watched items from a playlist'
+    'playlist-copy'         = 'Copy a playlist to one user, or to all of them'
+    'playlist-export'       = 'Export a playlist to an M3U file'
+    'playlist-list'         = 'List the items in a playlist'
+    'playlist-remove'       = 'Delete a playlist'
+    'playlists-list'        = 'List a user''s playlists'
+    'read'                  = 'Stream a media file to stdout'
+    'rescan'                = 'Rescan libraries, or show the scans under way'
+    'search'                = 'Search for titles matching a query'
+    'set-pin'               = 'Save or remove a Plex Home member''s PIN'
+    'show-list'             = 'List a show''s episodes'
+    'show-metadata'         = 'Show the metadata of one item'
+    'show-watched-cp'       = 'Sync watched state and resume points of two users'
+    'status'                = 'Show the server''s sessions, users, scans, and tasks'
+    'titles-export'         = 'Export a library to an M3U file or photo gallery'
+    'users-list'            = 'List the server''s users'
+    'wait'                  = 'Sleep until a session''s current play is over'
+    'write-config-example'  = 'Write a template configuration file'
+    'write-secrets-example' = 'Write an example secrets file, or print it'
 }
 
 $script:PlexdoGlobalFlags = [ordered]@{
@@ -210,7 +205,7 @@ function Get-PlexdoPositionals {
 
 function Get-PlexdoUsers {
     $results = @(New-PlexdoResult '0' 'admin account')
-    foreach ($row in Get-PlexdoCacheRows 'users' @('list-users')) {
+    foreach ($row in Get-PlexdoCacheRows 'users' @('users-list')) {
         $results += New-PlexdoResult ([string] $row.id) $row.title
         if ($row.title) { $results += New-PlexdoResult ([string] $row.title) "user id $($row.id)" }
     }
@@ -219,7 +214,7 @@ function Get-PlexdoUsers {
 
 function Get-PlexdoLibraries {
     $results = @()
-    foreach ($row in Get-PlexdoCacheRows 'libraries' @('list-libraries')) {
+    foreach ($row in Get-PlexdoCacheRows 'libraries' @('libraries-list')) {
         $results += New-PlexdoResult ([string] $row.id) $row.title
         if ($row.title) { $results += New-PlexdoResult ([string] $row.title) "library id $($row.id)" }
     }
@@ -235,7 +230,7 @@ function Get-PlexdoRatingKeys {
     foreach ($file in Get-ChildItem -LiteralPath $dir -Filter 'titles.*.json' -ErrorAction SilentlyContinue) {
         $library = $file.BaseName -replace '^titles\.', ''
         if (-not (Test-PlexdoCacheFresh $file.FullName)) {
-            Update-PlexdoCache @('list-titles', $library)
+            Update-PlexdoCache @('library-list', $library)
         }
         try {
             foreach ($row in @(Get-Content -LiteralPath $file.FullName -Raw | ConvertFrom-Json)) {
@@ -250,7 +245,7 @@ function Get-PlexdoPlaylists {
     param([string] $User, [switch] $IncludeKeys)
     if (-not $User) { $User = '0' }
     $results = @()
-    foreach ($row in Get-PlexdoCacheRows "playlists.$User" @('list-playlists', $User)) {
+    foreach ($row in Get-PlexdoCacheRows "playlists.$User" @('playlists-list', $User)) {
         $results += New-PlexdoResult ([string] $row.title) "$($row.items) items"
         if ($IncludeKeys) {
             $results += New-PlexdoResult ([string] $row.ratingKey) $row.title
@@ -264,7 +259,7 @@ function Get-PlexdoAlbums {
     if (-not $Library) { return @() }
     $seen = @{}
     $results = @()
-    foreach ($row in Get-PlexdoCacheRows "titles.$Library" @('list-titles', $Library)) {
+    foreach ($row in Get-PlexdoCacheRows "titles.$Library" @('library-list', $Library)) {
         $album = ([string] $row.title -split ' - ')[0]
         if ($album -and -not $seen.ContainsKey($album)) {
             $seen[$album] = $true
@@ -298,12 +293,23 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
     $positionals = Get-PlexdoPositionals $tokens
     $index = $positionals.Count
 
+    # playlist-build and playlist-copy take a flag saying what their positional
+    # arguments are. The comparisons are case-sensitive: -a is --all-users.
+    $mode = ''
+    foreach ($token in $tokens) {
+        if ($token -cin '-I', '--interleaved') { $mode = 'interleaved'; break }
+        if ($token -cin '-C', '--chronological') { $mode = 'chronological'; break }
+        if ($token -cin '-R', '--randomize') { $mode = 'randomize'; break }
+        if ($token -cin '-A', '--append', '--all') { $mode = 'all-or-append'; break }
+        if ($token -cin '-T', '--to') { $mode = 'to'; break }
+    }
+
     $results = @()
 
     # A value expected by the option just typed.
     switch ($previous) {
         { $_ -in '-u', '--user' } {
-            if ($command -like 'build-*') { $results = Get-PlexdoUsers }
+            if ($command -in 'playlist-build', 'merge-build') { $results = Get-PlexdoUsers }
         }
         { $_ -in '-r', '--rating-key' } {
             if ($command -eq 'wait') { $results = Get-PlexdoRatingKeys }
@@ -345,23 +351,25 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
         } elseif ($wordToComplete.StartsWith('-')) {
             $flags = [ordered]@{} + $script:PlexdoGlobalFlags
             switch -Regex ($command) {
-                '^(list-playlist|list-show|build-)' { $flags['--m3u'] = 'Also export an M3U file'; $flags['--prefix'] = 'Rewrite exported paths onto this prefix' }
-                '^(export-playlist|export-titles)$' { $flags['--prefix'] = 'Rewrite exported paths onto this prefix' }
-                '^(build-|copy-playlist-)'          { $flags['--overwrite'] = 'Replace an existing playlist of the same name' }
-                '^build-'                           { $flags['--user'] = 'Create the playlist for this user instead'; $flags['--all-users'] = 'Create the playlist for every user on the server' }
-                '^build-concatenated$'              { $flags['--unique'] = 'Skip an item an earlier playlist already contributed' }
-                '^build-merge$'                     { $flags['--ratio'] = 'A:B: take A items from the first, then B from the second'; $flags['--stop-short'] = 'Stop when either playlist runs out'; $flags['--unique'] = 'Skip an item already taken' }
-                '^(list-titles|list-library|export-titles)$' { $flags['--album'] = 'Restrict to a single photo album' }
-                '^export-titles$'                   { $flags['--sort'] = 'Sort order' }
+                '^(playlist-list|show-list|playlist-build|merge-build)$' { $flags['--m3u'] = 'Also export an M3U file'; $flags['--prefix'] = 'Rewrite exported paths onto this prefix' }
+                '^(playlist-export|titles-export)$' { $flags['--prefix'] = 'Rewrite exported paths onto this prefix' }
+                '^(playlist-build|merge-build|playlist-copy)$' { $flags['--overwrite'] = 'Replace an existing playlist of the same name' }
+                '^(playlist-build|merge-build)$'    { $flags['--user'] = 'Create the playlist for this user instead'; $flags['--all-users'] = 'Create the playlist for every user on the server' }
+                '^playlist-build$'                  { $flags['--interleaved'] = 'Take one episode from each show in turn'; $flags['--chronological'] = 'Sort the episodes and movies by air date'; $flags['--randomize'] = 'Shuffle an existing playlist into a new one'; $flags['--append'] = 'Add items to the end of an existing playlist' }
+                '^playlist-copy$'                   { $flags['--all'] = 'Copy to every user the server is shared with'; $flags['--to'] = 'Copy to one user, under a title of your choosing' }
+                '^merge-build$'                     { $flags['--ratio'] = 'A:B: take A items from the first, then B from the second'; $flags['--stop-short'] = 'Stop when either playlist runs out'; $flags['--unique'] = 'Skip an item already taken' }
+                '^(library-list|titles-export)$'    { $flags['--album'] = 'Restrict to a single photo album' }
+                '^titles-export$'                   { $flags['--sort'] = 'Sort order' }
                 '^search$'                          { $flags['--media-type'] = 'Restrict to one media type'; $flags['--library-id'] = 'Restrict to one library' }
                 '^rescan$'                          { $flags['--status'] = 'Print all active scan jobs'; $flags['--now'] = 'Cancel pending scans first' }
                 '^status$'                          { $flags['--section'] = 'Show only one section' }
                 '^write-config-example$'            { $flags['--overwrite'] = 'Replace an existing config file' }
+                '^write-secrets-example$'           { $flags['--overwrite'] = 'Replace an existing secrets file' }
                 '^wait$'                            { $flags['--session'] = 'Follow the session with this sessionKey'; $flags['--rating-key'] = 'Wait for this video'; $flags['--interval'] = 'Seconds between polls'; $flags['--fast-interval'] = 'Seconds between polls near the end point'; $flags['--no-credits'] = 'Ignore the credits marker and wait for the end'; $flags['--offset'] = 'Signed seconds: negative ends early, positive sleeps after'; $flags['--all'] = 'Wait for every play by every user'; $flags['--paused'] = 'Count a play as over once paused this many seconds'; $flags['--now'] = 'With -r: exit at once if the video is not playing' }
                 '^player-remote-play$'              { $flags['--port'] = 'Port the player listens on for remote control'; $flags['--player-user'] = 'Account signed in to the player: user id, username, or email'; $flags['--server-url'] = 'Server address the player should fetch from' }
-                '^find-missing$'                    { $flags['--library'] = 'Library to look in'; $flags['--all'] = 'Check every show'; $flags['--season'] = 'Season number, or several comma separated'; $flags['--include-specials'] = 'Also check season 0' }
-                '^clean-playlist$'                  { $flags['--include-partial'] = 'Also remove part-played items' }
-                '^copy-watched$'                    { $flags['--one-way'] = 'Only write to the second user'; $flags['--library'] = 'Restrict to one library'; $flags['--title'] = 'Restrict to one item'; $flags['--unwatch'] = 'Propagate the unwatched state instead' }
+                '^missing-find$'                    { $flags['--library'] = 'Library to look in'; $flags['--all'] = 'Check every show'; $flags['--season'] = 'Season number, or several comma separated'; $flags['--include-specials'] = 'Also check season 0' }
+                '^playlist-clean$'                  { $flags['--include-partial'] = 'Also remove part-played items' }
+                '^show-watched-cp$'                    { $flags['--one-way'] = 'Only write to the second user'; $flags['--library'] = 'Restrict to one library'; $flags['--title'] = 'Restrict to one item'; $flags['--unwatch'] = 'Propagate the unwatched state instead' }
                 '^login$'                           { $flags['--username'] = 'Plex username or email'; $flags['--password'] = 'Plex password (INSECURE)'; $flags['--save-password'] = 'Also save the password in the system keyring'; $flags['--code'] = 'Two-factor code'; $flags['--two-factor'] = 'Prompt for a two-factor code' }
                 '^logout$'                          { $flags['--username'] = 'Sign out only this saved name' }
                 '^set-pin$'                         { $flags['--remove'] = 'Remove the saved PIN instead of prompting' }
@@ -370,44 +378,42 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
         } else {
             $user = if ($positionals.Count) { $positionals[0] } else { '' }
             switch ($command) {
-                { $_ -in 'list-titles', 'list-library', 'list-albums' } { if ($index -eq 0) { $results = Get-PlexdoLibraries } }
-                'export-titles'  { if ($index -eq 0) { $results = Get-PlexdoLibraries } }
+                { $_ -in 'library-list', 'albums-list' } { if ($index -eq 0) { $results = Get-PlexdoLibraries } }
+                'titles-export'  { if ($index -eq 0) { $results = Get-PlexdoLibraries } }
                 'rescan'         { if ($index -eq 0) { $results = Get-PlexdoLibraries } }
-                'find-missing'   { if ($index -eq 0) { $results = Get-PlexdoRatingKeys } }
+                'missing-find'   { if ($index -eq 0) { $results = Get-PlexdoRatingKeys } }
                 'read'           { if ($index -eq 0) { $results = Get-PlexdoLibraries }
                                    elseif ($index -eq 1) { $results = Get-PlexdoRatingKeys } }
-                'list-show'      { if ($index -eq 0) { $results = Get-PlexdoRatingKeys } }
+                'show-list'      { if ($index -eq 0) { $results = Get-PlexdoRatingKeys } }
                 'player-remote-play' { if ($index -eq 1) { $results = Get-PlexdoRatingKeys } }
                 'show-metadata'  { if ($index -eq 0) { $results = Get-PlexdoRatingKeys } }
-                'list-album'     { if ($index -eq 0) { $results = Get-PlexdoRatingKeys } }
-                'list-playlists' { if ($index -eq 0) { $results = Get-PlexdoUsers } }
+                'album-list'     { if ($index -eq 0) { $results = Get-PlexdoRatingKeys } }
+                'playlists-list' { if ($index -eq 0) { $results = Get-PlexdoUsers } }
                 'search'         { if ($index -eq 0) { $results = Get-PlexdoUsers } }
                 'set-pin'        { if ($index -eq 0) { $results = Get-PlexdoUsers } }
-                'list-playlist'  { if ($index -eq 0) { $results = Get-PlexdoUsers }
+                'playlist-list'  { if ($index -eq 0) { $results = Get-PlexdoUsers }
                                    elseif ($index -eq 1) { $results = Get-PlexdoPlaylists $user -IncludeKeys } }
-                'export-playlist'   { if ($index -eq 0) { $results = Get-PlexdoUsers }
+                'playlist-export'   { if ($index -eq 0) { $results = Get-PlexdoUsers }
                                       elseif ($index -eq 1) { $results = Get-PlexdoPlaylists $user } }
-                'remove-playlist'   { if ($index -eq 0) { $results = Get-PlexdoUsers }
+                'playlist-remove'   { if ($index -eq 0) { $results = Get-PlexdoUsers }
                                       elseif ($index -eq 1) { $results = Get-PlexdoPlaylists $user } }
-                'clean-playlist'    { if ($index -eq 0) { $results = Get-PlexdoUsers }
+                'playlist-clean'    { if ($index -eq 0) { $results = Get-PlexdoUsers }
                                       elseif ($index -eq 1) { $results = Get-PlexdoPlaylists $user } }
-                'append-playlist'   { if ($index -eq 0) { $results = Get-PlexdoUsers }
-                                      elseif ($index -eq 1) { $results = Get-PlexdoPlaylists $user }
-                                      else { $results = Get-PlexdoRatingKeys } }
-                'build-randomize'   { if ($index -eq 0) { $results = Get-PlexdoUsers }
-                                      elseif ($index -eq 1) { $results = Get-PlexdoPlaylists $user } }
-                'build-concatenated' { if ($index -eq 0) { $results = Get-PlexdoUsers }
-                                       elseif ($index -ge 2) { $results = Get-PlexdoPlaylists $user -IncludeKeys } }
-                'build-merge'       { if ($index -eq 0) { $results = Get-PlexdoUsers }
+                'playlist-build'    {
+                    if ($mode -in 'interleaved', 'chronological') {
+                        if ($index -ge 1) { $results = Get-PlexdoRatingKeys }
+                    } elseif ($mode -in 'randomize', 'all-or-append') {
+                        if ($index -eq 0) { $results = Get-PlexdoUsers }
+                        elseif ($index -eq 1) { $results = Get-PlexdoPlaylists $user -IncludeKeys }
+                        elseif ($mode -eq 'all-or-append') { $results = Get-PlexdoRatingKeys }
+                    }
+                }
+                'merge-build'       { if ($index -eq 0) { $results = Get-PlexdoUsers }
                                       elseif ($index -in 2, 3) { $results = Get-PlexdoPlaylists $user -IncludeKeys } }
-                'copy-playlist-all-users' { if ($index -eq 0) { $results = Get-PlexdoUsers }
-                                            elseif ($index -eq 1) { $results = Get-PlexdoPlaylists $user } }
-                'copy-playlist-to-user'   { if ($index -eq 0) { $results = Get-PlexdoUsers }
-                                            elseif ($index -eq 1) { $results = Get-PlexdoPlaylists $user }
-                                            elseif ($index -eq 2) { $results = Get-PlexdoUsers } }
-                'copy-watched'   { if ($index -le 1) { $results = Get-PlexdoUsers } }
-                { $_ -in 'build-interleaved', 'build-chronological' } {
-                                   if ($index -ge 1) { $results = Get-PlexdoRatingKeys } }
+                'playlist-copy'     { if ($index -eq 0) { $results = Get-PlexdoUsers }
+                                      elseif ($index -eq 1) { $results = Get-PlexdoPlaylists $user }
+                                      elseif ($index -eq 2 -and $mode -eq 'to') { $results = Get-PlexdoUsers } }
+                'show-watched-cp'   { if ($index -le 1) { $results = Get-PlexdoUsers } }
             }
         }
     }

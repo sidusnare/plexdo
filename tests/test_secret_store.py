@@ -16,6 +16,7 @@ from keyring.backends import chainer, fail
 from conftest import REAL_BACKEND
 from plexdo import config, migrate, secret_store
 from plexdo.commands import auth
+from plexdo.constants import SECRETS_EXAMPLE
 from plexdo.tokens import ADMIN_KEY, lookup, saved_password, saved_pin
 
 
@@ -328,3 +329,97 @@ def test_set_pin_dry_run_saves_nothing(monkeypatch):
     monkeypatch.setattr(auth.getpass, "getpass", lambda prompt: "1234")
     set_pin(dry_run=True)
     assert saved_pin(826699965) is None
+
+
+# --- write-secrets-example ---------------------------------------------------
+
+
+@pytest.fixture
+def config_file(monkeypatch, tmp_path):
+    """A config path inside a temporary directory, not yet written."""
+    path = tmp_path / "config.yaml"
+    monkeypatch.setattr(auth, "CONFIG_PATH", path)
+    return path
+
+
+def write_secrets_example(**flags):
+    args = argparse.Namespace(overwrite=False, dry_run=False)
+    vars(args).update(flags)
+    auth.cmd_write_secrets_example(None, args)
+
+
+@pytest.mark.parametrize("body", [None, "plex:\n  url: http://x\n"])
+def test_with_no_secrets_file_set_the_example_is_printed(
+    config_file, capsys, tmp_path, body
+):
+    """No config at all sets no secrets_file either."""
+    if body is not None:
+        config_file.write_text(body)
+    before = sorted(tmp_path.iterdir())
+    write_secrets_example()
+    captured = capsys.readouterr()
+    assert captured.out == SECRETS_EXAMPLE
+    assert "secrets_file is not set" in captured.err
+    assert str(config_file) in captured.err
+    assert sorted(tmp_path.iterdir()) == before
+
+
+def test_the_example_is_written_where_secrets_file_says(
+    config_file, capsys, tmp_path
+):
+    target = tmp_path / "private" / "secrets.json"
+    config_file.write_text(f"plex:\n  url: x\n  secrets_file: {target}\n")
+    write_secrets_example()
+    captured = capsys.readouterr()
+    assert target.read_text() == SECRETS_EXAMPLE
+    assert str(target) in captured.out
+    assert captured.err == ""
+    if os.name != "nt":
+        assert stat.S_IMODE(target.stat().st_mode) == 0o600
+
+
+def test_an_existing_secrets_file_is_refused_and_left_alone(
+    config_file, tmp_path
+):
+    target = tmp_path / "secrets.json"
+    target.write_text('{"tokens": {"me": "real"}}')
+    config_file.write_text(f"plex:\n  url: x\n  secrets_file: {target}\n")
+    for flags in ({}, {"dry_run": True}):
+        with pytest.raises(SystemExit) as exc:
+            write_secrets_example(**flags)
+        assert "--overwrite" in str(exc.value)
+    assert target.read_text() == '{"tokens": {"me": "real"}}'
+
+
+def test_overwrite_replaces_the_secrets_file_privately(config_file, tmp_path):
+    target = tmp_path / "secrets.json"
+    target.write_text("{}")
+    target.chmod(0o644)
+    config_file.write_text(f"plex:\n  url: x\n  secrets_file: {target}\n")
+    write_secrets_example(overwrite=True)
+    assert target.read_text() == SECRETS_EXAMPLE
+    if os.name != "nt":
+        assert stat.S_IMODE(target.stat().st_mode) == 0o600
+
+
+def test_write_secrets_example_dry_run_writes_nothing(
+    config_file, capsys, tmp_path
+):
+    target = tmp_path / "secrets.json"
+    config_file.write_text(f"plex:\n  url: x\n  secrets_file: {target}\n")
+    write_secrets_example(dry_run=True)
+    assert not target.exists()
+    assert str(target) in capsys.readouterr().err
+
+
+def test_the_example_is_a_secrets_file_the_store_can_read(tmp_path):
+    """Its three kinds load, and its note survives a later save."""
+    path = tmp_path / "secrets.json"
+    path.write_text(SECRETS_EXAMPLE)
+    path.chmod(0o600)
+    store = secret_store.FileStore(path)
+    for kind in ("tokens", "passwords", "pins"):
+        entries = json.loads(store.read(kind))
+        assert entries and all(isinstance(v, str) for v in entries.values())
+    store.write("pins", '{"1": "1234"}')
+    assert "_comment" in json.loads(path.read_text())

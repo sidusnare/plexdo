@@ -1,15 +1,15 @@
-plexdo-remove-playlist(1) "plexdo" "User Commands"
+plexdo-playlist-remove(1) "plexdo" "User Commands"
 ; SPDX-FileCopyrightText: 2026 SidusNare
 ; SPDX-License-Identifier: GPL-3.0-or-later
 ; SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 # NAME
 
-plexdo-remove-playlist - delete a playlist from a user's account
+plexdo-playlist-remove - delete a playlist from a user's account
 
 # SYNOPSIS
 
-*plexdo remove-playlist* _USER_ _PLAYLIST_ [_GLOBAL OPTIONS_]
+*plexdo playlist-remove* _USER_ _PLAYLIST_ [_GLOBAL OPTIONS_]
 
 # DESCRIPTION
 
@@ -87,18 +87,18 @@ has nothing shared and cannot be acted on. See *plexdo-conventions*(7).
 Check what would be removed, then remove it:
 
 ```
-plexdo remove-playlist 0 "Old Mix" --dry-run --verbose
-plexdo remove-playlist 0 "Old Mix"
+plexdo playlist-remove 0 "Old Mix" --dry-run --verbose
+plexdo playlist-remove 0 "Old Mix"
 ```
 
 Remove one of another user's playlists by ratingKey, which is unambiguous
 even if they have two playlists of the same title:
 
 ```
-plexdo remove-playlist Alice 9104
+plexdo playlist-remove Alice 9104
 ```
 
 # SEE ALSO
 
-*plexdo-list-playlists*(1), *plexdo-clean-playlist*(1),
-*plexdo-copy-playlist-all-users*(1), *plexdo-conventions*(7), *plexdo*(1)
+*plexdo-playlists-list*(1), *plexdo-playlist-clean*(1),
+*plexdo-playlist-copy*(1), *plexdo-conventions*(7), *plexdo*(1)

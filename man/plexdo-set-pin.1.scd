@@ -32,7 +32,7 @@ PIN saved for the member, as *--remove* does.
 # ARGUMENTS
 
 _USER_ID_
-	The member's numeric plex.tv user ID, as *plexdo-list-users*(1) shows
+	The member's numeric plex.tv user ID, as *plexdo-users-list*(1) shows
 	it. A title is not accepted: the ID is not looked up, so the server is
 	not needed.
 
@@ -121,5 +121,5 @@ Where secrets are kept is described under *FILES* in
 
 # SEE ALSO
 
-*plexdo-player-remote-play*(1), *plexdo-list-users*(1), *plexdo-login*(1),
+*plexdo-player-remote-play*(1), *plexdo-users-list*(1), *plexdo-login*(1),
 *plexdo-logout*(1), *plexdo-conventions*(7), *plexdo*(1)

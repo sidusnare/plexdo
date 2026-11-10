@@ -9,16 +9,11 @@ import sys
 from collections.abc import Sequence
 from typing import Any
 
-from plexapi.exceptions import NotFound
 from plexapi.playlist import Playlist
 from plexapi.server import PlexServer
 
 from plexdo.accounts import server_for_user
-from plexdo.arguments import (
-    add_m3u_argument,
-    add_rating_keys_argument,
-    add_user_argument,
-)
+from plexdo.arguments import add_m3u_argument, add_user_argument
 from plexdo.cache import write_cache
 from plexdo.console import output, output_format
 from plexdo.constants import LOG, MediaItem
@@ -96,42 +91,6 @@ def cmd_remove_playlist(plex: PlexServer, args: argparse.Namespace) -> None:
         return
     playlist.delete()
     print(f"Deleted playlist: {args.playlist!r}")
-
-
-def cmd_append_playlist(plex: PlexServer, args: argparse.Namespace) -> None:
-    """Append one or more items to an existing playlist."""
-    user_plex = server_for_user(plex, args.user_id)
-    playlist: Playlist = resolve_playlist(user_plex, args.playlist)
-
-    rating_keys = [int(k) for k in args.rating_keys]
-    new_items: list[MediaItem] = []
-    for rk in rating_keys:
-        try:
-            new_items.append(user_plex.fetchItem(rk))
-        except NotFound:
-            sys.exit(f"ratingKey not found: {rk}")
-
-    if not new_items:
-        sys.exit("No items to append.")
-
-    LOG.info("Appending %d item(s) to '%s'", len(new_items), args.playlist)
-
-    preview_rows = [
-        {
-            "index": i + 1,
-            "ratingKey": int(item.ratingKey),
-            "title": display_title(item),
-        }
-        for i, item in enumerate(new_items)
-    ]
-    output(preview_rows, args)
-
-    if args.dry_run:
-        LOG.info("--dry-run: skipping append.")
-        return
-
-    playlist.addItems(new_items)
-    LOG.info("Appended %d item(s) to '%s'.", len(new_items), args.playlist)
 
 
 def _watched_label(item: MediaItem, include_partial: bool) -> str | None:
@@ -242,38 +201,40 @@ def register(
 ) -> None:
     """Register the playlist inspection and mutation subparsers."""
     p_lpl = sub.add_parser(
-        "list-playlists", parents=parents, help="List playlists for a user."
+        "playlists-list", parents=parents, help="List a user's playlists."
     )
     add_user_argument(p_lpl)
 
     p_lp = sub.add_parser(
-        "list-playlist",
+        "playlist-list",
         parents=parents,
-        help="List items in a specific playlist.",
+        help="List the items in a playlist.",
     )
     add_user_argument(p_lp)
     p_lp.add_argument(
         "playlist",
+        metavar="PLAYLIST",
         type=str,
         help=(
             "Playlist name (str) or ratingKey (int). Obtain either with "
-            "list-playlists."
+            "playlists-list."
         ),
     )
     add_m3u_argument(p_lp)
     add_prefix_argument(p_lp)
 
     p_ep = sub.add_parser(
-        "export-playlist",
+        "playlist-export",
         parents=parents,
-        help="Export an existing playlist to an M3U file.",
+        help="Export a playlist to an M3U file.",
     )
     add_user_argument(p_ep)
     p_ep.add_argument(
         "playlist",
+        metavar="PLAYLIST",
         help="To export. "
         + "Playlist name (str) or ratingKey (int). Obtain either with "
-        "list-playlists.",
+        "playlists-list.",
     )
     p_ep.add_argument(
         "m3u",
@@ -283,49 +244,31 @@ def register(
     add_prefix_argument(p_ep)
 
     p_rp = sub.add_parser(
-        "remove-playlist",
+        "playlist-remove",
         parents=parents,
-        help="Delete a playlist from a user's account.",
+        help="Delete a playlist.",
     )
     add_user_argument(p_rp)
     p_rp.add_argument(
         "playlist",
+        metavar="PLAYLIST",
         help="To delete. "
         + "Playlist name (str) or ratingKey (int). Obtain either with "
-        "list-playlists.",
-    )
-
-    p_ap = sub.add_parser(
-        "append-playlist",
-        parents=parents,
-        help="Append one or more items to an existing playlist.",
-    )
-    add_user_argument(p_ap)
-    p_ap.add_argument(
-        "playlist",
-        help="To append to. "
-        + "Playlist name (str) or ratingKey (int). Obtain either with "
-        "list-playlists.",
-    )
-    add_rating_keys_argument(
-        p_ap,
-        (
-            "One or more item ratingKeys to append (int). Obtain with "
-            "list-titles or list-show."
-        ),
+        "playlists-list.",
     )
 
     p_cp = sub.add_parser(
-        "clean-playlist",
+        "playlist-clean",
         parents=parents,
-        help="Remove watched items from an existing playlist.",
+        help="Remove the watched items from a playlist.",
     )
     add_user_argument(p_cp)
     p_cp.add_argument(
         "playlist",
+        metavar="PLAYLIST",
         help="To clean. "
         + "Playlist name (str) or ratingKey (int). Obtain either with "
-        "list-playlists.",
+        "playlists-list.",
     )
     p_cp.add_argument(
         "--include-partial",
@@ -341,12 +284,11 @@ def register(
 
 
 COMMANDS = {
-    "list-playlists": cmd_list_playlists,
-    "list-playlist": cmd_list_playlist,
-    "export-playlist": cmd_export_playlist,
-    "remove-playlist": cmd_remove_playlist,
-    "append-playlist": cmd_append_playlist,
-    "clean-playlist": cmd_clean_playlist,
+    "playlists-list": cmd_list_playlists,
+    "playlist-list": cmd_list_playlist,
+    "playlist-export": cmd_export_playlist,
+    "playlist-remove": cmd_remove_playlist,
+    "playlist-clean": cmd_clean_playlist,
 }
 
 REQUIRES_PLEX = frozenset(COMMANDS)

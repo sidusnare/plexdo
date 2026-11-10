@@ -1,23 +1,20 @@
-plexdo-list-titles(1) "plexdo" "User Commands"
+plexdo-library-list(1) "plexdo" "User Commands"
 ; SPDX-FileCopyrightText: 2026 SidusNare
 ; SPDX-License-Identifier: GPL-3.0-or-later
 ; SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 # NAME
 
-plexdo-list-titles, plexdo-list-library - list the titles in a library
+plexdo-library-list - list the titles in a library
 
 # SYNOPSIS
 
-*plexdo list-titles* _LIBRARY_ [*--album* _ALBUM_] [_GLOBAL OPTIONS_]
-
-*plexdo list-library* _LIBRARY_ [*--album* _ALBUM_] [_GLOBAL OPTIONS_]
+*plexdo library-list* _LIBRARY_ [*--album* _ALBUM_] [_GLOBAL OPTIONS_]
 
 # DESCRIPTION
 
 Lists what a library holds: its films, its shows, its artists, or, for a
-photo library, its photos. *list-library* is another name for the same
-command; the two behave identically.
+photo library, its photos.
 
 How much each entry carries depends on the output format. The table is kept
 compact, five columns per title. Every machine-readable format carries every
@@ -38,7 +35,7 @@ _ratingKey_ argument offers these titles afterwards.
 
 _LIBRARY_
 	The library to list, by numeric ID or by title, as
-	*plexdo-list-libraries*(1) shows them. See *plexdo-conventions*(7) for
+	*plexdo-libraries-list*(1) shows them. See *plexdo-conventions*(7) for
 	how a title is matched.
 
 # OPTIONS
@@ -136,26 +133,26 @@ the title, sorted by name, plus:
 List the shows in a library named by its title:
 
 ```
-plexdo list-titles "TV Shows"
+plexdo library-list "TV Shows"
 ```
 
 The same library by its ID, through the other name of the command:
 
 ```
-plexdo list-library 2
+plexdo library-list 2
 ```
 
 List the photos in one album of a photo library; the album name is matched
 ignoring case:
 
 ```
-plexdo list-titles Photos --album "summer 2024"
+plexdo library-list Photos --album "summer 2024"
 ```
 
 Export the full record for every film, then print the path of every file:
 
 ```
-plexdo list-titles Movies --json > movies.json
+plexdo library-list Movies --json > movies.json
 jq -r '.[].files[]' movies.json
 ```
 
@@ -163,18 +160,18 @@ Collect every show with its seasons and episodes as YAML. On a fast local
 network, *--throttle 0* removes the pause between shows:
 
 ```
-plexdo list-titles "TV Shows" -f yaml --throttle 0 > shows.yaml
+plexdo library-list "TV Shows" -f yaml --throttle 0 > shows.yaml
 ```
 
 Count the episodes of each show:
 
 ```
-plexdo list-titles "TV Shows" --json |
+plexdo library-list "TV Shows" --json |
     jq -r '.[] | "\\(.title): \\([.seasons[] | length] | add)"'
 ```
 
 # SEE ALSO
 
-*plexdo-list-libraries*(1), *plexdo-list-albums*(1), *plexdo-list-show*(1),
-*plexdo-export-titles*(1), *plexdo-show-metadata*(1), *plexdo-conventions*(7),
+*plexdo-libraries-list*(1), *plexdo-albums-list*(1), *plexdo-show-list*(1),
+*plexdo-titles-export*(1), *plexdo-show-metadata*(1), *plexdo-conventions*(7),
 *plexdo*(1)

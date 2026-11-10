@@ -15,7 +15,7 @@ DUPES = [(1, "Media"), (2, "Media")]
 
 
 def r(value, roster=ROSTER):
-    return resolve_identifier(roster, value, "library", "list-libraries")
+    return resolve_identifier(roster, value, "library", "libraries-list")
 
 
 def test_numeric_id_resolves_to_itself():
@@ -52,7 +52,7 @@ def test_unknown_numeric_id_passes_through_for_the_caller_to_report():
 
 def test_duplicate_titles_abort():
     with pytest.raises(SystemExit) as exc:
-        resolve_identifier(DUPES, "Media", "library", "list-libraries")
+        resolve_identifier(DUPES, "Media", "library", "libraries-list")
     assert "1, 2" in str(exc.value)
 
 
@@ -63,10 +63,10 @@ def test_duplicate_titles_do_not_block_an_unambiguous_numeric_id():
 def test_unknown_title_aborts_naming_the_listing_command():
     with pytest.raises(SystemExit) as exc:
         r("Nothing")
-    assert "list-libraries" in str(exc.value)
+    assert "libraries-list" in str(exc.value)
 
 
 def test_messages_name_the_kind_being_resolved():
     with pytest.raises(SystemExit) as exc:
-        resolve_identifier([(0, "Fred")], "Ghost", "user", "list-users")
+        resolve_identifier([(0, "Fred")], "Ghost", "user", "users-list")
     assert "User not found" in str(exc.value)

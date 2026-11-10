@@ -6,12 +6,14 @@
 
 import argparse
 import sys
+from functools import partial
 from typing import Any
 
 from plexapi.playlist import Playlist
 from plexapi.server import PlexServer
 
 from plexdo.accounts import UserAccessError, server_for_user
+from plexdo.arguments import add_overwrite_argument
 from plexdo.console import clean_text, output, output_format
 from plexdo.constants import LOG, MediaItem
 from plexdo.fanout import report_line, run_per_user
@@ -52,9 +54,7 @@ def _copy_to_one_user(
     }
 
 
-def cmd_copy_playlist_all_users(
-    plex: PlexServer, args: argparse.Namespace
-) -> None:
+def _copy_to_all(plex: PlexServer, args: argparse.Namespace) -> None:
     """Copy a playlist from any user to all managed users."""
     src_plex = server_for_user(plex, args.source_user_id)
     src: Playlist = resolve_playlist(src_plex, args.source_playlist)
@@ -83,9 +83,7 @@ def cmd_copy_playlist_all_users(
     run_per_user(targets, (src.title, src_items), args, copy_to)
 
 
-def cmd_copy_playlist_to_user(
-    plex: PlexServer, args: argparse.Namespace
-) -> None:
+def _copy_to_one(plex: PlexServer, args: argparse.Namespace) -> None:
     """Copy a playlist from any user to a specific user."""
     src_plex = server_for_user(plex, args.source_user_id)
     src: Playlist = resolve_playlist(src_plex, args.source_playlist)
@@ -94,7 +92,7 @@ def cmd_copy_playlist_to_user(
     user_plex = server_for_user(plex, args.user_id)
     # A machine-readable format gets the outcome record alone: printing the
     # item list too would make two documents on one stream, which nothing
-    # parsing it expects. copy-playlist-all-users does the same.
+    # parsing it expects. --all does the same.
     table_mode = output_format(args) == "table"
     status, final_name, detail = copy_playlist_to(
         src_items,
@@ -117,66 +115,109 @@ def cmd_copy_playlist_to_user(
         output(record, args)
 
 
-_SRC_UID_HELP = (
-    "Source user ID (int) or user title (str); use 0 for the admin "
-    "account. Obtain both with list-users."
-)
-_OVERWRITE_HELP = (
-    "Overwrite an existing playlist of the same name on the destination "
-    "instead of appending ' admin copy'."
-)
+_COPY_USAGE = """%(prog)s -A USER PLAYLIST [-o] [options]
+       %(prog)s -T USER PLAYLIST TO_USER DEST [-o] [options]"""
+
+_COPY_DESCRIPTION = """\
+Copy a playlist from one user to others. Exactly one of -A and -T says to
+whom:
+
+  -A  every user the server is shared with, each getting a playlist of the
+      same name; the source user is skipped.
+  -T  the one user TO_USER, as the playlist DEST.
+
+A user is a user ID or title, 0 for the admin account (see users-list)."""
+
+
+def _check_copy(
+    parser: argparse.ArgumentParser, args: argparse.Namespace
+) -> None:
+    """Name playlist-copy's trailing arguments for its mode, or exit 2."""
+    if args.copy_to == "all":
+        if args.target:
+            parser.error(
+                "--all takes USER PLAYLIST alone; every user gets a "
+                "playlist of the same name"
+            )
+        return
+    if len(args.target) != 2:
+        parser.error(
+            "--to takes USER PLAYLIST TO_USER DEST; got "
+            f"{2 + len(args.target)} argument(s)"
+        )
+    args.user_id, args.dest = args.target
+
+
+def cmd_playlist_copy(plex: PlexServer, args: argparse.Namespace) -> None:
+    """Copy a playlist to every shared user, or to one."""
+    if args.copy_to == "all":
+        _copy_to_all(plex, args)
+    else:
+        _copy_to_one(plex, args)
 
 
 def register(
     sub: "argparse._SubParsersAction",
     parents: "list[argparse.ArgumentParser]",
 ) -> None:
-    """Register the playlist copying subparsers."""
-    playlist_help = (
-        "Playlist name (str) or ratingKey (int). Obtain either with "
-        "list-playlists."
-    )
-    uid_help = (
-        "User ID (int) or user title (str); use 0 for the admin account. "
-        "Obtain both with list-users."
-    )
-
-    p_all = sub.add_parser(
-        "copy-playlist-all-users",
+    """Register the playlist copying subparser."""
+    parser = sub.add_parser(
+        "playlist-copy",
         parents=parents,
-        help="Copy a playlist from any user to all managed users.",
+        help="Copy a playlist to one user, or to all of them.",
+        usage=_COPY_USAGE,
+        description=_COPY_DESCRIPTION,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    p_all.add_argument("source_user_id", metavar="USER", help=_SRC_UID_HELP)
-    p_all.add_argument("source_playlist", help="Source. " + playlist_help)
-    p_all.add_argument(
-        "-o",
-        "--overwrite",
-        action="store_true",
-        default=False,
-        help=_OVERWRITE_HELP,
+    parser.set_defaults(check_arguments=partial(_check_copy, parser))
+
+    whom = parser.add_argument_group("who to copy to (exactly one)")
+    mode = whom.add_mutually_exclusive_group(required=True)
+    mode.add_argument(
+        "-A",
+        "--all",
+        dest="copy_to",
+        action="store_const",
+        const="all",
+        help="Copy to every user the server is shared with.",
+    )
+    mode.add_argument(
+        "-T",
+        "--to",
+        dest="copy_to",
+        action="store_const",
+        const="one",
+        help="Copy to TO_USER, as the playlist DEST.",
     )
 
-    p_one = sub.add_parser(
-        "copy-playlist-to-user",
-        parents=parents,
-        help="Copy a playlist from any user to a specific user.",
+    parser.add_argument(
+        "source_user_id",
+        metavar="USER",
+        help="The user the playlist belongs to.",
     )
-    p_one.add_argument("source_user_id", metavar="USER", help=_SRC_UID_HELP)
-    p_one.add_argument("source_playlist", help="Source. " + playlist_help)
-    p_one.add_argument("user_id", metavar="USER", help="Target " + uid_help)
-    p_one.add_argument("dest", help="Destination playlist title (str).")
-    p_one.add_argument(
-        "-o",
-        "--overwrite",
-        action="store_true",
-        default=False,
-        help=_OVERWRITE_HELP,
+    parser.add_argument(
+        "source_playlist",
+        metavar="PLAYLIST",
+        help=(
+            "The playlist to copy: its name (str) or ratingKey (int). "
+            "Obtain either with playlists-list."
+        ),
+    )
+    parser.add_argument(
+        "target",
+        nargs="*",
+        metavar="TO_USER DEST",
+        help=("With -T: the user to copy to, and the title to give the copy."),
+    )
+    add_overwrite_argument(
+        parser,
+        (
+            "Overwrite an existing playlist of the same name on the "
+            "destination instead of appending ' admin copy'."
+        ),
     )
 
 
-COMMANDS = {
-    "copy-playlist-all-users": cmd_copy_playlist_all_users,
-    "copy-playlist-to-user": cmd_copy_playlist_to_user,
-}
+COMMANDS = {"playlist-copy": cmd_playlist_copy}
 
 REQUIRES_PLEX = frozenset(COMMANDS)

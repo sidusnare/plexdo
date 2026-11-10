@@ -9,8 +9,8 @@ from pathlib import Path
 import pytest
 
 from plexdo import __version__
-from plexdo.cli import build_parser
-from plexdo.commands import MODULES, build_registry
+from plexdo.cli import build_parser, parse_arguments
+from plexdo.commands import GROUPS, MODULES, build_registry
 from plexdo.constants import default_paths, windows_app_dir
 
 
@@ -38,6 +38,7 @@ def test_only_the_account_and_config_commands_run_without_a_server():
         "logout",
         "set-pin",
         "write-config-example",
+        "write-secrets-example",
     }
 
 
@@ -52,7 +53,7 @@ def test_only_the_account_and_config_commands_run_without_a_server():
 )
 def test_global_flags_work_before_the_command(parser, flag, attr, value):
     argv = (
-        [flag, "yaml", "list-users"] if flag == "-f" else [flag, "list-users"]
+        [flag, "yaml", "users-list"] if flag == "-f" else [flag, "users-list"]
     )
     assert getattr(parser.parse_args(argv), attr) == value
 
@@ -68,7 +69,7 @@ def test_global_flags_work_before_the_command(parser, flag, attr, value):
 )
 def test_global_flags_work_after_the_command(parser, flag, attr, value):
     argv = (
-        ["list-users", flag, "yaml"] if flag == "-f" else ["list-users", flag]
+        ["users-list", flag, "yaml"] if flag == "-f" else ["users-list", flag]
     )
     assert getattr(parser.parse_args(argv), attr) == value
 
@@ -76,13 +77,13 @@ def test_global_flags_work_after_the_command(parser, flag, attr, value):
 @pytest.mark.parametrize(
     "argv",
     [
-        ["--debug-log", "run.log", "list-users"],
-        ["list-users", "--debug-log", "run.log"],
+        ["--debug-log", "run.log", "users-list"],
+        ["users-list", "--debug-log", "run.log"],
     ],
 )
 def test_debug_log_works_before_or_after_the_command(parser, argv):
     assert parser.parse_args(argv).debug_log == "run.log"
-    assert parser.parse_args(["list-users"]).debug_log is None
+    assert parser.parse_args(["users-list"]).debug_log is None
 
 
 def test_a_flag_given_before_the_command_is_not_clobbered_by_the_subparser(
@@ -90,43 +91,37 @@ def test_a_flag_given_before_the_command_is_not_clobbered_by_the_subparser(
 ):
     """The subparser copies its whole namespace over; SUPPRESS prevents that."""
     assert (
-        parser.parse_args(["--json", "copy-watched", "7", "9"]).format == "json"
+        parser.parse_args(["--json", "show-watched-cp", "7", "9"]).format
+        == "json"
     )
 
 
 def test_users_and_libraries_accept_titles_not_just_numbers(parser):
-    assert parser.parse_args(["list-playlists", "Alice"]).user_id == "Alice"
+    assert parser.parse_args(["playlists-list", "Alice"]).user_id == "Alice"
     assert (
-        parser.parse_args(["list-titles", "TV Shows"]).library_id == "TV Shows"
+        parser.parse_args(["library-list", "TV Shows"]).library_id == "TV Shows"
     )
 
 
 def test_minus_one_parses_as_the_one_way_flag_not_a_negative_number(parser):
-    assert parser.parse_args(["copy-watched", "7", "9", "-1"]).one_way is True
+    assert (
+        parser.parse_args(["show-watched-cp", "7", "9", "-1"]).one_way is True
+    )
 
 
 def test_build_merge_keeps_minus_u_for_the_target_user(parser):
     """-U is --unique; -u stays --user, as on every build command."""
     args = parser.parse_args(
-        ["build-merge", "0", "Mix", "a", "b", "-s", "-U", "-u", "7"]
+        ["merge-build", "0", "Mix", "a", "b", "-s", "-U", "-u", "7"]
     )
     assert args.stop_short and args.unique
     assert args.dest_user_id == "7"
-    default = parser.parse_args(["build-merge", "0", "Mix", "a", "b"])
+    default = parser.parse_args(["merge-build", "0", "Mix", "a", "b"])
     assert default.ratio == (1, 1)
 
 
 @pytest.mark.parametrize(
-    "command",
-    [
-        "build-interleaved",
-        "build-chronological",
-        "build-randomize",
-        "build-concatenated",
-        "build-merge",
-        "copy-playlist-all-users",
-        "copy-playlist-to-user",
-    ],
+    "command", ["playlist-build", "merge-build", "playlist-copy"]
 )
 def test_every_creating_command_offers_overwrite(parser, command):
     action = {
@@ -140,15 +135,12 @@ def test_every_creating_command_offers_overwrite(parser, command):
 @pytest.mark.parametrize(
     "command",
     [
-        "list-playlist",
-        "list-show",
-        "export-playlist",
-        "export-titles",
-        "build-interleaved",
-        "build-chronological",
-        "build-randomize",
-        "build-concatenated",
-        "build-merge",
+        "playlist-list",
+        "show-list",
+        "playlist-export",
+        "titles-export",
+        "playlist-build",
+        "merge-build",
     ],
 )
 def test_every_export_command_offers_a_path_prefix(parser, command):
@@ -423,21 +415,178 @@ def test_write_cache_creates_the_configured_directory(tmp_path, configured):
     assert (tmp_path / "made" / "users.json").exists()
 
 
-# --- command alias -------------------------------------------------------
+# --- the renamed and merged commands ---------------------------------------
 
 
-def test_list_library_is_an_alias_for_list_titles(parser):
-    assert parser.parse_args(["list-library", "3"]).library_id == "3"
-    assert parser.parse_args(["list-library", "3"]).command == "list-library"
+def test_library_list_takes_a_library_and_an_album(parser):
+    args = parser.parse_args(["library-list", "My Photos", "--album", "Trip"])
+    assert (args.command, args.library_id, args.album) == (
+        "library-list",
+        "My Photos",
+        "Trip",
+    )
 
 
-def test_both_spellings_dispatch_to_the_same_handler():
-    """The argparse error names the spelling typed: aliases need an entry."""
-    handlers, needs_plex = build_registry()
-    assert handlers["list-library"] is handlers["list-titles"]
-    assert {"list-titles", "list-library"} <= needs_plex
+@pytest.mark.parametrize(
+    "gone",
+    [
+        "list-titles",
+        "list-library",
+        "list-users",
+        "build-concatenated",
+        "build-interleaved",
+        "append-playlist",
+        "copy-playlist-to-user",
+        "copy-watched",
+    ],
+)
+def test_the_old_command_names_are_gone(parser, gone):
+    with pytest.raises(SystemExit) as exc:
+        parser.parse_args([gone])
+    assert exc.value.code == 2
 
 
-def test_the_alias_accepts_the_same_options(parser):
-    args = parser.parse_args(["list-library", "My Photos", "--album", "Trip"])
-    assert (args.library_id, args.album) == ("My Photos", "Trip")
+def test_every_command_is_listed_in_exactly_one_help_group():
+    grouped = [name for _, names in GROUPS for name in names]
+    assert len(grouped) == len(set(grouped))
+    assert set(grouped) == set(build_registry()[0])
+
+
+def test_help_lists_the_commands_grouped_and_sorted(parser):
+    text = parser.format_help()
+    listed = [
+        line.split()[0]
+        for line in text.splitlines()
+        if line.startswith("  ") and line[2:3].isalpha()
+    ]
+    expected = [name for _, names in GROUPS for name in sorted(names)]
+    assert listed == expected
+    for title, _ in GROUPS:
+        assert f"\n{title}:\n" in text
+
+
+def test_a_command_lists_the_global_options_last_and_apart(parser):
+    command = parser._subparsers._group_actions[0].choices["library-list"]
+    text = command.format_help()
+    assert text.index("\noptions:") < text.index("\nglobal options:")
+    assert "[global options]" in command.format_usage()
+    assert "--debug-log" not in command.format_usage()
+
+
+def test_the_global_options_are_sorted_by_name(parser):
+    group = next(
+        g for g in parser._action_groups if g.title == "global options"
+    )
+    names = [a.option_strings[-1].lstrip("-") for a in group._group_actions]
+    assert names == sorted(names)
+
+
+# --- playlist-build: one command, four modes -------------------------------
+
+
+@pytest.mark.parametrize(
+    "flag,mode",
+    [
+        ("-I", "interleaved"),
+        ("--interleaved", "interleaved"),
+        ("-C", "chronological"),
+        ("--chronological", "chronological"),
+    ],
+)
+def test_playlist_build_from_rating_keys(parser, flag, mode):
+    args = parse_arguments(parser, ["playlist-build", flag, "Mix", "12", "34"])
+    assert (args.mode, args.name, args.rating_keys) == (mode, "Mix", [12, 34])
+
+
+@pytest.mark.parametrize("flag", ["-R", "--randomize"])
+def test_playlist_build_randomize_takes_user_source_dest(parser, flag):
+    args = parse_arguments(
+        parser, ["playlist-build", flag, "Alice", "Queue", "Shuffled", "-o"]
+    )
+    assert (args.mode, args.user_id, args.source, args.dest) == (
+        "randomize",
+        "Alice",
+        "Queue",
+        "Shuffled",
+    )
+    assert args.overwrite
+
+
+@pytest.mark.parametrize("flag", ["-A", "--append"])
+def test_playlist_build_append_takes_user_playlist_keys(parser, flag):
+    args = parse_arguments(parser, ["playlist-build", flag, "0", "Queue", "7"])
+    assert (args.mode, args.user_id, args.playlist, args.rating_keys) == (
+        "append",
+        "0",
+        "Queue",
+        [7],
+    )
+
+
+def test_minus_a_is_all_users_and_minus_capital_a_is_append(parser):
+    args = parse_arguments(parser, ["playlist-build", "-I", "Mix", "1", "-a"])
+    assert (args.mode, args.all_users) == ("interleaved", True)
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["Mix", "12"],  # no mode
+        ["-I", "-C", "Mix", "12"],  # two modes
+        ["-I", "Mix"],  # no ratingKey
+        ["-I", "Mix", "twelve"],  # not a ratingKey
+        ["-R", "0", "Queue"],  # no DEST
+        ["-R", "0", "Queue", "Shuffled", "extra"],
+        ["-A", "0", "Queue"],  # nothing to append
+        ["-A", "0", "Queue", "7", "-o"],  # nothing to overwrite
+        ["-A", "0", "Queue", "7", "-a"],
+        ["-A", "0", "Queue", "7", "-u", "3"],
+        ["-A", "0", "Queue", "7", "--m3u", "out.m3u"],
+    ],
+)
+def test_playlist_build_usage_errors_exit_2(parser, argv, capsys):
+    with pytest.raises(SystemExit) as exc:
+        parse_arguments(parser, ["playlist-build", *argv])
+    assert exc.value.code == 2
+    assert "usage: plexdo playlist-build" in capsys.readouterr().err
+
+
+# --- playlist-copy: to all, or to one --------------------------------------
+
+
+@pytest.mark.parametrize("flag", ["-A", "--all"])
+def test_playlist_copy_to_all(parser, flag):
+    args = parse_arguments(parser, ["playlist-copy", flag, "0", "Queue", "-o"])
+    assert (args.copy_to, args.source_user_id, args.source_playlist) == (
+        "all",
+        "0",
+        "Queue",
+    )
+    assert args.overwrite
+
+
+@pytest.mark.parametrize("flag", ["-T", "--to"])
+def test_playlist_copy_to_one(parser, flag):
+    args = parse_arguments(
+        parser, ["playlist-copy", flag, "0", "Queue", "Alice", "Hers"]
+    )
+    assert (args.copy_to, args.user_id, args.dest) == ("one", "Alice", "Hers")
+    assert (args.source_user_id, args.source_playlist) == ("0", "Queue")
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["0", "Queue"],  # neither -A nor -T
+        ["-A", "-T", "0", "Queue"],
+        ["-A", "0", "Queue", "Alice"],  # --all names no target
+        ["-T", "0", "Queue"],  # --to needs both
+        ["-T", "0", "Queue", "Alice"],
+        ["-T", "0", "Queue", "Alice", "Hers", "extra"],
+    ],
+)
+def test_playlist_copy_usage_errors_exit_2(parser, argv, capsys):
+    with pytest.raises(SystemExit) as exc:
+        parse_arguments(parser, ["playlist-copy", *argv])
+    assert exc.value.code == 2
+    assert "usage: plexdo playlist-copy" in capsys.readouterr().err

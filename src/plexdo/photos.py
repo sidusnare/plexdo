@@ -40,7 +40,7 @@ def collect_photos(
     if album is not None and not photos:
         sys.exit(
             f"Album '{album}' not found in library '{section.title}'. "
-            "Use list-titles to see available albums."
+            "Use library-list to see available albums."
         )
     return photos
 

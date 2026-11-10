@@ -1,15 +1,15 @@
-plexdo-copy-watched(1) "plexdo" "User Commands"
+plexdo-show-watched-cp(1) "plexdo" "User Commands"
 ; SPDX-FileCopyrightText: 2026 SidusNare
 ; SPDX-License-Identifier: GPL-3.0-or-later
 ; SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 # NAME
 
-plexdo-copy-watched - synchronise watched state and resume points between users
+plexdo-show-watched-cp - sync watched state and resume points of two users
 
 # SYNOPSIS
 
-*plexdo copy-watched* _USER_ _USER_ [*-1*] [*-l* _LIBRARY_ | *-t* _KEY_]
+*plexdo show-watched-cp* _USER_ _USER_ [*-1*] [*-l* _LIBRARY_ | *-t* _KEY_]
 \[*--unwatch*] [_GLOBAL OPTIONS_]
 
 # DESCRIPTION
@@ -138,42 +138,42 @@ user, or when either user has nothing shared and cannot be acted on. See
 Preview a full synchronisation between two users, then run it:
 
 ```
-plexdo copy-watched Alice Bob --dry-run
-plexdo copy-watched Alice Bob
+plexdo show-watched-cp Alice Bob --dry-run
+plexdo show-watched-cp Alice Bob
 ```
 
 Copy Alice's progress to Bob without ever changing Alice:
 
 ```
-plexdo copy-watched Alice Bob -1
+plexdo show-watched-cp Alice Bob -1
 ```
 
 Synchronise one library only:
 
 ```
-plexdo copy-watched 7 9 -l "TV Shows"
+plexdo show-watched-cp 7 9 -l "TV Shows"
 ```
 
 Synchronise a single film:
 
 ```
-plexdo copy-watched 7 9 -t 881
+plexdo show-watched-cp 7 9 -t 881
 ```
 
 Preview making Alice's TV watched state follow the Kids account's,
 unwatching for Alice whatever Kids has not watched, without changing Kids:
 
 ```
-plexdo copy-watched Kids Alice -1 --unwatch -l "TV Shows" --dry-run
+plexdo show-watched-cp Kids Alice -1 --unwatch -l "TV Shows" --dry-run
 ```
 
 Mirror the admin account's viewing to a managed account every night:
 
 ```
-plexdo copy-watched 0 Kids -1 --throttle 0.1 > /dev/null
+plexdo show-watched-cp 0 Kids -1 --throttle 0.1 > /dev/null
 ```
 
 # SEE ALSO
 
-*plexdo-clean-playlist*(1), *plexdo-list-users*(1), *plexdo-search*(1),
+*plexdo-playlist-clean*(1), *plexdo-users-list*(1), *plexdo-search*(1),
 *plexdo-conventions*(7), *plexdo*(1)

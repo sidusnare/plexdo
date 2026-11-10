@@ -1,22 +1,22 @@
-plexdo-export-playlist(1) "plexdo" "User Commands"
+plexdo-playlist-export(1) "plexdo" "User Commands"
 ; SPDX-FileCopyrightText: 2026 SidusNare
 ; SPDX-License-Identifier: GPL-3.0-or-later
 ; SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 # NAME
 
-plexdo-export-playlist - write a playlist to an M3U file
+plexdo-playlist-export - write a playlist to an M3U file
 
 # SYNOPSIS
 
-*plexdo export-playlist* _USER_ _PLAYLIST_ _PATH_ [*-p* _PREFIX_]
+*plexdo playlist-export* _USER_ _PLAYLIST_ _PATH_ [*-p* _PREFIX_]
 \[_GLOBAL OPTIONS_]
 
 # DESCRIPTION
 
 Writes one of _USER_'s playlists, in playlist order, to an M3U file holding
 the server's own file paths, for a player that can read those files
-directly. *plexdo-list-playlist*(1) *--m3u* does the same while also listing
+directly. *plexdo-playlist-list*(1) *--m3u* does the same while also listing
 the items.
 
 Each entry carries the item's length in seconds (*-1* when unknown), its
@@ -95,31 +95,31 @@ is empty, or when _USER_ has nothing shared and cannot be acted on. See
 Export a playlist by title:
 
 ```
-plexdo export-playlist 0 "Movie Night" ~/movie-night.m3u
+plexdo playlist-export 0 "Movie Night" ~/movie-night.m3u
 ```
 
 Export another user's playlist by ratingKey:
 
 ```
-plexdo export-playlist Alice 9104 alice.m3u
+plexdo playlist-export Alice 9104 alice.m3u
 ```
 
 Export for a Windows player reaching the film library through a share:
 
 ```
-plexdo export-playlist 0 "Movie Night" night.m3u -p '\\\\NAS\\movies'
+plexdo playlist-export 0 "Movie Night" night.m3u -p '\\\\NAS\\movies'
 ```
 
 Export every one of the admin account's playlists, one file each:
 
 ```
-plexdo list-playlists 0 --json | jq -r '.[].ratingKey' |
+plexdo playlists-list 0 --json | jq -r '.[].ratingKey' |
     while read -r key; do
-        plexdo export-playlist 0 "$key" "playlist-$key.m3u"
+        plexdo playlist-export 0 "$key" "playlist-$key.m3u"
     done
 ```
 
 # SEE ALSO
 
-*plexdo-list-playlist*(1), *plexdo-list-playlists*(1),
-*plexdo-export-titles*(1), *plexdo-conventions*(7), *plexdo*(1)
+*plexdo-playlist-list*(1), *plexdo-playlists-list*(1),
+*plexdo-titles-export*(1), *plexdo-conventions*(7), *plexdo*(1)

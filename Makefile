@@ -207,12 +207,13 @@ check-version:
 smoke:
 	@PYTHONPATH=src $(PYTHON) -c "\
 from plexdo.cli import build_parser; \
-from plexdo.commands import build_registry, MODULES; \
+from plexdo.commands import build_registry, GROUPS, MODULES; \
 build_parser(); \
 h, n = build_registry(); \
 missing = [m.__name__ for m in MODULES if not hasattr(m, 'register') or not getattr(m, 'COMMANDS', None)]; \
 assert not missing, 'modules missing register()/COMMANDS: %s' % missing; \
-assert len(h) >= 30, 'only %d commands registered' % len(h); \
+grouped = {c for _, names in GROUPS for c in names}; \
+assert set(h) == grouped, 'commands and help groups differ: %s' % sorted(set(h) ^ grouped); \
 print('smoke: %d commands across %d modules' % (len(h), len(MODULES)))"
 
 # The completions and man page are mirrored into the package as data files;

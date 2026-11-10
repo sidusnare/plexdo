@@ -18,7 +18,7 @@ rewriting of exported paths, request pacing, exit status, and the files
 # GLOBAL OPTIONS
 
 Every command accepts these, and they may be given either before or after
-the command name: *plexdo --json list-users* and *plexdo list-users --json*
+the command name: *plexdo --json users-list* and *plexdo users-list --json*
 are the same command. Each command page says what each option means for that
 command in particular.
 
@@ -72,7 +72,7 @@ command in particular.
 ## Users
 
 An argument shown as _USER_ takes either a numeric user ID or a user's
-title, as *plexdo-list-users*(1) lists them. *0* is the admin account
+title, as *plexdo-users-list*(1) lists them. *0* is the admin account
 itself, whose own title works too. The rules, in order:
 
 - A title matches exactly first, and only then ignoring case.
@@ -84,7 +84,7 @@ itself, whose own title works too. The rules, in order:
 - A number matching nothing is passed on, and the command then reports
   *User ID not found*.
 - Anything else matching nothing is an error pointing at
-  *plexdo list-users*.
+  *plexdo users-list*.
 
 Plex scopes every token to what its user can see, and being the server
 admin does not override that. A user with no libraries shared to them
@@ -100,14 +100,14 @@ token stops working. See *FILES*.
 ## Libraries
 
 An argument shown as _LIBRARY_ takes a numeric library ID or a library
-title, as *plexdo-list-libraries*(1) lists them, under exactly the rules
+title, as *plexdo-libraries-list*(1) lists them, under exactly the rules
 for users above; the error for an unknown title points at
-*plexdo list-libraries*.
+*plexdo libraries-list*.
 
 ## Playlists
 
 An argument shown as _PLAYLIST_ that names an existing playlist takes its
-title or its ratingKey, as *plexdo-list-playlists*(1) lists them. A value
+title or its ratingKey, as *plexdo-playlists-list*(1) lists them. A value
 made only of digits is always taken as a ratingKey, so a playlist whose
 title is a number can only be named by its ratingKey. A title must match
 exactly. A ratingKey belonging to something other than a playlist is an
@@ -116,8 +116,8 @@ error.
 ## Items
 
 An argument shown as _ratingKey_ is the numeric key Plex gives every show,
-season, episode, film, track, and photo. *plexdo-list-titles*(1),
-*plexdo-list-show*(1), *plexdo-search*(1), and *plexdo-show-metadata*(1)
+season, episode, film, track, and photo. *plexdo-library-list*(1),
+*plexdo-show-list*(1), *plexdo-search*(1), and *plexdo-show-metadata*(1)
 all report them. Items are named by ratingKey only; titles are not
 accepted, since many items share one.
 
@@ -314,7 +314,8 @@ _$XDG_STATE_HOME/plexdo/secrets.json_
 	keyring, or *plex: secret_store* is *file*. Created readable by its
 	owner alone, warned about if that changes, and deleted with its last
 	secret. It is not encrypted. With *secret_store* left at *auto*, using
-	it prints a warning; *plex: secrets_file* moves it.
+	it prints a warning; *plex: secrets_file* moves it, and
+	*plexdo-write-secrets-example*(1) writes an example of it.
 
 _$XDG_CACHE_HOME/plexdo/_
 	By default _~/.cache/plexdo/_, and _%LOCALAPPDATA%\\PlexDo\\Cache\\_
@@ -346,19 +347,23 @@ _~/.local/etc/plexdo.ini_, _plexdo.ini.migrated_
 
 # SEE ALSO
 
-*plexdo*(1), and a page per command:
-*plexdo-list-libraries*(1), *plexdo-list-titles*(1), *plexdo-list-albums*(1),
-*plexdo-list-album*(1), *plexdo-list-show*(1), *plexdo-export-titles*(1),
-*plexdo-find-missing*(1), *plexdo-search*(1), *plexdo-list-users*(1),
-*plexdo-list-playlists*(1),
-*plexdo-list-playlist*(1), *plexdo-export-playlist*(1),
-*plexdo-remove-playlist*(1), *plexdo-append-playlist*(1),
-*plexdo-clean-playlist*(1), *plexdo-show-metadata*(1), *plexdo-read*(1),
-*plexdo-rescan*(1), *plexdo-status*(1), *plexdo-wait*(1),
-*plexdo-player-remote-play*(1),
-*plexdo-build-interleaved*(1), *plexdo-build-chronological*(1),
-*plexdo-build-randomize*(1), *plexdo-build-concatenated*(1),
-*plexdo-build-merge*(1), *plexdo-copy-playlist-all-users*(1),
-*plexdo-copy-playlist-to-user*(1), *plexdo-copy-watched*(1),
-*plexdo-login*(1), *plexdo-logout*(1), *plexdo-set-pin*(1), and
-*plexdo-write-config-example*(1).
+*plexdo*(1), and a page per command.
+
+Libraries and titles: *plexdo-album-list*(1), *plexdo-albums-list*(1),
+*plexdo-libraries-list*(1), *plexdo-library-list*(1),
+*plexdo-missing-find*(1), *plexdo-search*(1), *plexdo-show-list*(1),
+*plexdo-show-metadata*(1), *plexdo-titles-export*(1).
+
+Playlists: *plexdo-merge-build*(1), *plexdo-playlist-build*(1),
+*plexdo-playlist-clean*(1), *plexdo-playlist-copy*(1),
+*plexdo-playlist-export*(1), *plexdo-playlist-list*(1),
+*plexdo-playlist-remove*(1), *plexdo-playlists-list*(1).
+
+Playback and watched state: *plexdo-player-remote-play*(1),
+*plexdo-read*(1), *plexdo-show-watched-cp*(1), *plexdo-wait*(1).
+
+Server: *plexdo-rescan*(1), *plexdo-status*(1), *plexdo-users-list*(1).
+
+Account and configuration: *plexdo-login*(1), *plexdo-logout*(1),
+*plexdo-set-pin*(1), *plexdo-write-config-example*(1),
+*plexdo-write-secrets-example*(1).

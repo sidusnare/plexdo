@@ -16,7 +16,8 @@ Every command module exposes three names:
     The subset of those names needing a connected server. Commands outside it
     (``login``, ``logout``, ``write-config-example``) do not need one.
 
-Adding a command means adding a module here - ``cli`` needs no edit.
+Adding a command means adding a module here, and its name to ``GROUPS`` so
+``--help`` lists it - ``cli`` needs no edit.
 """
 
 import argparse
@@ -42,7 +43,6 @@ from plexdo.commands import (
     watched,
 )
 
-# Order determines the order subcommands appear in --help.
 MODULES = (
     libraries,
     albums,
@@ -60,6 +60,53 @@ MODULES = (
     copy,
     watched,
     auth,
+)
+
+# How --help lists the commands: under these headings, in this order, and
+# sorted by name within each. Every command belongs to exactly one group.
+GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (
+        "libraries and titles",
+        (
+            "album-list",
+            "albums-list",
+            "libraries-list",
+            "library-list",
+            "missing-find",
+            "search",
+            "show-list",
+            "show-metadata",
+            "titles-export",
+        ),
+    ),
+    (
+        "playlists",
+        (
+            "merge-build",
+            "playlist-build",
+            "playlist-clean",
+            "playlist-copy",
+            "playlist-export",
+            "playlist-list",
+            "playlist-remove",
+            "playlists-list",
+        ),
+    ),
+    (
+        "playback and watched state",
+        ("player-remote-play", "read", "show-watched-cp", "wait"),
+    ),
+    ("server", ("rescan", "status", "users-list")),
+    (
+        "account and configuration",
+        (
+            "login",
+            "logout",
+            "set-pin",
+            "write-config-example",
+            "write-secrets-example",
+        ),
+    ),
 )
 
 Handler = Callable[[Any, argparse.Namespace], None]

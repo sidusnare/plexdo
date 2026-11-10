@@ -1,15 +1,15 @@
-plexdo-list-libraries(1) "plexdo" "User Commands"
+plexdo-libraries-list(1) "plexdo" "User Commands"
 ; SPDX-FileCopyrightText: 2026 SidusNare
 ; SPDX-License-Identifier: GPL-3.0-or-later
 ; SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 # NAME
 
-plexdo-list-libraries - list the libraries on the Plex server
+plexdo-libraries-list - list the libraries on the Plex server
 
 # SYNOPSIS
 
-*plexdo list-libraries* [_GLOBAL OPTIONS_]
+*plexdo libraries-list* [_GLOBAL OPTIONS_]
 
 # DESCRIPTION
 
@@ -82,7 +82,7 @@ server cannot be reached. See *plexdo-conventions*(7).
 List the libraries as a table:
 
 ```
-$ plexdo list-libraries
+$ plexdo libraries-list
 +----+--------+----------+
 | id | type   | title    |
 +----+--------+----------+
@@ -99,16 +99,16 @@ The table is box-drawn on a console that can show the box characters; the
 Print only the IDs of the show libraries, for a script:
 
 ```
-plexdo list-libraries --json | jq '.[] | select(.type == "show") | .id'
+plexdo libraries-list --json | jq '.[] | select(.type == "show") | .id'
 ```
 
 Save the list as CSV:
 
 ```
-plexdo list-libraries -f csv > libraries.csv
+plexdo libraries-list -f csv > libraries.csv
 ```
 
 # SEE ALSO
 
-*plexdo-list-titles*(1), *plexdo-list-albums*(1), *plexdo-export-titles*(1),
+*plexdo-library-list*(1), *plexdo-albums-list*(1), *plexdo-titles-export*(1),
 *plexdo-rescan*(1), *plexdo-conventions*(7), *plexdo*(1)

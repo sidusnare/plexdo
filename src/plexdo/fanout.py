@@ -4,10 +4,10 @@
 
 """Creating one playlist for one user, a chosen user, or every user.
 
-Every build command ends the same way: an item list exists, and it has to
-become a playlist somewhere. Without -u or -a that is the account the items
-came from, which is what the commands have always done. With them the same
-list is created for a named user or for every user on the server.
+playlist-build and merge-build end the same way: an item list exists, and it
+has to become a playlist somewhere. Without -u or -a that is the account the
+items came from. With them the same list is created for a named user or for
+every user on the server.
 
 A run across many users must survive a bad one. Plex scopes a token to what
 its user can see, so a user with nothing shared is simply unreachable, and a
@@ -37,9 +37,9 @@ from plexdo.throttle import paced
 def add_user_target_arguments(parser: argparse.ArgumentParser) -> None:
     """Add -u/--user and -a/--all-users to a playlist building command.
 
-    Registered from here rather than written out on each parser: four
-    commands carry the identical pair, and repeating the help text inline is
-    what trips pylint's duplicate-code.
+    Registered from here rather than written out on each parser: both
+    building commands carry the identical pair, and repeating the help text
+    inline is what trips pylint's duplicate-code.
     """
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
@@ -51,7 +51,7 @@ def add_user_target_arguments(parser: argparse.ArgumentParser) -> None:
         help=(
             "Create the playlist for this user rather than for the account "
             "the items came from. User ID (int) or user title (str); use 0 "
-            "for the admin account. Obtain both with list-users."
+            "for the admin account. Obtain both with users-list."
         ),
     )
     group.add_argument(

@@ -1,15 +1,15 @@
-plexdo-list-playlist(1) "plexdo" "User Commands"
+plexdo-playlist-list(1) "plexdo" "User Commands"
 ; SPDX-FileCopyrightText: 2026 SidusNare
 ; SPDX-License-Identifier: GPL-3.0-or-later
 ; SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 # NAME
 
-plexdo-list-playlist - list the items in one playlist, optionally writing an M3U
+plexdo-playlist-list - list the items in one playlist, optionally writing an M3U
 
 # SYNOPSIS
 
-*plexdo list-playlist* _USER_ _PLAYLIST_ [*--m3u* _PATH_ [*-p* _PREFIX_]]
+*plexdo playlist-list* _USER_ _PLAYLIST_ [*--m3u* _PATH_ [*-p* _PREFIX_]]
 \[_GLOBAL OPTIONS_]
 
 # DESCRIPTION
@@ -18,7 +18,7 @@ Lists the items of one of _USER_'s playlists, numbered in playlist order.
 
 With *--m3u*, the same items are also written to an M3U playlist that holds
 the server's own file paths, for a player that can read those files
-directly. *plexdo-export-playlist*(1) writes the M3U without the listing.
+directly. *plexdo-playlist-export*(1) writes the M3U without the listing.
 
 # ARGUMENTS
 
@@ -27,7 +27,7 @@ _USER_
 	account. See *plexdo-conventions*(7).
 
 _PLAYLIST_
-	The playlist, by title or ratingKey, as *plexdo-list-playlists*(1)
+	The playlist, by title or ratingKey, as *plexdo-playlists-list*(1)
 	shows them. A value made only of digits is always taken as a ratingKey.
 
 # OPTIONS
@@ -103,19 +103,19 @@ has nothing shared and cannot be acted on. See *plexdo-conventions*(7).
 List a playlist by title:
 
 ```
-plexdo list-playlist 0 "Movie Night"
+plexdo playlist-list 0 "Movie Night"
 ```
 
 The same playlist by its ratingKey:
 
 ```
-plexdo list-playlist 0 9001
+plexdo playlist-list 0 9001
 ```
 
 List another user's playlist and keep an M3U copy of it:
 
 ```
-plexdo list-playlist Alice "Road Trip" --m3u ~/road-trip.m3u
+plexdo playlist-list Alice "Road Trip" --m3u ~/road-trip.m3u
 ```
 
 Write the M3U of a film playlist for a machine that mounts the film
@@ -124,10 +124,10 @@ root, so a playlist mixing several libraries would put them all under the
 one prefix:
 
 ```
-plexdo list-playlist 0 "Movie Night" --m3u night.m3u -p /mnt/movies
+plexdo playlist-list 0 "Movie Night" --m3u night.m3u -p /mnt/movies
 ```
 
 # SEE ALSO
 
-*plexdo-list-playlists*(1), *plexdo-export-playlist*(1),
-*plexdo-clean-playlist*(1), *plexdo-conventions*(7), *plexdo*(1)
+*plexdo-playlists-list*(1), *plexdo-playlist-export*(1),
+*plexdo-playlist-clean*(1), *plexdo-conventions*(7), *plexdo*(1)

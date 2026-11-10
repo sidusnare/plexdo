@@ -1,15 +1,15 @@
-plexdo-build-merge(1) "plexdo" "User Commands"
+plexdo-merge-build(1) "plexdo" "User Commands"
 ; SPDX-FileCopyrightText: 2026 SidusNare
 ; SPDX-License-Identifier: GPL-3.0-or-later
 ; SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 # NAME
 
-plexdo-build-merge - mix two playlists into a new one at a ratio
+plexdo-merge-build - mix two playlists into a new one at a ratio
 
 # SYNOPSIS
 
-*plexdo build-merge* _USER_ _NAME_ _FIRST_ _SECOND_ [*--ratio* _A_:_B_] [*-s*]
+*plexdo merge-build* _USER_ _NAME_ _FIRST_ _SECOND_ [*--ratio* _A_:_B_] [*-s*]
 \[*-U*] [*-o*] [*--m3u* _PATH_ [*-p* _PREFIX_]] [*-u* _TARGET_ | *-a*]
 \[_GLOBAL OPTIONS_]
 
@@ -29,7 +29,7 @@ keeps the ratio. Playlists whose sizes match the ratio, such as 20 and 10
 items at 2:1, run out together, and *-s* changes nothing.
 
 Both playlists are read before anything is written, so either may also be
-_NAME_: with *-o*, *build-merge 0 Mix Mix Extras -o* mixes Extras into Mix.
+_NAME_: with *-o*, *merge-build 0 Mix Mix Extras -o* mixes Extras into Mix.
 
 By default an item in both playlists appears twice, as Plex permits; *-U*
 keeps only its first appearance. An empty playlist is reported with a
@@ -177,35 +177,35 @@ account. *2* when *--ratio* is not two whole numbers above 0, or *-u* and
 Alternate two playlists, one item from each:
 
 ```
-plexdo build-merge 0 "Date Night" "Her Picks" "His Picks"
+plexdo merge-build 0 "Date Night" "Her Picks" "His Picks"
 ```
 
 Two cartoons for every film, checking the result first:
 
 ```
-plexdo build-merge 0 "Saturday" Cartoons Films --ratio 2:1 --dry-run
+plexdo merge-build 0 "Saturday" Cartoons Films --ratio 2:1 --dry-run
 ```
 
 Two shows for every film, ending with the last film, and without an
 episode the two playlists share appearing twice:
 
 ```
-plexdo build-merge 0 "Weekend" Shows Films --ratio 2:1 -s -U
+plexdo merge-build 0 "Weekend" Shows Films --ratio 2:1 -s -U
 ```
 
 Mix new finds into an existing playlist, one for every three, in place:
 
 ```
-plexdo build-merge 0 Mix Mix "New Finds" --ratio 3:1 -o
+plexdo merge-build 0 Mix Mix "New Finds" --ratio 3:1 -o
 ```
 
 Mix playlists by ratingKey, and give the result to every user:
 
 ```
-plexdo build-merge 0 "Holiday Mix" 9001 9017 -a
+plexdo merge-build 0 "Holiday Mix" 9001 9017 -a
 ```
 
 # SEE ALSO
 
-*plexdo-build-concatenated*(1), *plexdo-build-interleaved*(1),
-*plexdo-list-playlists*(1), *plexdo-conventions*(7), *plexdo*(1)
+*plexdo-playlist-build*(1), *plexdo-playlist-copy*(1),
+*plexdo-playlists-list*(1), *plexdo-conventions*(7), *plexdo*(1)
