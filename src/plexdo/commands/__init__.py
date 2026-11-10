@@ -24,6 +24,7 @@ from collections.abc import Callable
 from typing import Any
 
 from plexdo.commands import (
+    albums,
     auth,
     build,
     copy,
@@ -44,6 +45,7 @@ from plexdo.commands import (
 # Order determines the order subcommands appear in --help.
 MODULES = (
     libraries,
+    albums,
     missing,
     search,
     users,

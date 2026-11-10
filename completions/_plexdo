@@ -187,6 +187,7 @@ _plexdo_commands() {
     'list-libraries:List all Plex libraries'
     'list-titles:List titles in a library'
     'list-library:List titles in a library (alias for list-titles)'
+    'list-albums:List the albums in a music or photo library'
     'list-show:List all episodes in a show'
     'export-titles:Export an entire library to M3U or an HTML gallery'
     'search:Search Plex for titles matching a query'
@@ -244,6 +245,9 @@ _plexdo_subcommand() {
       _arguments $_plexdo_global_opts \
         '--album[Photo libraries only: restrict to one album]:album:{_plexdo_albums $(_plexdo_positional 0)}' \
         '1:library id:_plexdo_libraries'
+      ;;
+    list-albums)
+      _arguments $_plexdo_global_opts '1:library id:_plexdo_libraries'
       ;;
     list-show)
       _arguments $_plexdo_global_opts $pfx $m3u '1:show rating key:_plexdo_rating_keys'

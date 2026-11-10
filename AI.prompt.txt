@@ -881,12 +881,40 @@ touched.
 - `list-libraries` - columns `id`, `type`, `title`; writes the libraries cache.
 - `list-titles LIBRARY [--album A]` - registered with
   `aliases=["list-library"]`. argparse reports whichever spelling was typed,
-  so `COMMANDS` needs an entry for both, giving 30 registry entries for 29
-  commands; the smoke test floor must allow for it. Table columns are
+  so `COMMANDS` needs an entry for both, giving one more registry entry
+  than there are commands; the smoke test floor must allow for it. Table
+  columns are
   `ratingKey`, `title`, `releaseDate`, `rating`, `studio`; a machine-readable
   format carries every listed field and, for a show library, nests each show's
   episodes under a `seasons` object keyed by season name. Always cache the
   minimal `ratingKey`/`title` rows whatever the caller asked to see.
+- `list-albums LIBRARY` (`commands/albums.py`) - the albums of a music
+  (section type `artist`) or photo library; any other type exits 1. Music
+  albums come from `section.albums()`. A photo library is walked depth
+  first from `section.all()`, opening each album with one
+  `fetchItems(f"{album.key}/children")` and splitting the children by
+  `TAG == "Directory"` into nested albums, walked next so they follow their
+  parent, and contents; a ratingKey met twice is listed once. Table
+  columns are `ratingKey`, `artist` (music only), `title`, `year`, `items`,
+  `played`; a music table reads `leafCount`/`viewedLeafCount` from the
+  listing and opens no album. Every other format, and every photo listing,
+  opens each album through `paced`. A machine-readable record carries
+  `ratingKey`, `artist`, `title`, `year`, `items`, `duration`, `state`,
+  `played`, `playedItems`, `inProgressItems`, `lastViewedAt`, `progress`,
+  and `contents`; each content record `index`, `ratingKey`, `type`, `disc`,
+  `track`, `title`, `artist`, `duration`, `state`, `played`, `viewCount`,
+  `lastViewedAt`, `viewOffset`, `progress`, `files`. Every key is always
+  present, null where it does not apply. Fields are read from `vars()`, so
+  nothing reloads. An item has a state only if it carries `viewCount`
+  (tracks and clips; photos do not): `in progress` when `viewOffset > 0`,
+  even if played before, else `played` when `viewCount > 0`, else
+  `unplayed`. An album is `in progress` if any item is, `played` if every
+  playable item is, `unplayed` if none is, else `in progress`; null with no
+  playable item. `progress` is a percentage to one decimal, null unless the
+  state is `in progress`: an item's resume point over its duration; an
+  album's played running time (played items in full, items in progress up
+  to their resume point) over the total of its playable items. `viewOffset`
+  is likewise null unless in progress.
 - `list-show RATINGKEY [--m3u P] [-p PREFIX]` - fails fast if not a `Show`.
 - `list-users` - `id`, `type`, `title`, `username`, `email`. `account_type`
   returns managed/home/friend/shared. plexapi exposes `restricted` as the raw

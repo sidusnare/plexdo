@@ -151,6 +151,26 @@ album and is ignored elsewhere.
 .BI list\-show " ratingKey " [ \-\-m3u " PATH" ]
 List every episode of a show, skipping specials.
 .TP
+.BI list\-albums " library"
+List the albums in a music or photo library, nested photo albums included.
+Table output shows each album\(aqs rating key, artist (music only), title,
+year, item count, and how many items you have played. A machine\-readable
+format adds each album\(aqs
+.B state
+.RB ( played ", " "in progress" ", or " unplayed ),
+its
+.B progress
+as a percentage of its running time when in progress, and its
+.B contents
+in order: every track, photo, or clip, with its own state, view count, last
+viewed time,
+.BR viewOffset ,
+.BR progress ,
+and files. A music library\(aqs table costs one request; its other formats,
+and any photo library, which must be opened to find nested albums, cost one
+per album. Photos have no played state, so theirs is null. Other library
+types are refused.
+.TP
 .BI list\-users
 List users with their ID, account type (\fBmanaged\fR, \fBhome\fR,
 \fBfriend\fR, \fBshared\fR), title, username, and email.

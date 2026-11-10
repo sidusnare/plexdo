@@ -249,6 +249,7 @@ identical rules apply to library IDs and titles.
 | --- | --- |
 | `list-libraries` | Library IDs, types, and titles |
 | `list-titles <library> [--album A]` | Titles in a library (alias: `list-library`) |
+| `list-albums <library>` | Albums in a music or photo library, with played state |
 | `find-missing <show> [-l L] [-A] [-s N,N]` | Seasons with gaps in their episode numbering |
 | `list-show <rating_key> [--m3u P]` | Every episode of a show, specials skipped |
 | `list-users` | User IDs, account types, and titles |
@@ -279,6 +280,28 @@ item in someone else's playlist, and is null for anything on your own server.
 
 Those fields are the ones present in the library listing; `show-metadata` is
 the route to the full picture for a single item.
+
+### Albums
+
+`list-albums` lists the albums of a music or photo library, nested photo
+albums included. The table shows how many items each album holds and how
+many have been played. A machine-readable format adds each album's played
+state (`played`, `in progress`, or `unplayed`) and its contents, every
+track, photo, or clip with its own state, view count, and last-played time.
+Anything part way through also carries `progress`, a percentage: for an
+item, how far its resume point is into it; for an album, how much of its
+running time has been played. Photos have no played state, so theirs is
+null.
+
+```bash
+plexdo list-albums Music                    # one row per album
+plexdo list-albums Music --json |           # albums part way through
+    jq -r '.[] | select(.state == "in progress") | "\(.progress)% \(.title)"'
+```
+
+Played state is the connected account's own. The music table costs one
+request; the other formats, and any photo library, open each album, one
+request apiece, paced like the other per-item walks.
 
 ### Finding gaps
 

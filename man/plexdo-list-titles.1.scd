@@ -175,5 +175,6 @@ plexdo list-titles "TV Shows" --json |
 
 # SEE ALSO
 
-*plexdo-list-libraries*(1), *plexdo-list-show*(1), *plexdo-export-titles*(1),
-*plexdo-show-metadata*(1), *plexdo-conventions*(7), *plexdo*(1)
+*plexdo-list-libraries*(1), *plexdo-list-albums*(1), *plexdo-list-show*(1),
+*plexdo-export-titles*(1), *plexdo-show-metadata*(1), *plexdo-conventions*(7),
+*plexdo*(1)

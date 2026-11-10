@@ -31,6 +31,7 @@ $script:PlexdoCommands = [ordered]@{
     'list-libraries'          = 'List all Plex libraries'
     'list-titles'             = 'List titles in a library'
     'list-library'            = 'List titles in a library (alias for list-titles)'
+    'list-albums'              = 'List the albums in a music or photo library'
     'list-show'               = 'List all episodes in a show'
     'export-titles'           = 'Export a library to M3U or an HTML gallery'
     'search'                  = 'Search Plex for titles matching a query'
@@ -368,7 +369,7 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
         } else {
             $user = if ($positionals.Count) { $positionals[0] } else { '' }
             switch ($command) {
-                { $_ -in 'list-titles', 'list-library' } { if ($index -eq 0) { $results = Get-PlexdoLibraries } }
+                { $_ -in 'list-titles', 'list-library', 'list-albums' } { if ($index -eq 0) { $results = Get-PlexdoLibraries } }
                 'export-titles'  { if ($index -eq 0) { $results = Get-PlexdoLibraries } }
                 'rescan'         { if ($index -eq 0) { $results = Get-PlexdoLibraries } }
                 'find-missing'   { if ($index -eq 0) { $results = Get-PlexdoRatingKeys } }

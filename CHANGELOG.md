@@ -12,6 +12,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `list-albums LIBRARY` lists the albums of a music or photo library, nested
+  photo albums included, with how many items each holds and how many have
+  been played. A machine-readable format adds each album's played state and
+  progress, and its contents: every track, photo, or clip with its own
+  played state, view count, last-played time, and, when part way through,
+  its resume point and progress.
+
 ## [2.1.0-rc.1] - 2026-10-29
 
 The first release candidate for 2.1.0. On PyPI this version is
