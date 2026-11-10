@@ -250,6 +250,7 @@ identical rules apply to library IDs and titles.
 | `list-libraries` | Library IDs, types, and titles |
 | `list-titles <library> [--album A]` | Titles in a library (alias: `list-library`) |
 | `list-albums <library>` | Albums in a music or photo library, with played state |
+| `list-album <rating_key>` | One album's tracks, photos, or clips, and how far through each you are |
 | `find-missing <show> [-l L] [-A] [-s N,N]` | Seasons with gaps in their episode numbering |
 | `list-show <rating_key> [--m3u P]` | Every episode of a show, specials skipped |
 | `list-users` | User IDs, account types, and titles |
@@ -302,6 +303,20 @@ plexdo list-albums Music --json |           # albums part way through
 Played state is the connected account's own. The music table costs one
 request; the other formats, and any photo library, open each album, one
 request apiece, paced like the other per-item walks.
+
+`list-album` shows a single album by its rating key: the album with its
+state and progress, then one row per item. An item in progress shows its
+resume point, length, and percentage:
+
+```text
+| # | ratingKey | track | title              | length | state       | progress            |
+| 1 | 4128      | 1     | So What            | 9:22   | played      |                     |
+| 2 | 4129      | 2     | Freddie Freeloader | 9:46   | in progress | 3:20 / 9:46 (34.1%) |
+| 3 | 4130      | 3     | Blue in Green      | 5:37   | unplayed    |                     |
+```
+
+JSON and YAML carry the same record `list-albums` gives for each album; CSV
+and CLIXML, which cannot nest, carry one row per item.
 
 ### Finding gaps
 

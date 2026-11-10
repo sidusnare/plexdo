@@ -300,11 +300,21 @@ nothing to do with this version.
   the range its dependent declares. A vulnerability in a development-only
   npm dependency is fixed by upgrading the package that pulls it in. One
   that no consistent tree avoids is left, with the reason recorded here:
-  KaTeX's GHSA-238p-pmpm-9mq7 (low), reached through
-  `markdownlint -> micromark-extension-math`, whose `^0.16` range no patched
-  KaTeX release satisfies. markdownlint imports only that package's syntax
-  extension; its KaTeX renderer is loaded and never called, and plexdo
-  ships none of it.
+  - KaTeX's GHSA-238p-pmpm-9mq7 (low), reached through
+    `markdownlint -> micromark-extension-math`, whose `^0.16` range no
+    patched KaTeX release satisfies. markdownlint imports only that
+    package's syntax extension; its KaTeX renderer is loaded and never
+    called, and plexdo ships none of it.
+  - re2js's GHSA-gg6h-894w-4m9c (high), quadratic time matching a
+    lookbehind, fixed in 2.8.7. markdownlint-cli2 0.24.0 pins markdownlint
+    0.42.0, which pins re2js 2.8.6 exactly; markdownlint 0.42.1 moves to
+    2.9.1, so the fix arrives with the markdownlint-cli2 release that takes
+    it up, and is not forced in early. markdownlint's own patterns (MD011,
+    MD013, MD039, and the default front-matter pattern) have no lookbehind,
+    `.markdownlint-cli2.yaml` adds no custom rule or pattern, and the only
+    input is this repository's own Markdown, so the slow path is not
+    reached. Check for that markdownlint-cli2 release before each commit,
+    and drop this entry once it is taken.
 - A linter suppression covers one line and one rule, with a comment saying
   why the code cannot change instead.
 - One Google rule is knowingly not followed: its guide imports modules, not
@@ -915,6 +925,22 @@ touched.
   album's played running time (played items in full, items in progress up
   to their resume point) over the total of its playable items. `viewOffset`
   is likewise null unless in progress.
+- `list-album RATINGKEY` (also `commands/albums.py`) - one album, by
+  `fetch_item` and one `/children` fetch. Refused with exit 1 unless the
+  item is a Directory whose `type` is `album` (music) or `photo` (a photo
+  album; a photo shares the type but not the TAG), since shows, seasons,
+  and artists are Directories too. Nested photo albums are split off,
+  logged at INFO, and counted in the table summary as `nested albums`, not
+  listed. JSON and YAML output the same `album_record` as `list-albums`;
+  CSV and CLIXML output its `contents` alone. A table prints the album as a
+  metadata block with only the keys that apply (`ratingKey`, `artist`,
+  `title`, `year`, `items`, `nested albums`, `length`, `state`, `played` as
+  "N of M", `in progress`, `progress` as "P%", `last played`), a blank
+  line, then one row per item: `#`, `ratingKey`, `track` (as `2-03` when
+  the album spans several discs; music only), `title`, `artist` (only when
+  some track's artist differs from the album's), `length`, then, unless the
+  album holds photos alone, `state`, `progress` ("3:20 / 9:46 (34.1%)" for
+  an item in progress, else empty), and `last played` as a date.
 - `list-show RATINGKEY [--m3u P] [-p PREFIX]` - fails fast if not a `Show`.
 - `list-users` - `id`, `type`, `title`, `username`, `email`. `account_type`
   returns managed/home/friend/shared. plexapi exposes `restricted` as the raw

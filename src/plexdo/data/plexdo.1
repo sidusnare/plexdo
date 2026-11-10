@@ -148,6 +148,17 @@ is not a file name: it is the remote server URI of an item in someone else\(aqs
 playlist, and is null for anything on your own server. \fB\-\-album\fR restricts a photo library to one
 album and is ignored elsewhere.
 .TP
+.BI list\-album " ratingKey"
+Show one music or photo album: the album, with its played state and
+progress, then a row per track, photo, or clip, with its state and, when in
+progress, its resume point, length, and percentage, as
+.BR "3:20 / 9:46 (34.1%)" .
+JSON and YAML carry the same record
+.B list\-albums
+gives for each album; CSV and CLIXML, which cannot nest, carry one row per
+item. Albums nested in a photo album are left out, and counted. Anything but
+an album is refused.
+.TP
 .BI list\-show " ratingKey " [ \-\-m3u " PATH" ]
 List every episode of a show, skipping specials.
 .TP

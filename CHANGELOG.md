@@ -20,6 +20,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   progress, and its contents: every track, photo, or clip with its own
   played state, view count, last-played time, and, when part way through,
   its resume point and progress.
+- `list-album RATINGKEY` shows one album: the album with its played state
+  and progress, then each track, photo, or clip, with its own state and,
+  when part way through, its resume point, length, and percentage.
 
 ## [2.1.0-rc.1] - 2026-10-29
 

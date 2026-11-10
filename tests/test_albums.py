@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
-"""list-albums: albums, their contents, played state, and progress."""
+"""list-albums and list-album: albums, contents, played state, progress."""
 
 import datetime
 import json
@@ -14,8 +14,11 @@ from plexdo.commands.albums import (
     PLAYED,
     UNPLAYED,
     album_record,
+    album_summary,
+    cmd_list_album,
     cmd_list_albums,
     content_record,
+    item_rows,
     item_state,
     table_row,
 )
@@ -377,3 +380,181 @@ def test_the_command_takes_a_library_by_id_or_title():
     parser = build_parser()
     assert parser.parse_args(["list-albums", "Music"]).library_id == "Music"
     assert parser.parse_args(["list-albums", "4", "--json"]).format == "json"
+
+
+# --- list-album -----------------------------------------------------------
+
+
+class ItemPlex:
+    """A server holding these items, fetched by ratingKey."""
+
+    def __init__(self, *items):
+        self.items = {int(item.ratingKey): item for item in items}
+
+    def fetchItem(self, key):
+        from plexapi.exceptions import NotFound
+
+        try:
+            return self.items[int(key)]
+        except KeyError:
+            raise NotFound(key) from None
+
+
+def show(item, capsys, fmt="json"):
+    import argparse
+
+    args = argparse.Namespace(
+        rating_key=int(item.ratingKey), format=fmt, wide=True
+    )
+    cmd_list_album(ItemPlex(item), args)
+    out = capsys.readouterr().out
+    return json.loads(out) if fmt == "json" else out
+
+
+def music_album(*tracks, **fields):
+    fields.setdefault("type", "album")
+    return Album(100, "Record", tracks, parentTitle="Band", **fields)
+
+
+def test_json_is_the_list_albums_record(capsys):
+    album = music_album(
+        Track(1, "A", duration=100_000, viewCount=1),
+        Track(2, "B", duration=100_000, viewOffset=25_000),
+    )
+    record = show(album, capsys)
+    assert record == json.loads(
+        json.dumps(album_record(album, album._children, True))
+    )
+    assert record["state"] == IN_PROGRESS
+    assert record["progress"] == 62.5
+    assert record["contents"][1]["progress"] == 25.0
+    assert album._fetched == ["/library/metadata/100/children"]
+
+
+def test_csv_carries_one_row_per_item(capsys):
+    album = music_album(Track(1, "A"), Track(2, "B"))
+    out = show(album, capsys, fmt="csv").splitlines()
+    assert out[0].startswith("index,ratingKey,type,disc,track,title")
+    assert len(out) == 3
+
+
+def test_the_table_shows_the_album_then_its_items(capsys):
+    album = music_album(
+        Track(1, "Opener", index=1, duration=200_000, viewCount=1),
+        Track(2, "Closer", index=2, duration=200_000, viewOffset=50_000),
+        year=1999,
+    )
+    out = show(album, capsys, fmt="table")
+    assert out.index("Record") < out.index("Opener") < out.index("Closer")
+    assert "1 of 2" in out
+    assert "0:50 / 3:20 (25.0%)" in out
+
+
+def test_a_photo_is_not_an_album(capsys):
+    with pytest.raises(SystemExit, match="not an album"):
+        show(Photo(5, "Beach"), capsys)
+
+
+def test_a_show_is_not_an_album(capsys):
+    """Shows are Directory elements too; only the type tells them apart."""
+    with pytest.raises(SystemExit, match="not an album .it is a show"):
+        show(Album(9, "Series", type="show"), capsys)
+
+
+def test_a_missing_album_is_reported(capsys):
+    import argparse
+
+    args = argparse.Namespace(rating_key=404, format="json", wide=True)
+    with pytest.raises(SystemExit, match="not found: 404"):
+        cmd_list_album(ItemPlex(), args)
+
+
+def test_nested_photo_albums_are_not_contents(capsys):
+    album = Album(
+        1,
+        "Trip",
+        [Photo(10, "a"), Album(2, "Day 1", type="photo")],
+        type="photo",
+    )
+    record = show(album, capsys)
+    assert [c["title"] for c in record["contents"]] == ["a"]
+    summary = album_summary(record, 1)
+    assert summary["nested albums"] == "1, listed by list-albums"
+
+
+def test_the_summary_shows_only_what_applies():
+    photos = album_record(
+        Album(1, "Trip", type="photo"), [Photo(10, "a")], False
+    )
+    summary = album_summary(photos, 0)
+    assert list(summary) == ["ratingKey", "title", "items"]
+
+    album = music_album(
+        Track(1, "A", duration=60_000, viewCount=1),
+        Track(2, "B", duration=60_000, viewOffset=30_000),
+        year=2001,
+    )
+    summary = album_summary(album_record(album, album._children, True), 0)
+    assert summary["artist"] == "Band"
+    assert summary["year"] == 2001
+    assert summary["length"] == "2:00"
+    assert summary["state"] == IN_PROGRESS
+    assert summary["played"] == "1 of 2"
+    assert summary["in progress"] == 1
+    assert summary["progress"] == "75.0%"
+
+
+def rows_of(*tracks):
+    album = music_album(*tracks)
+    return item_rows(album_record(album, album._children, True))
+
+
+def test_item_rows_on_one_disc_show_bare_track_numbers():
+    rows = rows_of(
+        Track(1, "A", index=1, parentIndex=1, duration=61_000, viewCount=1),
+        Track(2, "B", index=2, parentIndex=1, duration=5_000, viewOffset=1_000),
+    )
+    assert rows[0] == {
+        "#": 1,
+        "ratingKey": 1,
+        "track": 1,
+        "title": "A",
+        "length": "1:01",
+        "state": PLAYED,
+        "progress": "",
+        "last played": "",
+    }
+    assert rows[1]["progress"] == "0:01 / 0:05 (20.0%)"
+    assert "artist" not in rows[0]
+
+
+def test_item_rows_across_discs_carry_the_disc():
+    rows = rows_of(
+        Track(1, "A", index=9, parentIndex=1),
+        Track(2, "B", index=1, parentIndex=2),
+    )
+    assert [r["track"] for r in rows] == ["1-09", "2-01"]
+
+
+def test_item_rows_name_the_artist_only_on_a_compilation():
+    assert "artist" not in rows_of(Track(1, "A", grandparentTitle="Band"))[0]
+    rows = rows_of(
+        Track(1, "A", grandparentTitle="Band"),
+        Track(2, "B", originalTitle="Guest"),
+    )
+    assert [r["artist"] for r in rows] == ["Band", "Guest"]
+
+
+def test_item_rows_of_photos_have_no_played_columns():
+    album = Album(1, "Trip", [Photo(10, "a")], type="photo")
+    rows = item_rows(album_record(album, album._children, False))
+    assert rows == [{"#": 1, "ratingKey": 10, "title": "a", "length": ""}]
+
+
+def test_list_album_takes_a_rating_key():
+    from plexdo.cli import build_parser
+
+    parser = build_parser()
+    assert parser.parse_args(["list-album", "100"]).rating_key == 100
+    with pytest.raises(SystemExit):
+        parser.parse_args(["list-album", "Record"])

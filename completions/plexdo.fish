@@ -212,7 +212,7 @@ end
 # Commands
 # ---------------------------------------------------------------------------
 
-set -l plexdo_cmds list-libraries list-titles list-library list-albums list-show export-titles search status find-missing \
+set -l plexdo_cmds list-libraries list-titles list-library list-albums list-album list-show export-titles search status find-missing \
     list-users list-playlists list-playlist export-playlist remove-playlist \
     append-playlist clean-playlist show-metadata read rescan status wait player-remote-play find-missing build-interleaved \
     build-chronological build-randomize build-concatenated build-merge copy-playlist-all-users \
@@ -231,6 +231,7 @@ for prog in plexdo
     complete -c $prog -n __plexdo_no_subcommand -a list-titles -d 'List titles in a library'
     complete -c $prog -n __plexdo_no_subcommand -a list-library -d 'List titles in a library (alias)'
     complete -c $prog -n __plexdo_no_subcommand -a list-albums -d 'List the albums in a music or photo library'
+    complete -c $prog -n __plexdo_no_subcommand -a list-album -d 'Show one album with its played state and progress'
     complete -c $prog -n __plexdo_no_subcommand -a list-show -d 'List all episodes in a show'
     complete -c $prog -n __plexdo_no_subcommand -a export-titles -d 'Export a library to M3U or an HTML gallery'
     complete -c $prog -n __plexdo_no_subcommand -a search -d 'Search Plex for titles matching a query'
@@ -280,7 +281,7 @@ for prog in plexdo
         -d 'Also check season 0'
     complete -c $prog -l include-partial -n '__fish_seen_subcommand_from clean-playlist' \
         -d 'Also remove part-played items'
-    complete -c $prog -n "__fish_seen_subcommand_from list-show show-metadata; and __plexdo_at 0" \
+    complete -c $prog -n "__fish_seen_subcommand_from list-show show-metadata list-album; and __plexdo_at 0" \
         -a '(__plexdo_rating_keys)' -d 'item'
     complete -c $prog -n "__fish_seen_subcommand_from player-remote-play; and __plexdo_at 0" \
         -a '(__fish_print_hostnames)' -d 'player host'

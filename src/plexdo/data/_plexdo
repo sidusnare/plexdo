@@ -188,6 +188,7 @@ _plexdo_commands() {
     'list-titles:List titles in a library'
     'list-library:List titles in a library (alias for list-titles)'
     'list-albums:List the albums in a music or photo library'
+    'list-album:Show one album with its played state and progress'
     'list-show:List all episodes in a show'
     'export-titles:Export an entire library to M3U or an HTML gallery'
     'search:Search Plex for titles matching a query'
@@ -252,7 +253,7 @@ _plexdo_subcommand() {
     list-show)
       _arguments $_plexdo_global_opts $pfx $m3u '1:show rating key:_plexdo_rating_keys'
       ;;
-    show-metadata)
+    show-metadata|list-album)
       _arguments $_plexdo_global_opts '1:rating key:_plexdo_rating_keys'
       ;;
     export-titles)

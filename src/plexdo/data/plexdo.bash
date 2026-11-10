@@ -269,7 +269,7 @@ PYEOF
 # ---------------------------------------------------------------------------
 
 _plexdo_commands() {
-    echo "list-libraries list-titles list-library list-albums list-users list-playlists list-playlist \
+    echo "list-libraries list-titles list-library list-albums list-album list-users list-playlists list-playlist \
 list-show show-metadata search read rescan status wait player-remote-play find-missing build-interleaved build-chronological build-randomize \
 build-concatenated build-merge \
 copy-playlist-all-users copy-playlist-to-user export-playlist remove-playlist \
@@ -469,7 +469,7 @@ _plexdo_complete() {
             esac ;;
 
         # <rating_key> [--m3u]
-        list-show|show-metadata)
+        list-show|show-metadata|list-album)
             case $pos in
                 0) _plexdo_complete_rating_key ;;
                 *) COMPREPLY=() ;;

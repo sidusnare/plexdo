@@ -348,8 +348,9 @@ _~/.local/etc/plexdo.ini_, _plexdo.ini.migrated_
 
 *plexdo*(1), and a page per command:
 *plexdo-list-libraries*(1), *plexdo-list-titles*(1), *plexdo-list-albums*(1),
-*plexdo-list-show*(1), *plexdo-export-titles*(1), *plexdo-find-missing*(1),
-*plexdo-search*(1), *plexdo-list-users*(1), *plexdo-list-playlists*(1),
+*plexdo-list-album*(1), *plexdo-list-show*(1), *plexdo-export-titles*(1),
+*plexdo-find-missing*(1), *plexdo-search*(1), *plexdo-list-users*(1),
+*plexdo-list-playlists*(1),
 *plexdo-list-playlist*(1), *plexdo-export-playlist*(1),
 *plexdo-remove-playlist*(1), *plexdo-append-playlist*(1),
 *plexdo-clean-playlist*(1), *plexdo-show-metadata*(1), *plexdo-read*(1),

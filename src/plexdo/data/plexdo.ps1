@@ -31,7 +31,8 @@ $script:PlexdoCommands = [ordered]@{
     'list-libraries'          = 'List all Plex libraries'
     'list-titles'             = 'List titles in a library'
     'list-library'            = 'List titles in a library (alias for list-titles)'
-    'list-albums'              = 'List the albums in a music or photo library'
+    'list-albums'             = 'List the albums in a music or photo library'
+    'list-album'              = 'Show one album with its played state and progress'
     'list-show'               = 'List all episodes in a show'
     'export-titles'           = 'Export a library to M3U or an HTML gallery'
     'search'                  = 'Search Plex for titles matching a query'
@@ -378,6 +379,7 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
                 'list-show'      { if ($index -eq 0) { $results = Get-PlexdoRatingKeys } }
                 'player-remote-play' { if ($index -eq 1) { $results = Get-PlexdoRatingKeys } }
                 'show-metadata'  { if ($index -eq 0) { $results = Get-PlexdoRatingKeys } }
+                'list-album'     { if ($index -eq 0) { $results = Get-PlexdoRatingKeys } }
                 'list-playlists' { if ($index -eq 0) { $results = Get-PlexdoUsers } }
                 'search'         { if ($index -eq 0) { $results = Get-PlexdoUsers } }
                 'set-pin'        { if ($index -eq 0) { $results = Get-PlexdoUsers } }
