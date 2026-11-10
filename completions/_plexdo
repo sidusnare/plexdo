@@ -11,9 +11,9 @@
 #   System-wide: cp _plexdo /usr/local/share/zsh/site-functions/
 #
 # Completion for user IDs, library IDs, rating keys, playlists, and albums is
-# read from the 15-minute cache under ~/.cache/plexdo that the list commands
-# populate. A stale cache is refreshed in the background so completion never
-# blocks; the values shown come from whatever is cached at that moment.
+# read from the 15-minute cache that the list commands populate, in plex:
+# cache_dir or else $XDG_CACHE_HOME/plexdo, by default ~/.cache/plexdo. A
+# stale cache is refreshed in the background so completion never blocks; the values shown come from whatever is cached at that moment.
 
 # Some systems ship "python" but not "python3".
 _plexdo_python() {
@@ -21,28 +21,53 @@ _plexdo_python() {
 }
 
 (( $+functions[_plexdo_cache_dir] )) || _plexdo_cache_dir() {
-  # Memoised: this reads the config file to honour [plex] cache_dir, so it
+  # Memoised: this reads the config file to honour plex: cache_dir, so it
   # should not run once per completion candidate.
   if [[ -z $_plexdo_cache_resolved ]]; then
     typeset -g _plexdo_cache_resolved
     _plexdo_cache_resolved="$("$(_plexdo_python)" - <<'PYCACHE' 2>/dev/null
-import configparser, os
+import json, os
 from pathlib import Path
+def xdg(name, fallback):
+    value = os.environ.get(name, "")
+    if value and Path(value).is_absolute():
+        return Path(value)
+    return Path(fallback).expanduser()
 if os.name == "nt":
-    base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
-    app = Path(base) / "PlexDo" if base else Path.home() / "AppData/Local/PlexDo"
-    cfg_path, default = app / "plexdo.ini", app / "Cache"
+    root = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+    app = Path(root) / "PlexDo" if root else Path.home() / "AppData/Local/PlexDo"
+    cfg_path, default = app / "config.yaml", app / "Cache"
 else:
-    cfg_path = Path("~/.local/etc/plexdo.ini").expanduser()
-    default = Path("~/.cache/plexdo").expanduser()
-value = ""
-if cfg_path.exists():
-    parser = configparser.ConfigParser(interpolation=None)
-    try:
-        parser.read(cfg_path, encoding="utf-8")
-        value = (parser.get("plex", "cache_dir", fallback="") or "").strip()
-    except Exception:
-        value = ""
+    cfg_path = xdg("XDG_CONFIG_HOME", "~/.config") / "plexdo" / "config.yaml"
+    default = xdg("XDG_CACHE_HOME", "~/.cache") / "plexdo"
+try:
+    lines = cfg_path.read_text(encoding="utf-8").splitlines()
+except OSError:
+    lines = []
+# The one value wanted is a scalar directly under plex:, so the file is
+# read a line at a time; PyYAML may not be importable from this python.
+value, in_plex, dq, sq = "", False, chr(34), chr(39)
+for line in lines:
+    text = line.strip()
+    if not text or text.startswith("#") or text == "---":
+        continue
+    if line[:1] not in (" ", chr(9)):
+        in_plex = text.split(":")[0].strip() == "plex"
+        continue
+    key, colon, rest = text.partition(":")
+    if not (in_plex and colon and key.strip() == "cache_dir"):
+        continue
+    rest = rest.strip()
+    if rest[:1] == dq:
+        try:
+            rest = json.JSONDecoder().raw_decode(rest)[0]
+        except ValueError:
+            rest = rest.strip(dq)
+    elif rest[:1] == sq and sq in rest[1:]:
+        rest = rest[1:rest.rindex(sq)].replace(sq + sq, sq)
+    else:
+        rest = rest.split(" #")[0].strip()
+    value = "" if rest in ("null", "~") else str(rest)
 print(Path(os.path.expandvars(value)).expanduser() if value else default)
 PYCACHE
 )"
@@ -126,10 +151,18 @@ _plexdo_rating_keys() {
   _describe -t rating-keys 'rating key' keys
 }
 
+# A word typed for a user or library, as the name plexdo files its by-word
+# cache under: every character a file name cannot hold replaced by "_", as
+# plexdo's cache_key does. plexdo writes that cache for the ID, the title,
+# and the word as typed, so whichever is on the command line finds it.
+_plexdo_word_key() {
+  print -r -- ${1//[\/\\:\*\?\"\<\>\|]/_}
+}
+
 # $1 is the user id or title already typed on the command line.
 _plexdo_playlists() {
-  local user=${1:-0} dir="$(_plexdo_cache_dir)"
-  local cache="$dir/playlists.${user}.json"
+  local user=${(Q)${1:-0}} dir="$(_plexdo_cache_dir)"
+  local cache="$dir/playlists-by-word.$(_plexdo_word_key $user).json"
   _plexdo_cache_fresh $cache || _plexdo_refresh playlists-list $user
   local -a names
   names=( ${(f)"$(_plexdo_read_cache $cache title '')"} )
@@ -142,7 +175,8 @@ _plexdo_playlists() {
 
 # Playlists by title or ratingKey, for playlist-list which accepts either.
 _plexdo_playlists_or_keys() {
-  local user=${1:-0} cache="$(_plexdo_cache_dir)/playlists.${user}.json"
+  local user=${(Q)${1:-0}}
+  local cache="$(_plexdo_cache_dir)/playlists-by-word.$(_plexdo_word_key $user).json"
   _plexdo_cache_fresh $cache || _plexdo_refresh playlists-list $user
   local -a names keys
   names=( ${(f)"$(_plexdo_read_cache $cache title '')"} )
@@ -153,7 +187,8 @@ _plexdo_playlists_or_keys() {
 
 # Album names, derived from the "Album - Photo" titles cached for a library.
 _plexdo_albums() {
-  local lib=${1:-} cache="$(_plexdo_cache_dir)/titles.${lib}.json"
+  local lib=${(Q)${1:-}}
+  local cache="$(_plexdo_cache_dir)/titles-by-word.$(_plexdo_word_key $lib).json"
   [[ -z $lib ]] && { _message 'album name'; return }
   _plexdo_cache_fresh $cache || _plexdo_refresh library-list $lib
   local -a albums
@@ -343,9 +378,7 @@ _plexdo_subcommand() {
         '2:playlist:{_plexdo_playlists_or_keys $(_plexdo_positional 0)}'
       ;;
     read)
-      _arguments $_plexdo_global_opts \
-        '1:library id:_plexdo_libraries' \
-        '2:rating key:_plexdo_rating_keys'
+      _arguments $_plexdo_global_opts '1:rating key:_plexdo_rating_keys'
       ;;
     missing-find)
       _arguments $_plexdo_global_opts \
@@ -357,6 +390,7 @@ _plexdo_subcommand() {
       ;;
     rescan)
       _arguments $_plexdo_global_opts \
+        '(-a --all)'{-a,--all}'[Rescan every library]' \
         '(-s --status)'{-s,--status}'[Print all active scan jobs]' \
         '(-n --now)'{-n,--now}'[Cancel pending scans before rescanning]' \
         '1:library id:_plexdo_libraries'

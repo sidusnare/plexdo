@@ -45,6 +45,7 @@ class MemoryStore:
 
 # The real chooser, for the tests of it, before the fixture replaces it.
 REAL_BACKEND = secret_store.backend
+REAL_SESSION_BACKEND = secret_store.session_backend
 
 
 @pytest.fixture(autouse=True)
@@ -52,6 +53,7 @@ def secrets(monkeypatch):
     """Every test gets an empty secret store of its own."""
     store = MemoryStore()
     monkeypatch.setattr(secret_store, "backend", lambda: store)
+    monkeypatch.setattr(secret_store, "session_backend", lambda: store)
     return store
 
 

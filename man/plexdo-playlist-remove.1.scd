@@ -47,8 +47,7 @@ None beyond the global options.
 	No effect: the deletion is a single request.
 
 *-v*, *--verbose*; *--debug*
-	*--verbose* reports the playlist being removed, and under *--dry-run*
-	that the deletion was skipped.
+	*--verbose* reports the playlist being removed.
 
 *--debug-log* _PATH_
 	Appends what *--debug* reports to _PATH_ instead, with the run
@@ -57,9 +56,9 @@ None beyond the global options.
 	*plexdo-conventions*(7).
 
 *--dry-run*
-	Find the playlist, fail as usual if it cannot be found, and stop
-	without deleting it. Nothing is printed on standard output; add
-	*--verbose* to see what would have been removed.
+	Find the playlist, fail as usual if it cannot be found, and say on
+	standard error which one would be deleted, by title and ratingKey,
+	without deleting it.
 
 *-V*, *--version*; *-h*, *--help*
 	Print the version, or this command's help, and exit.
@@ -70,7 +69,7 @@ None: the command takes no options of its own.
 
 # OUTPUT
 
-One line naming the playlist as it was given:
+One line naming the playlist by its title, however it was given:
 
 ```
 Deleted playlist: 'Movie Night'

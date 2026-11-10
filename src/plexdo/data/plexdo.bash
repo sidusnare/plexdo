@@ -19,29 +19,54 @@
 # ---------------------------------------------------------------------------
 
 # Resolved on first use rather than at source time: it reads the config file
-# to honour [plex] cache_dir, and spawning python for every new shell would be
+# to honour plex: cache_dir, and spawning python for every new shell would be
 # a noticeable startup cost.
 _PLEXDO_CACHE=""
 
 _plexdo_resolve_cache() {
     "$(_plexdo_python)" - << 'PYCACHE' 2>/dev/null
-import configparser, os
+import json, os
 from pathlib import Path
+def xdg(name, fallback):
+    value = os.environ.get(name, "")
+    if value and Path(value).is_absolute():
+        return Path(value)
+    return Path(fallback).expanduser()
 if os.name == "nt":
-    base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
-    app = Path(base) / "PlexDo" if base else Path.home() / "AppData/Local/PlexDo"
-    cfg_path, default = app / "plexdo.ini", app / "Cache"
+    root = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+    app = Path(root) / "PlexDo" if root else Path.home() / "AppData/Local/PlexDo"
+    cfg_path, default = app / "config.yaml", app / "Cache"
 else:
-    cfg_path = Path("~/.local/etc/plexdo.ini").expanduser()
-    default = Path("~/.cache/plexdo").expanduser()
-value = ""
-if cfg_path.exists():
-    parser = configparser.ConfigParser(interpolation=None)
-    try:
-        parser.read(cfg_path, encoding="utf-8")
-        value = (parser.get("plex", "cache_dir", fallback="") or "").strip()
-    except Exception:
-        value = ""
+    cfg_path = xdg("XDG_CONFIG_HOME", "~/.config") / "plexdo" / "config.yaml"
+    default = xdg("XDG_CACHE_HOME", "~/.cache") / "plexdo"
+try:
+    lines = cfg_path.read_text(encoding="utf-8").splitlines()
+except OSError:
+    lines = []
+# The one value wanted is a scalar directly under plex:, so the file is
+# read a line at a time; PyYAML may not be importable from this python.
+value, in_plex, dq, sq = "", False, chr(34), chr(39)
+for line in lines:
+    text = line.strip()
+    if not text or text.startswith("#") or text == "---":
+        continue
+    if line[:1] not in (" ", chr(9)):
+        in_plex = text.split(":")[0].strip() == "plex"
+        continue
+    key, colon, rest = text.partition(":")
+    if not (in_plex and colon and key.strip() == "cache_dir"):
+        continue
+    rest = rest.strip()
+    if rest[:1] == dq:
+        try:
+            rest = json.JSONDecoder().raw_decode(rest)[0]
+        except ValueError:
+            rest = rest.strip(dq)
+    elif rest[:1] == sq and sq in rest[1:]:
+        rest = rest[1:rest.rindex(sq)].replace(sq + sq, sq)
+    else:
+        rest = rest.split(" #")[0].strip()
+    value = "" if rest in ("null", "~") else str(rest)
 print(Path(os.path.expandvars(value)).expanduser() if value else default)
 PYCACHE
 }
@@ -220,10 +245,33 @@ _plexdo_complete_rating_key() {
     }
 }
 
+# A word typed for a user or library, as the name plexdo files its by-word
+# cache under: without the quotes it was typed in, and with every character a
+# file name cannot hold replaced by "_", as plexdo's cache_key does. plexdo
+# writes that cache for the ID, the title, and the word as typed, so whichever
+# of them is on the command line finds it.
+_plexdo_word() {
+    local word="$1"
+    case "$word" in
+        \"*\") word="${word#\"}"; word="${word%\"}" ;;
+        \'*\') word="${word#\'}"; word="${word%\'}" ;;
+    esac
+    printf '%s\n' "$word"
+}
+
+_plexdo_word_key() {
+    local word unsafe='[/\\:*?"<>|]'
+    word="$(_plexdo_word "$1")"
+    # shellcheck disable=SC2295  # $unsafe is a pattern, and meant as one
+    printf '%s\n' "${word//$unsafe/_}"
+}
+
 # Complete a playlist by title OR ratingKey for a given user_id.
 _plexdo_complete_playlist_id_or_name() {
-    local user_id="$1"
-    local cache="$_PLEXDO_CACHE/playlists.${user_id}.json"
+    local user_id
+    user_id="$(_plexdo_word "$1")"
+    local cache
+    cache="$_PLEXDO_CACHE/playlists-by-word.$(_plexdo_word_key "$1").json"
     _plexdo_cache_is_fresh "$cache" || _plexdo_bg_refresh playlists-list "$user_id"
     COMPREPLY=(); _plexdo_compreply < <(
         { _plexdo_json_candidates "$cache" "ratingKey"
@@ -233,8 +281,10 @@ _plexdo_complete_playlist_id_or_name() {
 
 # playlist title for a given user_id (string, may contain spaces)
 _plexdo_complete_playlist() {
-    local user_id="$1"
-    local cache="$_PLEXDO_CACHE/playlists.${user_id}.json"
+    local user_id
+    user_id="$(_plexdo_word "$1")"
+    local cache
+    cache="$_PLEXDO_CACHE/playlists-by-word.$(_plexdo_word_key "$1").json"
     _plexdo_cache_is_fresh "$cache" || _plexdo_bg_refresh playlists-list "$user_id"
     COMPREPLY=(); _plexdo_compreply < <( _plexdo_json_candidates "$cache" "title" )
 }
@@ -242,8 +292,10 @@ _plexdo_complete_playlist() {
 # Album names for a given library_id - drawn from the titles cache.
 # Emits the unique set of parentTitle values (album names) stored in the cache.
 _plexdo_complete_album() {
-    local lib_id="$1"
-    local cache="$_PLEXDO_CACHE/titles.${lib_id}.json"
+    local lib_id
+    lib_id="$(_plexdo_word "$1")"
+    local cache
+    cache="$_PLEXDO_CACHE/titles-by-word.$(_plexdo_word_key "$1").json"
     _plexdo_cache_is_fresh "$cache" || _plexdo_bg_refresh library-list "$lib_id"
     COMPREPLY=(); _plexdo_compreply < <(
         python3 - "$cur" "$cache" 2>/dev/null << 'PYEOF'
@@ -405,6 +457,8 @@ _plexdo_complete() {
                 COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --include-partial" -- "$cur") ;;
             write-config-example|write-secrets-example)
                 COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --overwrite -o" -- "$cur") ;;
+            rescan)
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --all -a --status -s --now -n" -- "$cur") ;;
             wait)
                 COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) -s --session -r --rating-key -a --all -i --interval --fast-interval --no-credits --offset --paused --now" -- "$cur") ;;
             player-remote-play)
@@ -513,10 +567,10 @@ _plexdo_complete() {
                 esac
             fi ;;
 
-        # [library_id] [-s/--status] [-n/--now]
+        # [library_id | -a/--all] [-s/--status] [-n/--now]
         rescan)
             if [[ "$cur" == --* || "$cur" == -* ]]; then
-                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --status -s --now -n" -- "$cur")
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --all -a --status -s --now -n" -- "$cur")
             else
                 case $pos in
                     0) _plexdo_complete_library_id ;;
@@ -558,11 +612,10 @@ _plexdo_complete() {
                 esac
             fi ;;
 
-        # <library_id> <rating_key>
+        # <rating_key>
         read)
             case $pos in
-                0) _plexdo_complete_library_id ;;
-                1) _plexdo_complete_rating_key ;;
+                0) _plexdo_complete_rating_key ;;
                 *) COMPREPLY=() ;;
             esac ;;
 

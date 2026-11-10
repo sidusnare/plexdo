@@ -9,7 +9,7 @@ plexdo-read - stream a media file to standard output
 
 # SYNOPSIS
 
-*plexdo read* _LIBRARY_ _ratingKey_ [_GLOBAL OPTIONS_]
+*plexdo read* _ratingKey_ [_GLOBAL OPTIONS_]
 
 # DESCRIPTION
 
@@ -27,11 +27,6 @@ files, only the first file of the first version is streamed, with a warning.
 *plexdo-show-metadata*(1) lists them all.
 
 # ARGUMENTS
-
-_LIBRARY_
-	The library the item belongs to, by numeric ID or title. It must be the
-	item's own library: a mismatch is an error, which guards against
-	streaming the wrong thing from a mistyped ratingKey.
 
 _ratingKey_
 	The item to stream, as *plexdo-library-list*(1), *plexdo-show-list*(1),
@@ -87,8 +82,8 @@ The media file, byte for byte, on standard output.
 # EXIT STATUS
 
 *0* on success, including when the player closes the pipe early. *1* when
-the library or item is not found, when the item belongs to another library,
-when it has no file, or when the server refuses the download. See
+the item is not found, when it has no file, or when the server refuses the
+download. See
 *plexdo-conventions*(7).
 
 # EXAMPLES
@@ -96,13 +91,13 @@ when it has no file, or when the server refuses the download. See
 Play an episode in *mpv*(1), which reads standard input given *-*:
 
 ```
-plexdo read "TV Shows" 4180 | mpv -
+plexdo read 4180 | mpv -
 ```
 
 Save a film to a local file:
 
 ```
-plexdo read Movies 881 > heat.mkv
+plexdo read 881 > heat.mkv
 ```
 
 On Linux with a display attached but no desktop environment, *mpv*(1) can
@@ -112,19 +107,19 @@ than a terminal emulator, as a user who can reach the DRM device, usually by
 being in the *video* group:
 
 ```
-plexdo read 2 4180 | mpv --vo=drm -
+plexdo read 4180 | mpv --vo=drm -
 ```
 
 Listen to a track in a player that reads standard input:
 
 ```
-plexdo read Music 5520 | ffplay -nodisp -autoexit -
+plexdo read 5520 | ffplay -nodisp -autoexit -
 ```
 
 Check what would be streamed, without streaming it:
 
 ```
-plexdo read Movies 881 --dry-run
+plexdo read 881 --dry-run
 ```
 
 # SEE ALSO

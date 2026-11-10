@@ -271,7 +271,10 @@ show the profiler's own overhead too.
 	An error, reported on standard error: missing configuration or token,
 	a user, library, item, or playlist not found, an ambiguous title, a
 	refused name collision, an unsupported combination of options, or a
-	request the server refused.
+	request that failed: a server that could not be reached or did not
+	answer in time, a token it no longer accepts, or a request it
+	refused. Each is one or two lines saying what went wrong and what to
+	do; *--debug* adds the traceback.
 
 *2*
 	The command line itself could not be understood: an unknown command or
@@ -311,19 +314,41 @@ _$XDG_STATE_HOME/plexdo/secrets.json_
 	By default _~/.local/state/plexdo/secrets.json_, and
 	_%LOCALAPPDATA%\\PlexDo\\secrets.json_ on Windows.
 	The same three entries, in one JSON object, where there is no
-	keyring, or *plex: secret_store* is *file*. Created readable by its
-	owner alone, warned about if that changes, and deleted with its last
-	secret. It is not encrypted. With *secret_store* left at *auto*, using
-	it prints a warning; *plex: secrets_file* moves it, and
-	*plexdo-write-secrets-example*(1) writes an example of it.
+	keyring. Created readable by its owner alone, warned about if that
+	changes, and deleted with its last secret. It is not encrypted. With
+	*secret_store* left at *auto*, using it prints a warning; *plex:
+	secrets_file* moves it. With *plex: secret_store* set to *file* it
+	is used always, and holds *passwords* and *pins* alone: the tokens
+	go in the session file below. *plexdo-write-secrets-example*(1)
+	writes an example of it in that form.
+
+_$XDG_RUNTIME_DIR/plexdo/session.json_
+	The session file, used only when *plex: secret_store* is *file*: the
+	*tokens* entry, kept apart from the passwords. Without
+	*XDG_RUNTIME_DIR*, as on macOS or under a bare cron environment, it
+	is _plexdo-UID/session.json_ under the temporary directory, which
+	*TMPDIR*, *TEMP*, and *TMP* name, and _PlexDo\\session.json_ there
+	on Windows. Its directory must be a real directory of your own, and
+	is closed to everyone else; one that is not is refused, and a
+	session file found in one is ignored. It is cleared at a reboot or
+	whenever the directory is, after which *plexdo login* is needed
+	again. Tokens found in the secrets file, where they were kept before,
+	are moved here once.
 
 _$XDG_CACHE_HOME/plexdo/_
 	By default _~/.cache/plexdo/_, and _%LOCALAPPDATA%\\PlexDo\\Cache\\_
 	on Windows.
 	The shell completion cache, written as a side effect of listing:
 	_libraries.json_, _users.json_, _titles.LIBRARY.json_, and
-	_playlists.USER.json_, keyed by numeric ID. *plex: cache_dir* moves
-	it.
+	_playlists.USER.json_, keyed by numeric ID. The last two are also
+	written as _titles-by-word.WORD.json_ and
+	_playlists-by-word.WORD.json_, once for each spelling the library or
+	user goes by: its ID, its title, and whatever was typed. A
+	completion script holding a title finds its cache that way, without
+	resolving the title as plexdo would. In those names a character a
+	file name cannot hold, one of */ \\ : \* ? " < > |*, is written
+	*\_*. *plex: cache_dir* moves the cache, and the completion scripts
+	read that option from _config.yaml_ themselves.
 
 _~/.local/etc/plexdo.ini_, _plexdo.ini.migrated_
 	The configuration of plexdo 1.x. The first run of any command that
@@ -340,6 +365,14 @@ _~/.local/etc/plexdo.ini_, _plexdo.ini.migrated_
 	live, when set to an absolute path, as the XDG Base Directory
 	Specification has it; otherwise _~/.config_, _~/.local/state_, and
 	_~/.cache_.
+
+*XDG_RUNTIME_DIR*
+	Where the session file lives when *plex: secret_store* is *file*,
+	when set to an absolute path.
+
+*TMPDIR*, *TEMP*, *TMP*
+	The temporary directory, where the session file lives when there is
+	no *XDG_RUNTIME_DIR*, and always on Windows.
 
 *LOCALAPPDATA*, *APPDATA*
 	On Windows, where the configuration, secrets file, and cache live;

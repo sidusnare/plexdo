@@ -24,8 +24,10 @@ episodes means walking the whole library a show at a time, so a large show
 library takes noticeably longer in a machine-readable format than as a
 table.
 
-A photo library is read album by album. Its photos are listed rather than its
-albums; *--album* narrows the listing to one album.
+A photo library is read album by album, albums inside other albums
+included. Its photos are listed rather than its albums; *--album* narrows
+the listing to one album and the albums inside it. See *NESTED ALBUMS* in
+*plexdo-albums-list*(1) for how far nesting is followed.
 
 The ratingKey and title of every entry are also written to the shell
 completion cache, whatever the output format, so that completing a
@@ -42,8 +44,9 @@ _LIBRARY_
 
 *--album* _ALBUM_
 	Photo libraries only: list only the photos in the album titled
-	_ALBUM_. The title is matched ignoring case. An album that is not found
-	is an error, and nothing is listed.
+	_ALBUM_, wherever it is nested, and in the albums inside it. The
+	title is matched ignoring case. An album that is not found is an
+	error, and nothing is listed.
 
 # GLOBAL OPTIONS
 

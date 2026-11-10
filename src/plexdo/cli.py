@@ -24,17 +24,22 @@ import argparse
 import sys
 import textwrap
 
+from plexapi.exceptions import PlexApiException, Unauthorized
+from requests.exceptions import ConnectionError as ConnectionFailure
+from requests.exceptions import RequestException, Timeout
+
 from plexdo import __version__
 from plexdo.accounts import UserAccessError, resolve_user_arguments
 from plexdo.commands import GROUPS, build_registry, register_all
 from plexdo.config import cached_config
 from plexdo.connection import connect_plex
+from plexdo.constants import CONFIG_PATH, LOG
 from plexdo.formats import OUTPUT_FORMATS
 from plexdo.logs import configure_logging
 from plexdo.migrate import migrate_legacy_config
 from plexdo.profiling import profiled, span
 from plexdo.sections import resolve_library_arguments
-from plexdo.security import scrub_password_argument
+from plexdo.security import redact, scrub_password_argument
 from plexdo.throttle import DEFAULT_THROTTLE, THROTTLE_THRESHOLD
 
 
@@ -282,7 +287,47 @@ def main(argv: list[str] | None = None) -> None:
     scrub_password_argument(args)
     # After the scrubbing, so the run start line never shows a --password.
     with profiled(args.debug_log is not None, args.command):
-        _run(args)
+        try:
+            _run(args)
+        except (RequestException, PlexApiException) as exc:
+            # The traceback is for --debug; what the user needs is which of
+            # the three things went wrong and what to do about it.
+            LOG.debug("Request failed", exc_info=True)
+            sys.exit(_request_failure(exc))
+
+
+def _first_line(exc: Exception) -> str:
+    """The first line of an error, with any secret in it redacted.
+
+    plexapi attaches the server's whole HTML error page to some of its
+    exceptions, and a URL in a requests error can carry a token.
+    """
+    lines = str(exc).strip().splitlines()
+    return redact(lines[0].strip()) if lines else type(exc).__name__
+
+
+def _request_failure(exc: Exception) -> str:
+    """What to tell the user when a request to Plex or plex.tv failed."""
+    reason = _first_line(exc)
+    if isinstance(exc, Unauthorized):
+        return (
+            f"Plex refused the saved token: {reason}\n"
+            "Run `plexdo login` to sign in again."
+        )
+    if isinstance(exc, Timeout):
+        return (
+            f"Plex did not answer in time: {reason}\n"
+            "Check that the server is up and not overloaded, then try again."
+        )
+    if isinstance(exc, ConnectionFailure):
+        return (
+            f"Could not reach Plex: {reason}\n"
+            f"Check that the server is running and that plex: url in "
+            f"{CONFIG_PATH} is its address."
+        )
+    if isinstance(exc, RequestException):
+        return f"The request to Plex failed: {reason}"
+    return f"Plex refused the request: {reason}"
 
 
 def _run(args: argparse.Namespace) -> None:

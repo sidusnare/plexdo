@@ -19,6 +19,7 @@ file is not encrypted.
 
 import json
 import os
+import stat
 import sys
 from collections.abc import Callable
 from functools import lru_cache
@@ -30,7 +31,13 @@ import keyring.errors
 from keyring.backends import chainer, fail
 
 from plexdo.config import cached_config, check_file_permissions, config_optional
-from plexdo.constants import CONFIG_PATH, DEFAULT_SECRETS_FILE, LOG
+from plexdo.constants import (
+    CONFIG_PATH,
+    DEFAULT_SECRETS_FILE,
+    DEFAULT_SESSION_FILE,
+    LOG,
+    PERMISSIVE_MODE_MASK,
+)
 from plexdo.security import hide_in_logs
 
 SERVICE = "plexdo"
@@ -111,8 +118,16 @@ class FileStore:
         """Where the secrets are, for messages."""
         return f"the secrets file {self.path}"
 
+    def _make_parent(self) -> None:
+        """Create the directory the file goes in."""
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+
+    def _trusted(self) -> bool:
+        """Whether a file found at the path may be read."""
+        return True
+
     def _load(self) -> dict[str, str]:
-        if not self.path.exists():
+        if not self.path.exists() or not self._trusted():
             return {}
         check_file_permissions(self.path, "secrets file")
         try:
@@ -129,7 +144,7 @@ class FileStore:
                 self.path.unlink()
                 LOG.debug("Secrets file %s is empty; removed it", self.path)
             return
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._make_parent()
         tmp = self.path.with_name(self.path.name + ".tmp")
         # Created private rather than tightened after, so the secrets are
         # never readable by anyone else, not even for a moment.
@@ -155,6 +170,59 @@ class FileStore:
         entries = self._load()
         if entries.pop(kind, None) is not None:
             self._save(entries)
+
+
+class SessionStore(FileStore):
+    """Session tokens in a file of their own, apart from the passwords.
+
+    The file lives in the runtime directory, or failing that under the
+    temporary directory, which other accounts can write to. So its
+    directory must be the user's own and closed to everyone else, both
+    before a token is written there and before one found there is believed.
+    """
+
+    def describe(self) -> str:
+        """Where the secrets are, for messages."""
+        return f"the session file {self.path}"
+
+    def _owned_and_private(self) -> bool:
+        """Whether the directory is a real one, ours, and ours alone."""
+        if os.name == "nt":
+            # No POSIX ownership or mode there; the temporary directory is
+            # already inside the user's own profile.
+            return True
+        try:
+            info = self.path.parent.lstat()
+        except OSError:
+            return False
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
+            return False
+        if info.st_mode & PERMISSIVE_MODE_MASK:
+            self.path.parent.chmod(0o700)
+        return True
+
+    def _make_parent(self) -> None:
+        """Create the directory private, refusing one that is not ours."""
+        parent = self.path.parent
+        parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if not self._owned_and_private():
+            sys.exit(
+                f"The session directory {parent} is not a directory of your "
+                "own, so no session token has been written there. Remove "
+                "it, or set XDG_RUNTIME_DIR or TMPDIR to a directory that "
+                "is yours."
+            )
+
+    def _trusted(self) -> bool:
+        """A session file in a directory someone else controls is ignored."""
+        if self._owned_and_private():
+            return True
+        LOG.warning(
+            "Ignoring the session file %s: its directory is not a private "
+            "directory of your own.",
+            self.path,
+        )
+        return False
 
 
 def _usable(ring: keyring.backend.KeyringBackend) -> bool:
@@ -192,9 +260,13 @@ def open_store(choice: str, path: Path) -> Store:
     return FileStore(path)
 
 
-@lru_cache(maxsize=1)
-def backend() -> Store:
-    """The store this run uses, chosen once.
+# The kinds that are sessions rather than lasting secrets: a token is what
+# a login leaves behind, and plex.tv can issue another.
+SESSION_KINDS = ("tokens",)
+
+
+def _configured() -> tuple[str, Path]:
+    """What the configuration says: (secret_store, the secrets file path).
 
     Works before the configuration exists, with the defaults, since the
     migration from plexdo 1.x saves secrets before writing the file.
@@ -206,14 +278,81 @@ def backend() -> Store:
         configured = config_optional(cfg, "secrets_file")
         if configured:
             path = Path(configured).expanduser()
-    store = open_store(choice, path)
+    return choice, path
+
+
+@lru_cache(maxsize=1)
+def backend() -> Store:
+    """The store for lasting secrets, passwords and PINs, chosen once.
+
+    It holds the session tokens too unless secret_store is file: see
+    session_backend.
+    """
+    store = open_store(*_configured())
     LOG.debug("Secrets are kept in %s", store.describe())
     return store
 
 
+def _adopt_sessions(main: Store, session: Store) -> None:
+    """Move tokens out of the secrets file, where they used to be kept.
+
+    Before sessions had a store of their own, secret_store: file put them
+    beside the passwords. Moving them once keeps a signed-in account
+    signed in; a token the session store already holds wins.
+    """
+    text = main.read("tokens")
+    if not text:
+        return
+    try:
+        old = json.loads(text)
+        new = json.loads(session.read("tokens") or "{}")
+    except json.JSONDecodeError:
+        old, new = {}, {}
+    if isinstance(old, dict) and isinstance(new, dict) and old:
+        session.write("tokens", json.dumps({**old, **new}, sort_keys=True))
+        LOG.warning(
+            "Moved %d session token(s) from %s to %s: with secret_store: "
+            "file, sessions are now kept apart from passwords and PINs.",
+            len(old),
+            main.describe(),
+            session.describe(),
+        )
+    main.remove("tokens")
+
+
+@lru_cache(maxsize=1)
+def session_backend() -> Store:
+    """The store for session tokens, chosen once.
+
+    The same store as everything else, except when secret_store is set to
+    file outright. That setting is for a machine with no keyring to unlock,
+    where the secrets file is all that guards a saved password, so the
+    tokens, which change with every login and are worth less, are kept out
+    of it: in the runtime directory, or under the temporary directory,
+    where they do not outlive a reboot.
+    """
+    main = backend()
+    if _configured()[0] != "file":
+        return main
+    session = SessionStore(DEFAULT_SESSION_FILE)
+    _adopt_sessions(main, session)
+    LOG.debug("Sessions are kept in %s", session.describe())
+    return session
+
+
+def sessions_are_apart() -> bool:
+    """Whether session tokens have a store of their own."""
+    return session_backend() is not backend()
+
+
+def _store_for(kind: str) -> Store:
+    """The store one kind of secret is kept in."""
+    return session_backend() if kind in SESSION_KINDS else backend()
+
+
 def load(kind: str) -> Secrets:
     """Every secret of one kind, as name -> secret."""
-    text = backend().read(kind)
+    text = _store_for(kind).read(kind)
     if not text:
         return {}
     try:
@@ -237,11 +376,11 @@ def save(kind: str, secrets: Secrets) -> None:
     for value in secrets.values():
         hide_in_logs(value)
     if secrets:
-        backend().write(kind, json.dumps(secrets, sort_keys=True))
+        _store_for(kind).write(kind, json.dumps(secrets, sort_keys=True))
     else:
-        backend().remove(kind)
+        _store_for(kind).remove(kind)
 
 
-def describe() -> str:
-    """Where this run's secrets are, for messages."""
-    return backend().describe()
+def describe(kind: str = "passwords") -> str:
+    """Where this run keeps one kind of secret, for messages."""
+    return _store_for(kind).describe()

@@ -76,8 +76,13 @@ One record per user:
 *title*
 	The user's display name, which _USER_ arguments also accept.
 
-For their usernames and email addresses as well, see
-*plexdo status --section users*.
+*username*
+	The plex.tv username, empty for a managed account, which has none.
+
+*email*
+	The account's email address, empty likewise.
+
+*plexdo status --section users* shows the same records.
 
 # EXIT STATUS
 

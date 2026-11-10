@@ -19,8 +19,13 @@ libraries shared with _USER_ are searched, and only what they hold is found.
 Each library is searched in turn using Plex's own library search, which
 performs a prefix and substring match on titles.
 
-A library in which the search fails is reported as a warning and skipped,
-and the others are still searched.
+With *--media-type*, only the libraries that can hold that type are
+searched: episodes are looked for in show libraries, not among the films.
+
+A library in which the search fails is skipped, and the others are still
+searched. The failure is only reported, as a warning naming the library and
+the reason, when the search found nothing at all: with results in hand it is
+beside the point, and *--debug* shows it regardless.
 
 # ARGUMENTS
 
@@ -99,8 +104,10 @@ format.
 
 # EXIT STATUS
 
-*0* on success, results found or not. *1* when _USER_ or the library is not
-found, or when _USER_ has nothing shared and cannot be acted on. See
+*0* on success, results found or not, including when a library could not
+be searched. *1* when _USER_ or the library is not found, when the library
+named cannot hold the *--media-type* asked for, or when _USER_ has nothing
+shared and cannot be acted on. See
 *plexdo-conventions*(7).
 
 # EXAMPLES

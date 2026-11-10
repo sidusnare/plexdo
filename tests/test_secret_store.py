@@ -8,15 +8,16 @@ import argparse
 import json
 import os
 import stat
+from pathlib import Path
 
 import pytest
 import yaml
 from keyring.backends import chainer, fail
 
-from conftest import REAL_BACKEND
+from conftest import REAL_BACKEND, REAL_SESSION_BACKEND
 from plexdo import config, migrate, secret_store
 from plexdo.commands import auth
-from plexdo.constants import SECRETS_EXAMPLE
+from plexdo.constants import SECRETS_EXAMPLE, session_file
 from plexdo.tokens import ADMIN_KEY, lookup, saved_password, saved_pin
 
 
@@ -412,14 +413,159 @@ def test_write_secrets_example_dry_run_writes_nothing(
     assert str(target) in capsys.readouterr().err
 
 
-def test_the_example_is_a_secrets_file_the_store_can_read(tmp_path):
-    """Its three kinds load, and its note survives a later save."""
+def test_the_example_is_a_password_store_the_store_can_read(tmp_path):
+    """Passwords and PINs load, no token is offered, and the note survives."""
     path = tmp_path / "secrets.json"
     path.write_text(SECRETS_EXAMPLE)
     path.chmod(0o600)
     store = secret_store.FileStore(path)
-    for kind in ("tokens", "passwords", "pins"):
+    for kind in ("passwords", "pins"):
         entries = json.loads(store.read(kind))
         assert entries and all(isinstance(v, str) for v in entries.values())
+    assert store.read("tokens") is None
     store.write("pins", '{"1": "1234"}')
     assert "_comment" in json.loads(path.read_text())
+
+
+# --- sessions apart from passwords, under secret_store: file ----------------
+
+
+@pytest.fixture
+def file_stores(monkeypatch, tmp_path):
+    """The real stores, configured as secret_store: file, under tmp_path."""
+    path = tmp_path / "config.yaml"
+    path.write_text(
+        f"plex:\n  url: x\n  secret_store: file\n"
+        f"  secrets_file: {tmp_path}/secrets.json\n"
+    )
+    session = tmp_path / "run" / "plexdo" / "session.json"
+    monkeypatch.setattr(secret_store, "CONFIG_PATH", path)
+    monkeypatch.setattr(config, "CONFIG_PATH", path)
+    monkeypatch.setattr(secret_store, "DEFAULT_SESSION_FILE", session)
+    monkeypatch.setattr(secret_store, "backend", REAL_BACKEND)
+    monkeypatch.setattr(secret_store, "session_backend", REAL_SESSION_BACKEND)
+    for cached in (config.cached_config, REAL_BACKEND, REAL_SESSION_BACKEND):
+        cached.cache_clear()
+    yield tmp_path / "secrets.json", session
+    for cached in (config.cached_config, REAL_BACKEND, REAL_SESSION_BACKEND):
+        cached.cache_clear()
+
+
+def test_file_keeps_tokens_out_of_the_secrets_file(file_stores):
+    secrets_path, session_path = file_stores
+    secret_store.save("tokens", {"bob": "t-bob"})
+    secret_store.save("passwords", {"bob": "pw"})
+    secret_store.save("pins", {"7": "1234"})
+    assert json.loads(session_path.read_text()) == {"tokens": {"bob": "t-bob"}}
+    assert json.loads(secrets_path.read_text()) == {
+        "passwords": {"bob": "pw"},
+        "pins": {"7": "1234"},
+    }
+    assert secret_store.load("tokens") == {"bob": "t-bob"}
+    assert secret_store.sessions_are_apart()
+    assert str(session_path) in secret_store.describe("tokens")
+    assert str(secrets_path) in secret_store.describe("passwords")
+
+
+def test_the_session_file_and_its_directory_are_private(file_stores):
+    _, session_path = file_stores
+    secret_store.save("tokens", {"bob": "t-bob"})
+    if os.name != "nt":
+        assert stat.S_IMODE(session_path.stat().st_mode) == 0o600
+        assert stat.S_IMODE(session_path.parent.stat().st_mode) == 0o700
+
+
+def test_tokens_left_in_the_secrets_file_are_moved_once(file_stores, caplog):
+    """An upgrade must not sign anyone out."""
+    secrets_path, session_path = file_stores
+    secrets_path.write_text(
+        json.dumps({"tokens": {"bob": "t-old"}, "passwords": {"bob": "pw"}})
+    )
+    secrets_path.chmod(0o600)
+    assert secret_store.load("tokens") == {"bob": "t-old"}
+    assert json.loads(secrets_path.read_text()) == {"passwords": {"bob": "pw"}}
+    assert json.loads(session_path.read_text()) == {"tokens": {"bob": "t-old"}}
+    assert "Moved 1 session token(s)" in caplog.text
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX ownership and modes")
+def test_a_session_directory_that_is_not_a_real_one_is_refused(tmp_path):
+    """Under a shared /tmp, someone else may have put a link there first."""
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (tmp_path / "plexdo-1000").symlink_to(elsewhere)
+    store = secret_store.SessionStore(tmp_path / "plexdo-1000" / "session.json")
+    with pytest.raises(SystemExit) as exc:
+        store.write("tokens", '{"a": "t"}')
+    assert "not a directory of your own" in str(exc.value)
+    assert not list(elsewhere.iterdir())
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX ownership and modes")
+def test_a_session_file_behind_a_link_is_not_believed(tmp_path, caplog):
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (elsewhere / "session.json").write_text('{"tokens": {"a": "planted"}}')
+    (tmp_path / "plexdo-1000").symlink_to(elsewhere)
+    store = secret_store.SessionStore(tmp_path / "plexdo-1000" / "session.json")
+    assert store.read("tokens") is None
+    assert "Ignoring the session file" in caplog.text
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX ownership and modes")
+def test_a_loose_session_directory_of_ours_is_tightened(tmp_path):
+    directory = tmp_path / "plexdo"
+    directory.mkdir(mode=0o755)
+    store = secret_store.SessionStore(directory / "session.json")
+    store.write("tokens", '{"a": "t"}')
+    assert stat.S_IMODE(directory.stat().st_mode) == 0o700
+
+
+def test_auto_and_keyring_keep_tokens_with_everything_else(secrets):
+    """Only an explicit file setting splits them; the fixture's store is one."""
+    secret_store.save("tokens", {"bob": "t"})
+    secret_store.save("passwords", {"bob": "pw"})
+    assert set(secrets.entries) == {"tokens", "passwords"}
+    assert not secret_store.sessions_are_apart()
+
+
+def test_the_session_file_goes_in_the_runtime_directory():
+    env = {"XDG_RUNTIME_DIR": "/run/user/1000"}
+    assert session_file(False, env, "/tmp", 1000) == Path(
+        "/run/user/1000/plexdo/session.json"
+    )
+
+
+@pytest.mark.parametrize("env", [{}, {"XDG_RUNTIME_DIR": "relative/dir"}])
+def test_without_a_runtime_directory_it_goes_under_the_temporary_one(env):
+    assert session_file(False, env, "/var/tmp", 1000) == Path(
+        "/var/tmp/plexdo-1000/session.json"
+    )
+
+
+def test_windows_keeps_the_session_under_its_temporary_directory():
+    env = {"XDG_RUNTIME_DIR": "/run/user/1000"}
+    assert session_file(True, env, "C:/Temp", None) == Path(
+        "C:/Temp/PlexDo/session.json"
+    )
+
+
+def test_login_says_on_stderr_where_the_session_went(
+    signing_in, file_stores, capsys
+):
+    secrets_path, session_path = file_stores
+    login(remember_login=True)
+    captured = capsys.readouterr()
+    assert str(session_path) in captured.err
+    assert "run `plexdo login` again" in captured.err
+    record = json.loads(captured.out)
+    assert str(session_path) in record["store"]
+    assert str(secrets_path) in record["passwordStore"]
+    assert json.loads(secrets_path.read_text()) == {
+        "passwords": {"bob@example.com": "typed-pw"}
+    }
+
+
+def test_login_says_nothing_extra_when_there_is_one_store(signing_in, capsys):
+    login()
+    assert capsys.readouterr().err == ""

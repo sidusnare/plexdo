@@ -388,16 +388,18 @@ src/plexdo/
     __main__.py     python -m plexdo
     cli.py          build_parser, main
     constants.py    windows_app_dir, default_paths, Paths, PATHS, CONFIG_PATH,
-                    DEFAULT_CACHE_DIR, DEFAULT_SECRETS_FILE, STORE_CHOICES,
-                    config_text, CONFIG_EXAMPLE, LOG
+                    DEFAULT_CACHE_DIR, DEFAULT_SECRETS_FILE, session_file,
+                    DEFAULT_SESSION_FILE, STORE_CHOICES, config_text,
+                    CONFIG_EXAMPLE, SECRETS_EXAMPLE, LOG
     logs.py         configure_logging, open_debug_log, RedactingFormatter,
                     TimestampedFormatter
     profiling.py    profiled, span, usage, Run, Usage
     config.py       load_config, parse_config, cached_config, config_optional,
                     user_option, configured_users, expand_environment,
                     check_file_permissions, Config
-    secret_store.py backend, open_store, load, save, describe, KeyringStore,
-                    FileStore, Store
+    secret_store.py backend, session_backend, sessions_are_apart,
+                    open_store, load, save, describe, KeyringStore,
+                    FileStore, SessionStore, Store
     tokens.py       load_store, lookup, store_token, admin_token,
                     forget_tokens, saved_password, save_password,
                     forget_logins, saved_pin, save_pin
@@ -406,7 +408,7 @@ src/plexdo/
     arguments.py    add_user_argument, add_library_argument,
                     add_m3u_argument, add_overwrite_argument,
                     add_rating_keys_argument, add_rating_key_option
-    cache.py        cache_dir, write_cache
+    cache.py        cache_dir, write_cache, cache_key, write_word_caches
     convert.py      parse_date, format_duration
     console.py      output, output_format, clean_text, table_limit,
                     print_table, print_metadata, stream_record,
@@ -414,22 +416,24 @@ src/plexdo/
     formats.py      to_json, to_yaml, to_csv, to_clixml, render
     records.py      loaded_fields, file_paths, release_date, summary_row,
                     cache_row, season_records
-    identify.py     resolve_identifier
+    identify.py     resolve_identifier, remember_words, argument_words
     accounts.py     server_for_user, account_type, resolve_user_arguments,
-                    user_roster, UserAccessError, connect_with_token,
+                    user_roster, user_rows, UserAccessError,
+                    connect_with_token,
                     connect_as_shared_user, configured_entries,
                     configured_account, configured_accounts
     sections.py     resolve_section, resolve_sections,
                     resolve_library_arguments
     titles.py       display_title, find_item, fetch_item, fetch_show,
                     non_special_episodes, shuffle_list, item_is_played,
-                    item_view_offset
+                    item_view_offset, as_rating_key
     playlists.py    resolve_playlist, finalize_playlist, copy_playlist_to,
                     existing_playlist, preview_rows, require_items,
                     create_for_user
     fanout.py       add_user_target_arguments, deliver_playlist, run_per_user,
                     report_line
-    photos.py       collect_photos, collect_library_items, photo_file_path
+    photos.py       walk_photo_albums, AlbumVisit, is_album, album_children,
+                    collect_photos, collect_library_items, photo_file_path
     sorting.py      apply_sort
     m3u.py          write_m3u
     gallery.py      write_gallery_html
@@ -563,6 +567,37 @@ removes its entry.
 - `secret_store.backend()` is chosen once per run and works before the
   config exists, with the defaults, since the migration saves secrets
   before writing the file.
+- **With `secret_store: file` set outright, sessions are kept apart from
+  passwords.** `SESSION_KINDS` is `("tokens",)`; `session_backend()` is the
+  store for those kinds and `backend()` the store for the rest, and
+  `load`, `save`, and `describe(kind)` pick between them. Under `auto` and
+  `keyring` the two are the same store, a file `auto` fell back to
+  included. Under `file` the secrets file holds `passwords` and `pins`
+  alone, and the tokens go in a `SessionStore`, a `FileStore` at
+  `constants.DEFAULT_SESSION_FILE`: `$XDG_RUNTIME_DIR/plexdo/session.json`
+  when that variable is an absolute path, else `plexdo-UID/session.json`
+  under `tempfile.gettempdir()`, which honours `TMPDIR`, `TEMP`, and `TMP`
+  (`PlexDo/session.json` there on Windows). `session_file(is_windows, env,
+  tmpdir, uid)` takes all four as arguments so every case is testable.
+  The reasoning: that setting is for a machine with no keyring to unlock,
+  where the secrets file is all that guards a saved password, and a token,
+  which changes with every login and which plex.tv can reissue, does not
+  belong beside it or need to outlive a reboot.
+- The temporary directory is writable by other accounts, so the session
+  directory is created with mode 0700 and then checked with `lstat`: it
+  must be a real directory, not a link, owned by the user. One of the
+  user's own that is open to group or other is tightened. Otherwise
+  writing is a `sys.exit` and nothing is written, and a session file
+  found there is ignored with a warning rather than believed. Windows has
+  neither check; its temporary directory is inside the user's profile.
+- The first time the session store is opened, a `tokens` entry still in
+  the secrets file, where it was kept before, is moved to the session
+  file, a token already there winning, with a warning saying so. An
+  upgrade must not sign anyone out.
+- `login` prints one note on **stderr**, in every format, when the two
+  stores differ: where sessions are kept, that they are apart from the
+  passwords and PINs, and that a session lasts until that file is cleared,
+  as at a reboot, when `plexdo login` is needed again.
 
 `tokens.py` is the only module that knows the three kinds.
 
@@ -812,7 +847,8 @@ turn it off.
 Apply wherever a loop makes one request per element and the count can exceed
 50: the seasons walk in `library-list`, `missing-find -A`, applying watched
 state in `show-watched-cp`, removing entries in `playlist-clean`, reading each
-source in `merge-build`, `collect_photos`, and the per-user loop in
+source in `merge-build`, `collect_photos`, the walk of a show library in
+`collect_library_items`, and the per-user loop in
 `fanout.run_per_user`, which serves `playlist-copy --all`, and
 `playlist-build` and `merge-build` given `-a`. Functions needing it take an optional `args`.
 
@@ -857,7 +893,10 @@ content.
 
 Every argument naming an **existing** playlist accepts a title or a ratingKey
 through `resolve_playlist`; no command may call `plex.playlist(name)`
-directly. A numeric value that is no item at all is a clean `sys.exit`, not
+directly. What counts as a ratingKey is decided by `titles.as_rating_key`,
+**ASCII digits and nothing else**: `int()` is too generous a test, taking
+`1_000`, `+7`, ` 12 `, and digits of other scripts, any of which may be what
+a playlist is called. A numeric value that is no item at all is a clean `sys.exit`, not
 plexapi's `NotFound` escaping as a traceback: look it up with
 `titles.find_item`, which returns None, and `fetch_item` wraps that for every
 other fatal lookup, `fetch_show` included. Nothing calls `fetchItem` bare.
@@ -1005,7 +1044,10 @@ and a description saying what each mode takes.
   album holds photos alone, `state`, `progress` ("3:20 / 9:46 (34.1%)" for
   an item in progress, else empty), and `last played` as a date.
 - `show-list RATINGKEY [--m3u P] [-p PREFIX]` - fails fast if not a `Show`.
-- `users-list` - `id`, `type`, `title`, `username`, `email`. `account_type`
+- `users-list` - `id`, `type`, `title`, `username`, `email`, from
+  `accounts.user_rows`, which the `users` section of `status` shows too, so
+  the two cannot come to differ; the command once printed three of the
+  five while its documentation promised all of them. `account_type`
   returns managed/home/friend/shared. plexapi exposes `restricted` as the raw
   XML **string**, so `"0"` is truthy and a naive check labels every account
   managed.
@@ -1013,10 +1055,23 @@ and a description saying what each mode takes.
 - `show-metadata RATINGKEY` - type-specific builders via `_METADATA_BUILDERS`
   keyed on `item.type`, plus the file paths. A table names a lone file `file`
   and numbers several `file 1`, `file 2`; other formats carry a `files` list.
-- `search USER QUERY [--media-type T] [--library-id L]` - per-library failures
-  log a warning and continue.
+- `search USER QUERY [--media-type T] [--library-id L]` - with
+  `--media-type`, search only the libraries whose section type can hold it
+  (`episode` in `show`, `track` and `album` in `artist`): asked for a type
+  it cannot hold, plexapi raises "Unknown libtype", once per library. A
+  library named with `--library-id` that cannot hold the type is a
+  `sys.exit`. A library whose search raises is skipped, logged at DEBUG,
+  and the rest are searched; the failures are reported, as **one** warning
+  starting `Search failed in`, **only when no result came back at all**.
+  With results in hand a library that could not be searched is noise.
 - `missing-find SHOW [-l LIBRARY] [-A] [-s SEASONS] [--include-specials]` -
-  names one show by default, resolved through `resolve_identifier`. `-A`
+  names one show by default, resolved through `resolve_identifier`. A SHOW
+  written as a ratingKey is fetched outright first, and used if it is a
+  show: listing every show of every library to look up a number was the
+  slow part. One `section.search(title=..., libtype="show")` per show
+  library is still made, to give the usual warning when another show is
+  *titled* that number ("24", "1923"). A number that is no show's key falls
+  through to the roster, where it may be a title. `-A`
   sweeps every show and refuses a SHOW argument; `-s` takes one number or a
   comma list and applies only to a single show. For each season the run starts
   at 0 when an episode 0 exists and otherwise at 1, ending at the highest
@@ -1038,7 +1093,11 @@ and a description saying what each mode takes.
   others still parses; `_check_build` names them for the mode. The wrong
   count for the mode, or a ratingKey that is not an integer, is a usage
   error, exit 2, as is `-A` with any of `-o`, `-u`, `-a`, `--m3u`, and
-  `-p`, which only make sense for a playlist being created. `-A` is
+  `-p`, which only make sense for a playlist being created. With too few
+  arguments for `first` and `rest` at all, argparse reports only "the
+  following arguments are required: ARG", before any flag is looked at;
+  the parser's `error` is wrapped to say instead what each mode takes,
+  naming together the modes that take the same ("-I and -C take ..."). `-A` is
   `--append`; `-a` stays `--all-users`.
   - `-I/--interleaved` - round-robin across shows.
   - `-C/--chronological` - sorted by air date. A missing date
@@ -1056,6 +1115,9 @@ and a description saying what each mode takes.
   - `-R/--randomize` - Fisher-Yates via `secrets.randbelow`.
   - `-A/--append` - fetches every ratingKey as the user sees the server,
     exits 1 if any is not found, previews, then adds them in one call.
+    Refuse a smart playlist before fetching anything, as `playlist-clean`
+    does: plexapi raises `BadRequest` from `addItems`, which is also
+    caught there and turned into a `sys.exit`.
 - `merge-build USER NAME FIRST SECOND [--ratio A:B] [-s] [-U]` - mixes two
   playlists in turn, A items from FIRST then B from SECOND, default 1:1,
   each keeping its own order. Parse the ratio in argparse (`type=`), so a
@@ -1091,7 +1153,11 @@ and a description saying what each mode takes.
   - `-T/--to` - a table shows the item list then the outcome line; a
     machine-readable format shows the outcome record **alone**, as `-A`
     does, because two documents on one stream parse as neither.
-- `playlist-remove USER PLAYLIST`.
+- `playlist-remove USER PLAYLIST` - names the playlist by its title in what
+  it prints, however it was given. `--dry-run` says on stderr which
+  playlist would be deleted, by title and ratingKey: a rehearsal that
+  prints nothing cannot be told from one that found nothing to do, and
+  every `--dry-run` must say what it would have done without `--verbose`.
 - `playlist-clean USER PLAYLIST [--include-partial]` - removes the watched
   entries and leaves the rest in their existing order. Preview first, then one
   `removeItems` call per entry so the loop is paced like any other per-item
@@ -1101,7 +1167,9 @@ and a description saying what each mode takes.
   the removal list, so it lines up with what Plex shows. A part-played item is
   **kept** by default - it is the one being watched right now, not a watched
   one - and `--include-partial` drops it, labelled `partial` rather than
-  `played`. Refuse a smart playlist: its contents come from a filter, and Plex
+  `played`. **The resume point is looked at first**: an item played before
+  and part way through again has a view count and a resume point, and it is
+  the second that says the user is in the middle of it. Refuse a smart playlist: its contents come from a filter, and Plex
   answers a delete on one of its entries with a 400. Warn when every entry is
   going, since Plex drops a playlist that loses its last item.
 
@@ -1146,7 +1214,32 @@ A `lastViewedAt` of `None` must never win: map it to `datetime.min` when the
 latest wins and `datetime.max` when the earliest does. Plex rewrites
 `viewOffset` continuously during playback, so treat offsets within
 `_OFFSET_TOLERANCE_MS` (10s) as identical, or every run reports spurious
-changes. Two fully played states need no sync at all.
+changes.
+
+A state is two things, **the played flag and the resume point, and both are
+copied as they stand**; the view count is used only to tell played from
+not, and is never copied. So two states match when the flags are equal and
+the offsets are within tolerance, whether or not the item is played: an item
+played before and part way through again differs from one simply played.
+Two fully played states with no resume point need no sync at all.
+
+`_planned_steps(winner, loser)` gives the calls that bring the loser to the
+winner's state, and the plan's `action` is those steps joined by `+`:
+`markPlayed` or `markUnplayed` when the flags differ; else `clearProgress`
+when the winner has no resume point and the loser has one; then
+`setProgress` when the winner has one. Marking played or unplayed clears
+the resume point on the server, so it comes **before** `updateProgress`,
+and `clearProgress` is done by marking the item what it already is. It was
+once applied only when the loser was fully played, so `--unwatch` planned
+`markUnplayed` for an item one user was part way through, called nothing,
+and reported the same change on every run.
+
+`-t KEY` names what to compare. A movie, episode, track, or clip is
+compared by itself. A show or season stands for its `episodes()`, an artist
+or album for its `tracks()`, each member compared on its own: a
+container's own played flag only says whether **every** member is played,
+so comparing containers found two users at different points in a show
+identical. Any other type is a `sys.exit` saying it has no watched state.
 
 plexapi renamed these methods, so call through a helper trying both spellings
 (`markPlayed`/`markWatched`, `markUnplayed`/`markUnwatched`) and read played
@@ -1162,6 +1255,9 @@ Watch state lives on leaf items: map `movie`->`movie`, `show`->`episode`,
 
 ### Exporting
 
+- `playlist-export` and `playlist-list --m3u` are two ways to the same
+  file, kept on purpose; both write through the one
+  `commands.playlists._export_m3u`, so neither can write it differently.
 - `playlist-export USER PLAYLIST PATH`, `titles-export LIBRARY PATH
   [--sort alpha|date|random] [--album A]`.
 - M3U carries Plex server filesystem paths, `#EXTINF` seconds from
@@ -1181,24 +1277,57 @@ Watch state lives on leaf items: map `movie`->`movie`, `show`->`episode`,
 
 ### Photos
 
-`collect_photos` walks `section.all()` (albums) then `palbum.photos()`.
+`photos.walk_photo_albums(section, args)` is the one walk of a photo
+library, used by `albums-list`, `library-list`, and `titles-export`. It
+starts from `section.all()` and opens each album with one
+`fetchItems(f"{album.key}/children")`, splitting the children by
+`TAG == "Directory"` into nested albums, walked next so they follow their
+parent, and contents. It returns an `AlbumVisit` per album: the album, its
+contents, and the titles of the albums around it ending with its own. The
+photos of an album inside another are in neither the library listing nor
+the outer album's own children, so a walk that stops at the top level
+loses them, as `collect_photos` once did.
+
+Two guards, both needed. A ratingKey met twice is passed over: that lists
+once an album the server shows at the top level as well as nested, and
+stops albums that contain one another from being walked for ever. And
+nesting is followed `MAX_ALBUM_DEPTH` (16) albums deep, since a loop check
+cannot stop a server that keeps producing new albums; what lies deeper is
+left out with **one** warning naming where the walk stopped.
+
+`collect_photos` takes the `type == "photo"` contents of each visit,
+leaving clips out. `--album` matches a title, ignoring case, against every
+title in the visit's path, so naming an album takes the albums inside it
+too, and an album nested anywhere can be named. A name matching no album
+is a `sys.exit`; an album that exists and is empty is not.
 **Never** `section.search(libtype="photo")`: Plex requires a non-empty query
 string and returns nothing for an empty one, so the library appears empty.
 
 ### Streaming and server management
 
-- `read LIBRARY RATINGKEY` - streams to `sys.stdout.buffer` in 64KB chunks via
-  `requests.get(stream=True)`. Validate the item's `librarySectionID` matches.
+- `read RATINGKEY` - streams to `sys.stdout.buffer` in 64KB chunks via
+  `requests.get(stream=True)`. It takes no library: a ratingKey is unique
+  on the server, and an argument that only existed to be checked against
+  the item was one more thing to look up and type.
   Catch `BrokenPipeError` silently and `os.dup2` the null device onto stdout,
   so the interpreter's final flush does not print "BrokenPipeError ignored"
   when the user quits the player. The epilog shows worked examples including
-  `plexdo read 3 12345 | mpv --vo=drm -` for **Linux with a display attached
+  `plexdo read 12345 | mpv --vo=drm -` for **Linux with a display attached
   but no desktop environment** - describe the condition, not the machine:
   "headless" contradicts having a screen, and the hardware could be a Pi, a
   kiosk, a sign, or an old laptop.
-- `rescan [LIBRARY] [-s] [-n]` - `plex.activities` is a **property**, not a
-  method. `section.update()` scans for files; `refresh()` only re-fetches
-  metadata.
+- `rescan LIBRARY [-n]`, `rescan -a [-n]`, `rescan -s` - `plex.activities`
+  is a **property**, not a method. `section.update()` scans for files;
+  `refresh()` only re-fetches metadata. `-a/--all` scans every library with
+  the one `plex.library.update()` call. Exactly one of LIBRARY and `-a` is
+  required without `-s`, checked by a `check_arguments` hook so it is a
+  usage error, exit 2, before anything connects: with neither, the message
+  says to name a library **or use `--all` to rescan every library**, so a
+  library left off by mistake does not set the whole server scanning.
+  `--dry-run` says on stderr what would be scanned, and whether pending
+  scans would be cancelled first. `-s` with no activity prints
+  `No active scan jobs.` on stderr as a table and an **empty list** in a
+  machine-readable format.
 - `status [--section S]` - the sessions table carries `sessionKey`, `user`,
   `library`, `ratingKey`, `title`, `state`, `player`, `platform`, `address`,
   `progress`, and `file`; `sessionKey` is what `wait --session` takes. `records.playing_file` reports the file in use: a session marks
@@ -1398,8 +1527,9 @@ command would not repeat them and trip `duplicate-code`.
   none), and `--save-password` saves the password beside it so plexdo can
   sign in again by itself once the token stops working. `--dry-run`
   authenticates and saves nothing. The table says where the token went
-  (`secret_store.describe()`); other formats give `user`, `store`,
-  `verified`, and `passwordSaved`. `--password` on the command line is
+  (`secret_store.describe("tokens")`); other formats give `user`, `store`,
+  `passwordStore` (`describe("passwords")`), `verified`, and
+  `passwordSaved`. `--password` on the command line is
   scrubbed from the process title via `ctypes.pythonapi.Py_GetArgcArgv`
   (`sys.argv` is only a copy; `ps` reads the original buffer) and redacted
   from `sys.argv`, with a warning that is blunt about what cannot be fixed:
@@ -1442,10 +1572,14 @@ command would not repeat them and trip `duplicate-code`.
   with `os.open(..., O_CREAT | O_EXCL, 0o600)`, unlinking an old one first
   under `-o`, so it is never readable by anyone else, even for a moment,
   and an overwritten file does not keep looser permissions. The example is
-  JSON as `FileStore` writes it (`indent=2`, sorted keys): `tokens`,
-  `passwords`, and `pins`, each with one placeholder entry, and a
+  the **password store**, the secrets file as `secret_store: file` keeps
+  it: JSON as `FileStore` writes it (`indent=2`, sorted keys), with
+  `passwords` and `pins`, each with one placeholder entry, and a
   `_comment` entry, a list of short lines, saying every value is a
-  placeholder. JSON has no comments; `FileStore` reads only the kinds it
+  placeholder and that session tokens are not kept there. It must hold no
+  `tokens`: a placeholder token beside a real one made the store hold
+  two, so `admin_token` no longer took "the only one" and every command
+  reported no admin token. JSON has no comments; `FileStore` reads only the kinds it
   is asked for and writes back every entry it loaded, so the note is
   harmless and survives a later save. Its `--help` prints the exact
   example in the epilog. Needs no server.
@@ -1463,7 +1597,21 @@ or where no player answers. A
 command line argparse cannot parse exits 2, its own convention. An
 interrupted `wait` exits 130. No bare
 `except`; the broad ones are in `_cancel_all_scans`, the per-user copy loop,
-and per-section collection, each with a `# pylint: disable=broad-except`.
+the per-library search, and per-section collection, each with a
+`# pylint: disable=broad-except`.
+
+**A request that fails must not reach the user as a traceback.** `cli.main`
+wraps `_run` and catches `requests.exceptions.RequestException` and
+`plexapi.exceptions.PlexApiException`, the two families everything raised
+by a request to the server or to plex.tv belongs to, and exits 1 with one
+or two lines chosen by kind: the server could not be reached (check it is
+running, and `plex: url`), it did not answer in time, it refused the saved
+token (run `plexdo login`), or it refused the request. Only the **first
+line** of the error is shown, since plexapi attaches the server's whole
+HTML error page to some, and it goes through `security.redact`, since a
+URL in a requests error can carry a token. The traceback is logged at
+DEBUG. Handlers closer to the request, such as the per-user loops and
+`UserAccessError`, still take precedence; this is the net under them.
 
 ## PLATFORM SUPPORT
 
@@ -1490,6 +1638,40 @@ Four scripts in `completions/`, mirrored into `src/plexdo/data/` as package
 data. All cover the same values, read a 15-minute cache under the platform
 cache directory (honouring `cache_dir`), and refresh a stale cache in the
 background so completion never blocks.
+
+**Each script finds the cache as plexdo does**, or completion silently
+offers nothing: `plex: cache_dir` from `config.yaml`, in
+`$XDG_CONFIG_HOME/plexdo` or `~/.config/plexdo` (`%LOCALAPPDATA%\PlexDo` on
+Windows), with environment variables and a leading `~` expanded; else
+`$XDG_CACHE_HOME/plexdo`, by default `~/.cache/plexdo`. An XDG variable
+counts only when absolute. They once read the 1.x INI file and a
+hard-coded `~/.cache`, long after both had moved. PyYAML may not be
+importable by whichever python the script finds, and PowerShell has no
+YAML reader, so each reads the one scalar it needs a line at a time: a
+`cache_dir:` line indented under the top-level `plex:` key, skipping
+blank and comment lines, unquoting a double-quoted value as a JSON string
+and a single-quoted one by its doubled quotes, and cutting a trailing
+` #` comment from a plain one. bash, zsh, and fish share one python
+snippet, which must contain **no single quote and no backslash**, because
+fish holds it in a single-quoted string.
+
+**The cache is kept twice, by ID and by word.** `titles.LIBRARY.json` and
+`playlists.USER.json` are named for the numeric ID, but a script holds
+whatever is on the command line, which may be a title, and cannot resolve
+it as plexdo does. So `cache.write_word_caches` files the same rows as
+`titles-by-word.WORD.json` and `playlists-by-word.WORD.json`, once for
+each spelling: the ID, the title, and the word as typed.
+`identify.remember_words` records the three while the argument is
+resolved, on `args.argument_words`, since resolution replaces what was
+typed with the ID; `argument_words(args, name)` reads them back. Both
+caches are written whenever a result is handled, so they cannot drift. In
+a file name `cache.cache_key` replaces each of `/ \ : * ? " < > |` and
+the control characters with `_`, chosen so every shell can make the same
+name with one substitution of its own; each script has that function and
+a test compares them. Playlist and album-name completion read the by-word
+cache for the word typed, dequoted; ratingKey completion still gathers
+every `titles.*.json`, which the by-word names do not match, so no key is
+offered twice.
 
 Numeric IDs are shown with their titles. Distinguish what is *insertable* from
 what is merely *shown*: user and library titles are insertable because those

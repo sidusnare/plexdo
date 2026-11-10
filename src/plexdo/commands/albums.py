@@ -31,6 +31,7 @@ from plexdo.console import (
 )
 from plexdo.constants import LOG
 from plexdo.convert import format_duration, parse_date
+from plexdo.photos import album_children, is_album, walk_photo_albums
 from plexdo.records import file_paths
 from plexdo.sections import resolve_section
 from plexdo.throttle import paced
@@ -53,20 +54,6 @@ _ALBUM_TYPES = {"album": True, "photo": False}
 _NESTING_FORMATS = ("json", "yaml")
 
 Record = dict[str, Any]
-
-
-def _is_album(item: Any) -> bool:
-    """True for an album, as opposed to a track, photo, or clip in one.
-
-    Albums are the only children Plex sends as a Directory element; plexapi
-    keeps the element name on each class as TAG.
-    """
-    return getattr(type(item), "TAG", None) == "Directory"
-
-
-def _children(album: Any) -> list[Any]:
-    """Everything directly inside an album, in one request."""
-    return list(album.fetchItems(f"{album.key}/children"))
 
 
 def _timestamp(value: Any) -> str | None:
@@ -226,27 +213,11 @@ def table_row(album: Any, contents: list[Any] | None, music: bool) -> Record:
 def _photo_albums(
     section: Any, args: argparse.Namespace
 ) -> list[tuple[Any, list[Any]]]:
-    """Every album of a photo library, nested ones included, with contents.
-
-    Depth first, so an album inside another follows it. Finding nested
-    albums means opening every album, which reads its contents too. An album
-    met twice, should the server list nested albums at the top as well, is
-    listed once.
-    """
-    found: list[tuple[Any, list[Any]]] = []
-    seen: set[int] = set()
-
-    def walk(albums: list[Any]) -> None:
-        for album in paced(albums, args, "albums"):
-            if int(album.ratingKey) in seen:
-                continue
-            seen.add(int(album.ratingKey))
-            children = _children(album)
-            found.append((album, [c for c in children if not _is_album(c)]))
-            walk([c for c in children if _is_album(c)])
-
-    walk(list(section.all()))
-    return found
+    """Every album of a photo library, nested ones included, with contents."""
+    return [
+        (visit.album, visit.contents)
+        for visit in walk_photo_albums(section, args)
+    ]
 
 
 def cmd_list_albums(plex: PlexServer, args: argparse.Namespace) -> None:
@@ -272,7 +243,8 @@ def cmd_list_albums(plex: PlexServer, args: argparse.Namespace) -> None:
             return
         LOG.info("Reading the contents of %d album(s)", len(albums))
         listed = [
-            (album, _children(album)) for album in paced(albums, args, "albums")
+            (album, album_children(album))
+            for album in paced(albums, args, "albums")
         ]
     else:
         listed = _photo_albums(section, args)
@@ -370,14 +342,14 @@ def cmd_list_album(plex: PlexServer, args: argparse.Namespace) -> None:
     """
     album = fetch_item(plex, args.rating_key)
     kind = vars(album).get("type")
-    if not _is_album(album) or kind not in _ALBUM_TYPES:
+    if not is_album(album) or kind not in _ALBUM_TYPES:
         sys.exit(
             f"ratingKey {args.rating_key} is not an album (it is a "
             f"{kind or type(album).__name__}); albums-list lists the albums "
             "of a library."
         )
-    children = _children(album)
-    contents = [child for child in children if not _is_album(child)]
+    children = album_children(album)
+    contents = [child for child in children if not is_album(child)]
     nested = len(children) - len(contents)
     if nested:
         LOG.info(

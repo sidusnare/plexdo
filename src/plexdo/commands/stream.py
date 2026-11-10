@@ -12,7 +12,7 @@ import textwrap
 import requests
 from plexapi.server import PlexServer
 
-from plexdo.arguments import add_library_argument, add_rating_key_argument
+from plexdo.arguments import add_rating_key_argument
 from plexdo.console import output_format
 from plexdo.constants import LOG
 from plexdo.titles import display_title, fetch_item
@@ -23,7 +23,7 @@ def _stream_to_stdout(url: str, label: str) -> None:
     if sys.stdout.isatty():
         LOG.warning(
             "stdout is a terminal - pipe into a player, e.g.: "
-            "plexdo read <lib> <key> | mpv -"
+            "plexdo read <key> | mpv -"
         )
     LOG.info("Streaming: %s", label)
     try:
@@ -46,7 +46,7 @@ def _stream_to_stdout(url: str, label: str) -> None:
 
 
 def cmd_read(plex: PlexServer, args: argparse.Namespace) -> None:
-    """Stream a media file to stdout by library ID and ratingKey."""
+    """Stream a media file to stdout by ratingKey."""
     if output_format(args) != "table":
         LOG.warning(
             "Output format flags have no effect on the read command; "
@@ -55,13 +55,6 @@ def cmd_read(plex: PlexServer, args: argparse.Namespace) -> None:
 
     rating_key = int(args.rating_key)
     item = fetch_item(plex, rating_key)
-
-    item_lib_id = int(getattr(item, "librarySectionID", 0))
-    if item_lib_id != args.library_id:
-        sys.exit(
-            f"ratingKey {rating_key} belongs to library {item_lib_id}, "
-            f"not library {args.library_id}."
-        )
 
     if not getattr(item, "media", None):
         sys.exit(f"No media attached to ratingKey: {rating_key}")
@@ -109,14 +102,14 @@ def register(
         ),
         epilog=(
             "examples:\n"
-            "  plexdo read 3 12345 > episode.mkv\n"
-            "  plexdo read 3 12345 | mpv -\n"
+            "  plexdo read 12345 > episode.mkv\n"
+            "  plexdo read 12345 | mpv -\n"
             "\n"
             "On Linux with a display attached but no desktop environment, mpv\n"
             "can draw straight to the console through the kernel modesetting\n"
             "driver, so playback needs neither X nor Wayland:\n"
             "\n"
-            "  plexdo read 3 12345 | mpv --vo=drm -\n"
+            "  plexdo read 12345 | mpv --vo=drm -\n"
             "\n"
             "Run it from a virtual terminal rather than a terminal emulator,\n"
             "and make sure your user can reach the DRM device (usually "
@@ -125,7 +118,6 @@ def register(
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    add_library_argument(parser)
     add_rating_key_argument(parser)
 
 

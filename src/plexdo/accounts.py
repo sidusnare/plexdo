@@ -16,7 +16,7 @@ from plexapi.server import PlexServer
 from plexdo.config import cached_config, configured_users, user_option
 from plexdo.console import clean_text
 from plexdo.constants import LOG
-from plexdo.identify import resolve_identifier
+from plexdo.identify import remember_words, resolve_identifier
 from plexdo.tokens import lookup, saved_password, store_token
 
 
@@ -283,6 +283,24 @@ def account_type(user: MyPlexUser) -> str:
     return "shared"
 
 
+def user_rows(plex: PlexServer) -> list[dict[str, Any]]:
+    """One record per user the server is shared with, for a listing.
+
+    Shared by users-list and the users section of status, so the two cannot
+    come to show different fields for the same people.
+    """
+    return [
+        {
+            "id": int(user.id),
+            "type": account_type(user),
+            "title": clean_text(user.title or ""),
+            "username": clean_text(getattr(user, "username", "") or ""),
+            "email": clean_text(getattr(user, "email", "") or ""),
+        }
+        for user in plex.myPlexAccount().users()
+    ]
+
+
 # Namespace attributes that hold a user identifier, resolved centrally in
 # cli.main() so every command handler receives a plain numeric user ID.
 USER_ID_ARGUMENTS = (
@@ -327,6 +345,7 @@ def resolve_user_arguments(
         return
     roster = user_roster(plex)
     for name in present:
-        setattr(
-            args, name, resolve_user_identifier(roster, getattr(args, name))
-        )
+        typed = getattr(args, name)
+        resolved = resolve_user_identifier(roster, typed)
+        remember_words(args, name, typed, roster, resolved)
+        setattr(args, name, resolved)

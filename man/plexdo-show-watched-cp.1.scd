@@ -19,6 +19,11 @@ line: what one has watched is marked watched for the other, and a resume
 point one has is given to the other. By default both users can be changed;
 *-1* only ever changes the second.
 
+Two things are copied for each item, as they stand: whether it has been
+played, and its resume point. An item played before and part way through
+again has both, and both are copied. How many times it has been played is
+not: the count is each user's own.
+
 Watched state belongs to individual films, episodes, and tracks, so those are
 what is compared, across every library both users can see that holds them.
 Photo libraries have no watched state and are skipped. Only items both users
@@ -31,9 +36,9 @@ The planned changes are listed first, then made.
 For each item:
 
 - Neither user has watched or started it, or both are in the same state:
-  nothing changes. Two resume points within 10 seconds of each other count
-  as the same, since Plex moves a resume point continuously during
-  playback.
+  nothing changes. The same state means the same played flag and the same
+  resume point; two resume points within 10 seconds of each other count as
+  the same, since Plex moves a resume point continuously during playback.
 - Only one user has watched or started it: that user's state is copied to
   the other. With *--unwatch* it goes the other way: the unwatched state is
   copied to the user who had watched it.
@@ -41,9 +46,10 @@ For each item:
   wins. With *--unwatch* the earlier one does. A viewing with no recorded
   date never wins.
 
-Applying a state means marking the item watched, setting its resume point,
-or marking it unwatched, whichever makes the losing user's state match the
-winner's.
+Applying a state means marking the item watched or unwatched where the two
+differ on that, then setting or clearing its resume point, so that the
+losing user's state matches the winner's in both. Under *--unwatch*, an item
+one user is only part way through loses its resume point too.
 
 # ARGUMENTS
 
@@ -62,8 +68,12 @@ _USER_ _USER_
 	Compare only this library, by numeric ID or title.
 
 *-t*, *--title* _KEY_
-	Compare only the one item with this ratingKey, normally a film,
-	episode, or track.
+	Compare only what this ratingKey names. A film, episode, track, or
+	clip is compared by itself. A show or season stands for every episode
+	in it, and an artist or album for every track, each compared on its
+	own, so two users at different points in a show are brought into
+	line episode by episode. Anything else, such as a photo or a
+	playlist, has no watched state and is an error.
 
 *--unwatch*
 	Invert the rules: an item unwatched by either user becomes unwatched for
@@ -121,7 +131,10 @@ One record per planned change:
 	The item.
 
 *action*
-	*markPlayed*, *setProgress*, or *markUnplayed*.
+	What is done to the target, as steps joined by *+*: *markPlayed* or
+	*markUnplayed* when the played flag changes, then *setProgress* when
+	the winner has a resume point to copy, as in *markPlayed+setProgress*;
+	or *clearProgress* alone, when only a resume point has to go.
 
 *target*
 	The user changed, as *user* followed by their numeric ID.
@@ -129,8 +142,9 @@ One record per planned change:
 # EXIT STATUS
 
 *0* on success, whether or not anything changed. *1* when a user, the
-library, or the item is not found, when both _USER_ arguments name the same
-user, or when either user has nothing shared and cannot be acted on. See
+library, or the item is not found, when *-t* names something with no watched
+state, when both _USER_ arguments name the same user, or when either user
+has nothing shared and cannot be acted on. See
 *plexdo-conventions*(7).
 
 # EXAMPLES

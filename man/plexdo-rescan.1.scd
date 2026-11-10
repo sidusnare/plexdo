@@ -11,6 +11,8 @@ plexdo-rescan - scan a library for new files, or list the server's activity
 
 *plexdo rescan* _LIBRARY_ [*-n*] [_GLOBAL OPTIONS_]
 
+*plexdo rescan* *-a* [*-n*] [_GLOBAL OPTIONS_]
+
 *plexdo rescan* *-s* [_GLOBAL OPTIONS_]
 
 # DESCRIPTION
@@ -20,17 +22,26 @@ changed, or removed, the same as *Scan Library Files* in Plex. Only files are
 scanned; existing items' metadata is not refreshed. The scan runs on the
 server after the command has returned.
 
+*-a* scans every library in place of one. Naming neither a library nor *-a*
+is an error that says to use *--all* to rescan them all, so a library left
+off the command line by mistake does not set the whole server scanning.
+
 With *-s*, nothing is scanned; instead the server's background activity is
 listed, scans among it, so a scan started earlier can be followed.
 
 # ARGUMENTS
 
 _LIBRARY_
-	The library to scan, by numeric ID or title. Required unless *-s* is
-	given. With *-s* it is not used, though a title matching no library
-	is still an error, since titles are resolved before anything else.
+	The library to scan, by numeric ID or title. Required unless *-a* or
+	*-s* is given, and not allowed with *-a*. With *-s* it is not used,
+	though a title matching no library is still an error, since titles
+	are resolved before anything else.
 
 # OPTIONS
+
+*-a*, *--all*
+	Scan every library, in a single request to the server, which queues
+	the scans itself.
 
 *-s*, *--status*
 	List the server's current activity instead of scanning: library scans,
@@ -39,7 +50,7 @@ _LIBRARY_
 *-n*, *--now*
 	Before starting the scan, cancel every scan pending or running on
 	every library, not only on _LIBRARY_, so this one starts at once rather
-	than waiting in the queue.
+	than waiting in the queue. With *-a*, the scans are started afresh.
 
 # GLOBAL OPTIONS
 
@@ -65,8 +76,10 @@ _LIBRARY_
 	*plexdo-conventions*(7).
 
 *--dry-run*
-	Resolve _LIBRARY_ and stop: nothing is cancelled and no scan starts.
-	*-s* is unaffected, since listing changes nothing.
+	Resolve _LIBRARY_ and say on standard error what would be scanned,
+	and whether pending scans would be cancelled first: nothing is
+	cancelled and no scan starts. *-s* is unaffected, since listing
+	changes nothing.
 
 *-V*, *--version*; *-h*, *--help*
 	Print the version, or this command's help, and exit.
@@ -76,7 +89,8 @@ _LIBRARY_
 - *-s* takes precedence over everything else: given *-s*, nothing is
   scanned or cancelled, and *-n* is ignored. So is _LIBRARY_, except that
   a title matching no library is still reported as an error.
-- Without *-s*, _LIBRARY_ is required.
+- Without *-s*, exactly one of _LIBRARY_ and *-a* is required: neither is
+  an error saying to use *--all*, and both is an error too.
 - *-n* cancels scans on every library, including ones unrelated to
   _LIBRARY_; any of those still wanted must be started again.
 - *--dry-run* suppresses *-n*'s cancellation as well as the scan.
@@ -87,6 +101,12 @@ A scan prints one line on standard output:
 
 ```
 Rescan triggered for library: 'TV Shows'
+```
+
+or, with *-a*:
+
+```
+Rescan triggered for all 4 libraries.
 ```
 
 *-s* lists one record per activity:
@@ -103,12 +123,15 @@ Rescan triggered for library: 'TV Shows'
 *uuid*
 	The activity's identifier.
 
-With no activity, *-s* prints *No active scan jobs.* on standard error.
+With no activity, *-s* as a table prints *No active scan jobs.* on standard
+error, and in any other format an empty list, so that what reads it has a
+document to read.
 
 # EXIT STATUS
 
-*0* on success. *1* when _LIBRARY_ is missing without *-s*, or not found, or
-ambiguous. See *plexdo-conventions*(7).
+*0* on success. *1* when _LIBRARY_ is not found, or ambiguous. *2* when
+neither _LIBRARY_ nor *-a* is given without *-s*, or both are. See
+*plexdo-conventions*(7).
 
 # EXAMPLES
 
@@ -116,6 +139,12 @@ Scan a library after copying new files into it:
 
 ```
 plexdo rescan "TV Shows"
+```
+
+Scan every library:
+
+```
+plexdo rescan --all
 ```
 
 Scan one library at once, cancelling the scans queued ahead of it:

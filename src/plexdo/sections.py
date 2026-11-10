@@ -12,7 +12,7 @@ from plexapi.exceptions import NotFound
 from plexapi.server import PlexServer
 
 from plexdo.console import clean_text
-from plexdo.identify import resolve_identifier
+from plexdo.identify import remember_words, resolve_identifier
 
 
 def resolve_section(plex: PlexServer, library_id: int) -> Any:
@@ -62,6 +62,6 @@ def resolve_library_arguments(
     if value is None:
         return
     roster = _library_roster(plex)
-    setattr(
-        args, LIBRARY_ID_ARGUMENT, resolve_library_identifier(roster, value)
-    )
+    resolved = resolve_library_identifier(roster, value)
+    remember_words(args, LIBRARY_ID_ARGUMENT, value, roster, resolved)
+    setattr(args, LIBRARY_ID_ARGUMENT, resolved)

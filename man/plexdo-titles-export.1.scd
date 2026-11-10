@@ -69,8 +69,10 @@ _PATH_
 	rather than a predictable generator.
 
 *--album* _ALBUM_
-	Photo libraries only: export only the album titled _ALBUM_, matched
-	ignoring case. The album's title is added to the gallery's heading.
+	Photo libraries only: export only the album titled _ALBUM_, wherever
+	it is nested, with the albums inside it, matched ignoring case. The
+	album's title is added to the gallery's heading. Without it, the
+	photos of every album are exported, nested albums included.
 
 *-p*, *--prefix* _PREFIX_
 	Rewrite every path so the server's library root is replaced by

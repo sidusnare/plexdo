@@ -19,9 +19,10 @@ leaving the rest in their existing order. Watched state belongs to each user,
 so _USER_ decides both whose playlist is cleaned and whose viewing history
 counts.
 
-An item counts as watched when Plex marks it fully played. An item that is
-only part played, with a resume point, is kept: it is the one being watched
-right now. *--include-partial* removes those too.
+An item counts as watched when Plex marks it fully played. An item with a
+resume point is kept: it is the one being watched right now, and that holds
+for one played before and part way through again. *--include-partial*
+removes those too.
 
 The items to be removed are listed first, each numbered by its place in the
 playlist as it stands, so the numbers line up with what Plex shows rather

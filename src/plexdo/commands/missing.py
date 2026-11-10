@@ -16,7 +16,7 @@ from plexdo.constants import LOG
 from plexdo.identify import resolve_identifier
 from plexdo.sections import resolve_sections
 from plexdo.throttle import paced
-from plexdo.titles import fetch_item
+from plexdo.titles import as_rating_key, fetch_item, find_item
 
 
 def episode_gaps(numbers: list[int]) -> list[int]:
@@ -112,6 +112,35 @@ def _show_sections(plex: PlexServer, library_id: str | None) -> list[Any]:
     return sections
 
 
+def _show_by_key(plex: PlexServer, key: int, library_id: Any) -> Any | None:
+    """The show with this ratingKey, or None when the key is not a show's.
+
+    A key needs no roster: listing every show of every library to look up
+    a number the server can fetch outright is what made this slow. One
+    search is still made, for a show whose *title* is that number, so the
+    warning every other identifier gives is not lost: "24" and "1923" are
+    shows.
+    """
+    show = find_item(plex, key)
+    if not isinstance(show, Show):
+        return None
+    text = str(key)
+    for section in _show_sections(plex, library_id):
+        for other in section.search(title=text, libtype="show"):
+            title = clean_text(vars(other).get("title") or "")
+            if title == text and int(other.ratingKey) != key:
+                LOG.warning(
+                    "%r is both a show ratingKey and the title of show %d; "
+                    "matching the ratingKey. Pass %d to select the show "
+                    "titled %r.",
+                    text,
+                    int(other.ratingKey),
+                    int(other.ratingKey),
+                    text,
+                )
+    return show
+
+
 def resolve_show(
     plex: PlexServer, identifier: str, library_id: str | None
 ) -> Any:
@@ -121,6 +150,12 @@ def resolve_show(
     value is a ratingKey, a title matches exactly before case-insensitively,
     and an ambiguous title aborts rather than guessing.
     """
+    key = as_rating_key(clean_text(identifier))
+    if key is not None:
+        show = _show_by_key(plex, key, library_id)
+        if show is not None:
+            return show
+    # A title, or a number that is no show's key and may be one's title.
     roster: list[tuple[int, str]] = []
     for section in _show_sections(plex, library_id):
         roster.extend(

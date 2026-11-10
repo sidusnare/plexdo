@@ -12,12 +12,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [3.0.0-rc.1] - 2026-11-10
+## [3.0.0] - 2026-11-10
 
-The first release candidate for 3.0.0. On PyPI this version is
-`3.0.0rc1`, the PEP 440 spelling of the same pre-release. It takes the
-place of 2.1.0, which stopped at its release candidate: everything in
-2.1.0-rc.1 is here, under the new command names.
+These changes are incompatible with 2.x, hence the MAJOR release: commands
+are renamed, some are merged or removed, and `read` takes a ratingKey alone.
+The old command names are not kept as aliases. 3.0.0 takes the place of
+2.1.0, which stopped at its release candidate: everything in 2.1.0-rc.1 is
+here, under the new command names.
+
+### Added
+
+- `write-secrets-example [-o]` writes an example secrets file, with a
+  placeholder entry for each kind of secret, to the path `plex:
+  secrets_file` names, readable by your account alone. When `secrets_file`
+  is not set, nothing is written: stderr says so, and the example is printed
+  to stdout. An existing file is replaced only with `-o/--overwrite`.
+- `albums-list LIBRARY` lists the albums of a music or photo library, nested
+  photo albums included, with how many items each holds and how many have
+  been played. A machine-readable format adds each album's played state and
+  progress, and its contents: every track, photo, or clip with its own
+  played state, view count, last-played time, and, when part way through,
+  its resume point and progress.
+- `album-list RATINGKEY` shows one album: the album with its played state
+  and progress, then each track, photo, or clip, with its own state and,
+  when part way through, its resume point, length, and percentage.
 
 ### Changed
 
@@ -60,23 +78,54 @@ place of 2.1.0, which stopped at its release candidate: everything in
   last, and its usage line names the command's own arguments followed by
   `[global options]` instead of spelling all nine out. Summaries and
   argument names are consistent across commands.
-
-### Added
-
-- `write-secrets-example [-o]` writes an example secrets file, with a
-  placeholder entry for each kind of secret, to the path `plex:
-  secrets_file` names, readable by your account alone. When `secrets_file`
-  is not set, nothing is written: stderr says so, and the example is printed
-  to stdout. An existing file is replaced only with `-o/--overwrite`.
-- `albums-list LIBRARY` lists the albums of a music or photo library, nested
-  photo albums included, with how many items each holds and how many have
-  been played. A machine-readable format adds each album's played state and
-  progress, and its contents: every track, photo, or clip with its own
-  played state, view count, last-played time, and, when part way through,
-  its resume point and progress.
-- `album-list RATINGKEY` shows one album: the album with its played state
-  and progress, then each track, photo, or clip, with its own state and,
-  when part way through, its resume point, length, and percentage.
+- With `plex: secret_store` set to `file`, session tokens are kept apart
+  from saved passwords and PINs. The secrets file holds passwords and PINs
+  only; tokens go in `$XDG_RUNTIME_DIR/plexdo/session.json`, or in a
+  private directory of your own under the temporary directory where there
+  is no runtime directory, and `login` says on stderr where that is. Such
+  a session does not survive a reboot: run `plexdo login` again then,
+  which asks for nothing when the password was saved. Tokens already in
+  the secrets file are moved across once, so upgrading signs nobody out.
+  `auto` and `keyring` are unchanged.
+- `write-secrets-example` writes the secrets file in that form, with a
+  placeholder password and PIN and no token.
+- `show-watched-cp` copies whether an item has been played and its resume
+  point, both as they stand, so an item one user is watching again arrives
+  played and part way through. The number of plays is not copied. The
+  `action` field joins its steps with `+`, as in `markPlayed+setProgress`,
+  and has a new value, `clearProgress`.
+- `show-watched-cp -t KEY` given a show or season synchronises every
+  episode in it, and given an artist or album every track, each on its
+  own. A ratingKey with no watched state, such as a photo, is an error.
+- `playlist-clean` keeps an item that was played before and is part way
+  through again, as it keeps any item with a resume point;
+  `--include-partial` removes it.
+- `search --media-type` searches only the libraries that can hold that
+  type, and naming a library that cannot is an error. A library that could
+  not be searched is reported only when the search found nothing at all.
+- `library-list` and `titles-export` on a photo library include the photos
+  of albums nested inside other albums, and `--album` matches an album
+  wherever it is nested and takes the albums inside it. Nesting is
+  followed 16 albums deep, in `albums-list` too.
+- Shell completion caches playlists and photo album names under every
+  spelling of their user or library, as `playlists-by-word.WORD.json` and
+  `titles-by-word.WORD.json`, beside the caches named for the numeric ID.
+- `login` in a machine-readable format adds `passwordStore`.
+- **Breaking:** `read` takes a ratingKey alone, as `read RATINGKEY`. The
+  library it used to require first only had to match the item, and is
+  gone.
+- `rescan --all` (`-a`) scans every library. `rescan` naming neither a
+  library nor `--all` now says to use `--all`, and is a usage error, exit
+  2 where it was 1.
+- `users-list` shows each user's `username` and `email` as well, the same
+  records as `status --section users`.
+- `rescan --dry-run` and `playlist-remove --dry-run` say on stderr what
+  they would do; they said nothing without `--verbose`.
+  `playlist-remove` names the playlist by its title, however it was given.
+- `missing-find` given a ratingKey fetches the show outright, without
+  first listing every show in every library.
+- `titles-export` paces its walk of a show library, as every other
+  per-item loop is paced.
 
 ### Removed
 
@@ -89,6 +138,29 @@ place of 2.1.0, which stopped at its release candidate: everything in
 
 - zsh completion offers `-p`/`--prefix` again: its option had been written
   in a form zsh does not expand, so it was never offered.
+- A request that fails, because the server cannot be reached, does not
+  answer in time, refuses the saved token, or refuses the request, ends
+  with a message saying which and what to do, not a traceback.
+- `show-watched-cp --unwatch` clears a resume point on an item one user was
+  only part way through. It listed the change and made none, on every run.
+- `playlist-build --append` refuses a smart playlist with a message; it
+  ended in a traceback.
+- `write-secrets-example` no longer writes a placeholder token. With
+  `secret_store: file`, one left beside a real token made every command
+  report that there was no admin token.
+- `rescan --status` with nothing running prints an empty list in a
+  machine-readable format; it printed a sentence in every format.
+- `playlist-build` given too few arguments says what each mode takes; it
+  said only that `ARG` was required.
+- A playlist whose title reads as a number to Python but is not a
+  ratingKey, such as `1_000` or `+7`, is found by its title. Only ASCII
+  digits are taken as a ratingKey.
+- Shell completion finds its cache again: all four scripts read
+  `cache_dir` from the 1.x configuration file and assumed `~/.cache`, so a
+  configured `cache_dir` or `XDG_CACHE_HOME` left completion with nothing
+  to offer.
+- Playlists, and photo album names, complete after a user or library given
+  by title; they completed only after a numeric ID.
 
 ## [2.1.0-rc.1] - 2026-10-29
 
@@ -684,8 +756,8 @@ multi-user token handling, watched-state synchronisation, a status report,
 photo galleries, YAML/CSV/CLIXML output, shell completions for bash, zsh, and
 fish, a manual page, and packaging for PyPI. See the commit history.
 
-[Unreleased]: https://github.com/sidusnare/plexdo/compare/v3.0.0-rc.1...HEAD
-[3.0.0-rc.1]: https://github.com/sidusnare/plexdo/compare/v2.1.0-rc.1...v3.0.0-rc.1
+[Unreleased]: https://github.com/sidusnare/plexdo/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/sidusnare/plexdo/compare/v2.0.3...v3.0.0
 [2.1.0-rc.1]: https://github.com/sidusnare/plexdo/compare/v2.0.3...v2.1.0-rc.1
 [2.0.3]: https://github.com/sidusnare/plexdo/compare/v2.0.2...v2.0.3
 [2.0.2]: https://github.com/sidusnare/plexdo/compare/v2.0.1...v2.0.2

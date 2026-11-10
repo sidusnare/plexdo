@@ -4,7 +4,7 @@
 .\" Man page for plexdo (plexdo).
 .\" Edit alongside AI.prompt.txt. The version and date on the .TH line are
 .\" written by tools/derive.py from pyproject.toml; do not edit them here.
-.TH PLEXDO 1 "2026-11-10" "plexdo 3.0.0rc1" "User Commands"
+.TH PLEXDO 1 "2026-11-10" "plexdo 3.0.0" "User Commands"
 .
 .SH NAME
 plexdo \- command\-line interface for Plex Media Server
@@ -166,7 +166,8 @@ List every library with its ID, type, and title.
 .TP
 .BI library\-list " library " [ \-\-album " ALBUM" ]
 List the titles in a library. Table output shows the rating key, title,
-release date, rating, and studio; a machine\-readable format carries every
+release date, rating, and studio; a photo library lists its photos, those in
+albums inside albums included. A machine\-readable format carries every
 field the server returned for each item, and for a show library nests each
 show\(aqs episodes under a
 .B seasons
@@ -216,8 +217,10 @@ irregularly, so this is off by default.
 .TP
 .BI search " user query " [ \-\-media\-type " TYPE" "] [" \-\-library\-id " LIBRARY" ]
 Search as the given user. \fITYPE\fR is one of \fBmovie\fR, \fBshow\fR,
-\fBepisode\fR, \fBtrack\fR, \fBphoto\fR, \fBalbum\fR, \fBartist\fR. A library
-that cannot be searched is warned about and skipped rather than aborting.
+\fBepisode\fR, \fBtrack\fR, \fBphoto\fR, \fBalbum\fR, \fBartist\fR, and only
+the libraries that can hold that type are searched. A library that cannot be
+searched is skipped rather than aborting, and is warned about only when the
+search found nothing at all.
 .TP
 .BI show\-list " ratingKey " [ \-\-m3u " PATH" ]
 List every episode of a show, skipping specials.
@@ -289,7 +292,7 @@ rather than a predictable generator.
 Append items to the existing playlist
 .IR playlist .
 Nothing is created, so none of the options below apply, and giving one is an
-error.
+error. A smart playlist is refused.
 .RE
 .TP
 .BI playlist\-clean " user playlist " [ \-\-include\-partial ]
@@ -298,7 +301,8 @@ order. The entries to be dropped are previewed first, numbered by their place
 in the playlist as it stands.
 .BI \-\-include\-partial
 also drops items that are only part\-played; by default a resume point is left
-alone, since it is what you are in the middle of watching. A smart playlist is
+alone, since it is what you are in the middle of watching, and that includes
+an item played before and part way through again. A smart playlist is
 refused, its contents being defined by a filter rather than by its entries.
 .TP
 .BI "playlist\-copy \-A" " user playlist " [ \-o ]
@@ -409,14 +413,14 @@ addresses never qualify.
 .B \-\-server\-url
 gives the address outright instead.
 .TP
-.BI read " library ratingKey"
+.BI read " ratingKey"
 Stream a media file to standard output, for piping into a player or
 redirecting to a file. Quitting the player early is not an error.
 .RS
 .PP
 .EX
-plexdo read 3 12345 | mpv \-
-plexdo read 3 12345 > episode.mkv
+plexdo read 12345 | mpv \-
+plexdo read 12345 > episode.mkv
 .EE
 .PP
 On Linux with a display attached but no desktop environment,
@@ -425,7 +429,7 @@ can draw straight to the console through the kernel modesetting driver, so
 playback needs neither X nor Wayland:
 .PP
 .EX
-plexdo read 3 12345 | mpv \-\-vo=drm \-
+plexdo read 12345 | mpv \-\-vo=drm \-
 .EE
 .PP
 Run that from a virtual terminal rather than a terminal emulator, and make
@@ -442,7 +446,9 @@ Synchronise watched state and resume points between two users.
 By default the more recent \fBlastViewedAt\fR wins. With
 .B \-\-unwatch
 an item unwatched for either user becomes unwatched for both, and where both
-have progress the earliest \fBlastViewedAt\fR wins instead.
+have progress the earliest \fBlastViewedAt\fR wins instead. Whether an item
+has been played and its resume point are both copied, as they stand, so an
+item being watched again keeps both; the number of plays is not copied.
 .TP
 .BR \-1 ", " \-\-one\-way
 Only write to the second user; never modify the first.
@@ -451,7 +457,8 @@ Only write to the second user; never modify the first.
 Restrict to one library.
 .TP
 .BR \-t ", " \-\-title " \fIKEY\fR"
-Restrict to one item, by ratingKey.
+Restrict to one item, by ratingKey, or to every episode of a show or season,
+or every track of an artist or album, each synchronised on its own.
 .RE
 .IP
 Preview a full\-library run with
@@ -525,12 +532,20 @@ if the video is not playing, exit 0 at once rather than waiting for it.
 .
 .SS Server
 .TP
-.BI rescan " [library] " [ \-s "] [" \-n ]
-Trigger a library scan for new files.
+.BI rescan " library " [ \-n ]
+.TQ
+.BR rescan " " \-a " [" \-n ]
+.TQ
+.BR rescan " " \-s
+Trigger a scan of one library for new files, or with
+.B \-a
+.RB ( \-\-all )
+of every library. Naming neither is an error that says to use
+.BR \-\-all .
 .B \-s
 .RB ( \-\-status )
 lists the server's background activity instead, library scans among it, and
-needs no library.
+needs no library; with none, a machine\-readable format gives an empty list.
 .B \-n
 .RB ( \-\-now )
 cancels pending scans on every library first.
@@ -586,8 +601,8 @@ writes nothing.
 prints the exact template that would be written.
 .TP
 .BI write\-secrets\-example " " [ \-o ]
-Write an example secrets file, with a placeholder entry for each kind of
-secret, to the path
+Write an example secrets file, with a placeholder password and PIN, to the
+path
 .B plex: secrets_file
 names, readable by your account alone. When that option is not set, nothing
 is written: standard error says so, and the example is printed to standard
@@ -696,6 +711,22 @@ uses that file always, for a machine whose keyring is locked when plexdo runs,
 as under cron, and silences the warning; set to
 .BR keyring ,
 the keyring is insisted on.
+.PP
+With
+.B plex: secret_store
+set to
+.BR file ,
+only saved passwords and PINs go in that file. Tokens are sessions, and are
+kept apart from them, in
+.IR $XDG_RUNTIME_DIR/plexdo/session.json ,
+or, where there is no runtime directory, in a directory of your own under the
+temporary directory.
+.B plexdo login
+says on standard error where the session went. It does not survive a reboot:
+run
+.B plexdo login
+again then, which asks for nothing when the password was saved. Tokens left in
+the secrets file by an earlier version are moved to the session file once.
 .B plexdo write\-secrets\-example
 writes an example of the file, or prints one when
 .B plex: secrets_file
@@ -721,11 +752,17 @@ covering user and library IDs and titles, rating keys, playlist names and
 keys, and photo album names. Numeric IDs are shown with the title they belong
 to.
 .PP
-Values are read from a 15\-minute cache under
+Values are read from a 15\-minute cache, in
+.B plex: cache_dir
+or else
+.IR $XDG_CACHE_HOME/plexdo ,
+by default
 .IR ~/.cache/plexdo ,
 populated as a side effect of the list commands. A stale cache is refreshed in
 the background, so completion never blocks; the values offered are whatever is
-cached at that moment.
+cached at that moment. Playlists and photo album names are cached under every
+spelling of their user or library, the ID, the title, and the word as typed,
+so they complete whichever of those is on the command line.
 .PP
 .B make install
 installs all three. See
@@ -767,6 +804,18 @@ The parent of the secrets file\(aqs directory, when an absolute path; otherwise
 The parent of the completion cache, when an absolute path; otherwise
 .IR ~/.cache .
 .TP
+.B XDG_RUNTIME_DIR
+The parent of the session file\(aqs directory, when an absolute path and
+.B plex: secret_store
+is
+.BR file .
+Otherwise the temporary directory is used, which
+.BR TMPDIR ,
+.BR TEMP ,
+and
+.B TMP
+name.
+.TP
 .B LOCALAPPDATA
 On Windows, the parent of the configuration and cache directories.
 .B APPDATA
@@ -783,6 +832,13 @@ Configuration.
 .TP
 .I ~/.local/state/plexdo/secrets.json
 Secrets, only where the system keyring is not used; mode 0600.
+.TP
+.I $XDG_RUNTIME_DIR/plexdo/session.json
+Session tokens, only when
+.B plex: secret_store
+is
+.BR file ;
+mode 0600, in a directory of mode 0700.
 .TP
 .I ~/.cache/plexdo/
 Completion cache.
@@ -835,7 +891,7 @@ plexdo titles\-export "TV Shows" ~/tv.m3u \-\-prefix \(aq\e\eNAS\emedia\(aq
 Stream an episode into a player:
 .PP
 .EX
-plexdo read 3 12345 | mpv \-
+plexdo read 12345 | mpv \-
 .EE
 .PP
 Restart the server once the current episode reaches its credits:

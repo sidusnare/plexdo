@@ -75,7 +75,7 @@ $script:PlexdoGlobalFlags = [ordered]@{
 function Get-PlexdoCacheDir {
     <#
     .SYNOPSIS
-        Resolve the completion cache directory, honouring [plex] cache_dir.
+        Resolve the completion cache directory, honouring plex: cache_dir.
     .DESCRIPTION
         Memoised: this reads the configuration file, and doing so once per
         completion candidate would be wasteful.
@@ -88,22 +88,39 @@ function Get-PlexdoCacheDir {
                 elseif ($env:APPDATA)  { $env:APPDATA }
                 else { Join-Path $HOME 'AppData/Local' }
         $app     = Join-Path $base 'PlexDo'
-        $config  = Join-Path $app 'plexdo.ini'
+        $config  = Join-Path $app 'config.yaml'
         $fallback = Join-Path $app 'Cache'
     } else {
-        $config   = Join-Path $HOME '.local/etc/plexdo.ini'
-        $fallback = Join-Path $HOME '.cache/plexdo'
+        # An XDG variable counts only when it is an absolute path.
+        $configHome = if ($env:XDG_CONFIG_HOME -and $env:XDG_CONFIG_HOME.StartsWith('/')) { $env:XDG_CONFIG_HOME }
+                      else { Join-Path $HOME '.config' }
+        $cacheHome  = if ($env:XDG_CACHE_HOME -and $env:XDG_CACHE_HOME.StartsWith('/')) { $env:XDG_CACHE_HOME }
+                      else { Join-Path $HOME '.cache' }
+        $config   = Join-Path (Join-Path $configHome 'plexdo') 'config.yaml'
+        $fallback = Join-Path $cacheHome 'plexdo'
     }
 
+    # The one value wanted is a scalar directly under plex:, so the YAML is
+    # read a line at a time rather than parsed.
     $resolved = $null
     if (Test-Path -LiteralPath $config) {
-        $section = ''
+        $inPlex = $false
         foreach ($line in Get-Content -LiteralPath $config -ErrorAction SilentlyContinue) {
             $trimmed = $line.Trim()
-            if ($trimmed -match '^\[(.+)\]$') { $section = $Matches[1]; continue }
-            if ($section -eq 'plex' -and $trimmed -match '^cache_dir\s*=\s*(.+)$') {
-                $resolved = $Matches[1].Trim()
+            if (-not $trimmed -or $trimmed.StartsWith('#') -or $trimmed -eq '---') { continue }
+            if ($line -notmatch '^\s') { $inPlex = ($trimmed -match '^plex\s*:'); continue }
+            if (-not $inPlex -or $trimmed -notmatch '^cache_dir\s*:\s*(.*)$') { continue }
+            $value = $Matches[1].Trim()
+            if ($value.StartsWith('"')) {
+                # A double-quoted YAML scalar reads as a JSON string.
+                try { $value = [string] (ConvertFrom-Json ($value -replace '("(?:[^"\\]|\\.)*").*$', '$1')) }
+                catch { $value = $value.Trim('"') }
+            } elseif ($value.StartsWith("'") -and $value.LastIndexOf("'") -gt 0) {
+                $value = $value.Substring(1, $value.LastIndexOf("'") - 1).Replace("''", "'")
+            } else {
+                $value = ($value -split ' #')[0].Trim()
             }
+            $resolved = if ($value -in 'null', '~') { $null } else { $value }
         }
     }
 
@@ -241,11 +258,38 @@ function Get-PlexdoRatingKeys {
     return $results
 }
 
+function Get-PlexdoWord {
+    <#
+    .SYNOPSIS
+        A word typed for a user or library, without the quotes around it.
+    #>
+    param([string] $Word)
+    if ($Word.Length -ge 2 -and $Word[0] -in '"', "'" -and $Word[-1] -eq $Word[0]) {
+        return $Word.Substring(1, $Word.Length - 2)
+    }
+    return $Word
+}
+
+function Get-PlexdoWordKey {
+    <#
+    .SYNOPSIS
+        A user or library word as plexdo names its by-word cache.
+    .DESCRIPTION
+        Every character a file name cannot hold becomes "_", as plexdo's
+        cache_key does. plexdo writes the by-word cache for the ID, the
+        title, and the word as typed, so whichever is on the command line
+        finds it.
+    #>
+    param([string] $Word)
+    return ($Word -replace '[/\\:*?"<>|]', '_')
+}
+
 function Get-PlexdoPlaylists {
     param([string] $User, [switch] $IncludeKeys)
+    $User = Get-PlexdoWord $User
     if (-not $User) { $User = '0' }
     $results = @()
-    foreach ($row in Get-PlexdoCacheRows "playlists.$User" @('playlists-list', $User)) {
+    foreach ($row in Get-PlexdoCacheRows "playlists-by-word.$(Get-PlexdoWordKey $User)" @('playlists-list', $User)) {
         $results += New-PlexdoResult ([string] $row.title) "$($row.items) items"
         if ($IncludeKeys) {
             $results += New-PlexdoResult ([string] $row.ratingKey) $row.title
@@ -256,10 +300,11 @@ function Get-PlexdoPlaylists {
 
 function Get-PlexdoAlbums {
     param([string] $Library)
+    $Library = Get-PlexdoWord $Library
     if (-not $Library) { return @() }
     $seen = @{}
     $results = @()
-    foreach ($row in Get-PlexdoCacheRows "titles.$Library" @('library-list', $Library)) {
+    foreach ($row in Get-PlexdoCacheRows "titles-by-word.$(Get-PlexdoWordKey $Library)" @('library-list', $Library)) {
         $album = ([string] $row.title -split ' - ')[0]
         if ($album -and -not $seen.ContainsKey($album)) {
             $seen[$album] = $true
@@ -361,7 +406,7 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
                 '^(library-list|titles-export)$'    { $flags['--album'] = 'Restrict to a single photo album' }
                 '^titles-export$'                   { $flags['--sort'] = 'Sort order' }
                 '^search$'                          { $flags['--media-type'] = 'Restrict to one media type'; $flags['--library-id'] = 'Restrict to one library' }
-                '^rescan$'                          { $flags['--status'] = 'Print all active scan jobs'; $flags['--now'] = 'Cancel pending scans first' }
+                '^rescan$'                          { $flags['--all'] = 'Rescan every library'; $flags['--status'] = 'Print all active scan jobs'; $flags['--now'] = 'Cancel pending scans first' }
                 '^status$'                          { $flags['--section'] = 'Show only one section' }
                 '^write-config-example$'            { $flags['--overwrite'] = 'Replace an existing config file' }
                 '^write-secrets-example$'           { $flags['--overwrite'] = 'Replace an existing secrets file' }
@@ -382,8 +427,7 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
                 'titles-export'  { if ($index -eq 0) { $results = Get-PlexdoLibraries } }
                 'rescan'         { if ($index -eq 0) { $results = Get-PlexdoLibraries } }
                 'missing-find'   { if ($index -eq 0) { $results = Get-PlexdoRatingKeys } }
-                'read'           { if ($index -eq 0) { $results = Get-PlexdoLibraries }
-                                   elseif ($index -eq 1) { $results = Get-PlexdoRatingKeys } }
+                'read'           { if ($index -eq 0) { $results = Get-PlexdoRatingKeys } }
                 'show-list'      { if ($index -eq 0) { $results = Get-PlexdoRatingKeys } }
                 'player-remote-play' { if ($index -eq 1) { $results = Get-PlexdoRatingKeys } }
                 'show-metadata'  { if ($index -eq 0) { $results = Get-PlexdoRatingKeys } }

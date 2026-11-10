@@ -10,7 +10,7 @@ from typing import Any
 
 from plexapi.server import PlexServer
 
-from plexdo.accounts import account_type
+from plexdo.accounts import user_rows
 from plexdo.console import (
     clean_text,
     output,
@@ -82,20 +82,6 @@ def _session_rows(plex: PlexServer) -> list[dict[str, Any]]:
             }
         )
     return rows
-
-
-def _user_rows(plex: PlexServer) -> list[dict[str, Any]]:
-    """Shared and managed users visible to the admin token."""
-    return [
-        {
-            "id": int(user.id),
-            "type": account_type(user),
-            "title": clean_text(user.title or ""),
-            "username": clean_text(getattr(user, "username", "") or ""),
-            "email": clean_text(getattr(user, "email", "") or ""),
-        }
-        for user in plex.myPlexAccount().users()
-    ]
 
 
 def _system_account_rows(plex: PlexServer) -> list[dict[str, Any]]:
@@ -182,7 +168,7 @@ def _butler_rows(plex: PlexServer) -> list[dict[str, Any]]:
 _SECTIONS: dict[str, Any] = {
     "server": ("Server", _server_record),
     "sessions": ("Active sessions", _session_rows),
-    "users": ("Shared users", _user_rows),
+    "users": ("Shared users", user_rows),
     "accounts": ("System accounts", _system_account_rows),
     "connections": ("Reachable addresses", _connection_rows),
     "scans": (

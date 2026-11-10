@@ -21,9 +21,17 @@ command uses that token to reach the server; none of them handles the
 password. Where there is no keyring, the token goes in a private file
 instead, with a warning; see *FILES* in *plexdo-conventions*(7).
 
+With *plex: secret_store* set to *file*, the token is a session kept apart
+from the saved passwords and PINs: it goes in a session file in the runtime
+directory, or under the temporary directory where there is none, and
+*login* says on standard error where that is. Such a session does not
+survive a reboot; run *plexdo login* again then, which asks for nothing
+when the password was saved with *--save-password*.
+
 Tokens are filed by username, so signing in as several accounts keeps each
 one's token; that is how an account in the configuration's *users* entries
-is signed in. A token survives a reboot. After saving, the token is tried
+is signed in. A token in the keyring survives a reboot. After saving, the
+token is tried
 against the server at *plex: url*; a failure there is reported as a
 warning, and the token is kept.
 
@@ -75,8 +83,9 @@ warning, and the first run moves it to the keyring by itself.
 *-f*, *--format* _FORMAT_; *--json*
 	A table prints where the token was saved, whether the password was
 	too, and, when it worked, the server it was verified against. Any other
-	format gives one record with *user*, *store*, *verified*, and
-	*passwordSaved*.
+	format gives one record with *user*, *store* (where the token
+	went), *passwordStore* (where a saved password goes), *verified*,
+	and *passwordSaved*.
 
 *-W*, *--wide*
 	No effect: there is no table.

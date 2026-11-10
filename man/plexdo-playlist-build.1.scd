@@ -64,8 +64,8 @@ of *-o*, *-u*, *-a*, *--m3u*, and *-p*.
 	unknown key means nothing is added at all. The items are listed
 	before they are added. An item already in the playlist is added
 	again rather than skipped, since Plex allows a playlist to hold the
-	same item more than once. A smart playlist's contents come from its
-	filter, so Plex refuses to add items to one.
+	same item more than once. A smart playlist is refused, and nothing
+	is looked up: its contents come from its filter.
 
 # ARGUMENTS
 
@@ -233,7 +233,7 @@ failed; their lines say so.
 nothing shared and cannot be acted on; when the list would be empty; when a
 date has to be asked for and there is no input to answer with; or when the
 new title is taken without *-o* on the default account. Under *-A*, one
-ratingKey not found means nothing is added.
+ratingKey not found means nothing is added, and a smart playlist is refused.
 
 *2* for a usage error: no mode or more than one, the wrong number of
 arguments for the mode, a ratingKey that is not a whole number, *-u* with

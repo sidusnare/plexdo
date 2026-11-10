@@ -106,15 +106,25 @@ that it is not encrypted. Set `secret_store: file` to use that file always -
 on a machine whose keyring is locked when plexdo runs, as under cron - and to
 silence the warning; `secret_store: keyring` refuses to fall back.
 
-A password is saved only if you ask: `plexdo login --save-password` keeps it
-beside the token, so plexdo can sign in again by itself once the token stops
-working. A password or PIN in the configuration file is ignored, with a warning.
+With `secret_store: file`, the secrets file holds saved passwords and PINs
+only. Tokens are sessions and are kept apart from them, in
+`$XDG_RUNTIME_DIR/plexdo/session.json`, or in a private directory of your own
+under the temporary directory where there is no runtime directory. `plexdo
+login` says on stderr where the session went. A session there does not
+survive a reboot: run `plexdo login` again, which asks for nothing when the
+password was saved. Tokens an earlier version left in the secrets file are
+moved to the session file once.
 
-`plexdo write-secrets-example` writes an example of the secrets file, with a
-placeholder entry of each kind, to the path `secrets_file` names in the
-configuration, readable by your account alone; an existing file is replaced
-only with `-o/--overwrite`. When `secrets_file` is not set, nothing is
-written: stderr says so, and the example is printed to stdout instead.
+A password is saved only if you ask: `plexdo login --save-password` keeps it
+so plexdo can sign in again by itself once the token stops working. A
+password or PIN in the configuration file is ignored, with a warning.
+
+`plexdo write-secrets-example` writes an example of the secrets file as it is
+under `secret_store: file`, with a placeholder password and PIN, to the path
+`secrets_file` names in the configuration, readable by your account alone;
+an existing file is replaced only with `-o/--overwrite`. When `secrets_file`
+is not set, nothing is written: stderr says so, and the example is printed
+to stdout instead.
 
 ### Multiple users
 
@@ -271,7 +281,7 @@ identical rules apply to library IDs and titles.
 | `album-list <rating_key>` | One album's tracks, photos, or clips, and how far through each you are |
 | `missing-find <show> [-l L] [-A] [-s N,N]` | Seasons with gaps in their episode numbering |
 | `show-list <rating_key> [--m3u P]` | Every episode of a show, specials skipped |
-| `users-list` | User IDs, account types, and titles |
+| `users-list` | User IDs, account types, titles, usernames, and emails |
 | `playlists-list <user_id>` | A user's playlists |
 | `playlist-list <user_id> <playlist\|ratingKey> [--m3u P]` | Items in one playlist |
 | `show-metadata <rating_key>` | Full metadata for one item, including its file paths |
@@ -476,7 +486,8 @@ than renumbering around the gaps:
 └───────┴───────────┴─────────────────────────────┴─────────┘
 ```
 
-A part-played item is kept, since it is the one you are in the middle of;
+A part-played item is kept, since it is the one you are in the middle of,
+and so is one you have played before and are part way through again;
 `--include-partial` drops those too, reported as `partial`. Watched state is
 per-user, so the USER argument decides whose viewing history is consulted.
 A smart playlist is refused - its contents come from a filter, not from its
@@ -525,6 +536,18 @@ By default the most recent `lastViewedAt` wins. With `--unwatch`, an item
 unwatched for either user is unwatched for both, and where both have progress
 the earliest `lastViewedAt` wins.
 
+Whether an item has been played and its resume point are both copied, as
+they stand, so an item one user is watching again arrives played and part
+way through. How many times it has been played is not copied.
+
+`-t KEY` narrows the sync to one ratingKey. A movie, episode, or track is
+compared by itself; a show or season stands for every episode in it, and an
+artist or album for every track, each compared on its own:
+
+```bash
+plexdo show-watched-cp 7 9 -t 4102       # every episode of one show
+```
+
 ### Exporting
 
 ```bash
@@ -562,8 +585,8 @@ to the photo gallery. Without it, exports keep the server's own paths.
 ### Streaming
 
 ```bash
-plexdo read 3 12345 | mpv -
-plexdo read 3 12345 > episode.mkv
+plexdo read 12345 | mpv -
+plexdo read 12345 > episode.mkv
 ```
 
 On Linux with a display attached but no desktop environment, mpv can draw
@@ -571,7 +594,7 @@ straight to the console through the kernel modesetting driver, so playback
 needs neither X nor Wayland:
 
 ```bash
-plexdo read 3 12345 | mpv --vo=drm -
+plexdo read 12345 | mpv --vo=drm -
 ```
 
 Run that from a virtual terminal rather than a terminal emulator, and make sure
@@ -756,17 +779,29 @@ would only say what plexdo can reach, not what the player can.
 plexdo rescan --status      # active scan jobs and progress
 plexdo rescan 3             # scan one library for new files
 plexdo rescan 3 --now       # cancel pending scans first
+plexdo rescan --all         # scan every library
 ```
+
+`rescan` with neither a library nor `--all` is an error that says to use
+`--all`, so a library left off by mistake does not set the whole server
+scanning.
 
 ## Shell completion
 
 Completion is provided for **bash, zsh, fish, and PowerShell**. All four cover
 user and library IDs *and* their titles, rating keys, playlist names and keys,
-and photo album names, reading a 15-minute cache under `~/.cache/plexdo` that
-the list commands populate as a side effect. Numeric IDs are shown with the
+and photo album names, reading a 15-minute cache that the list commands
+populate as a side effect. The cache is in `cache_dir` from the
+configuration, or else `$XDG_CACHE_HOME/plexdo`, by default
+`~/.cache/plexdo`. Numeric IDs are shown with the
 title they belong to - `7  (Alice)`, `101  (Breaking Bad - Pilot)` - and only
 the ID is inserted once you narrow to one. When a cache is stale it refreshes
 in the background, so completion never blocks.
+
+Playlists and photo album names are cached under every spelling of their
+user or library - the ID, the title, and the word as you typed it - so
+`plexdo playlist-list Alice <TAB>` completes as `plexdo playlist-list 7
+<TAB>` does.
 
 `make install` sets all three up for you. To manage them separately:
 

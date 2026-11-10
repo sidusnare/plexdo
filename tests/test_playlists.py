@@ -120,6 +120,13 @@ def test_include_partial_removes_a_resume_point():
     assert labelled(items, True) == [(1, "A", "partial")]
 
 
+def test_an_item_being_watched_again_is_kept_like_any_resume_point():
+    """It was removed as played, though it is what the user is watching."""
+    again = FakeItem(1, "A", viewCount=2, viewOffset=90_000)
+    assert labelled([again]) == []
+    assert labelled([again], True) == [(1, "A", "partial")]
+
+
 def test_is_played_beats_a_stale_view_count():
     """The isPlayed flag of plexapi is authoritative; viewCount falls back."""
     items = [

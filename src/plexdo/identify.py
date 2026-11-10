@@ -80,3 +80,27 @@ def resolve_identifier(
         f"{kind.capitalize()} not found: {text!r}. Run `plexdo {list_command}` "
         f"to see available {kind} IDs and titles."
     )
+
+
+def remember_words(
+    args: Any, name: str, typed: Any, roster: Roster, resolved: int
+) -> None:
+    """Note every spelling of one resolved argument, for the completion cache.
+
+    Resolution replaces what was typed with the numeric ID, and a command
+    that then files a result for completion needs the other spellings too.
+    """
+    words = getattr(args, "argument_words", None)
+    if words is None:
+        words = {}
+        args.argument_words = words
+    words[name] = [str(resolved), clean_text(typed), dict(roster).get(resolved)]
+
+
+def argument_words(args: Any, name: str) -> list[str]:
+    """Every spelling known for an argument: its ID, title, and as typed."""
+    words = (getattr(args, "argument_words", None) or {}).get(name)
+    if words is None:
+        value = getattr(args, name, None)
+        words = [] if value is None else [str(value)]
+    return [word for word in words if word]

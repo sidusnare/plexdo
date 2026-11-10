@@ -14,9 +14,10 @@ from plexapi.server import PlexServer
 
 from plexdo.accounts import server_for_user
 from plexdo.arguments import add_m3u_argument, add_user_argument
-from plexdo.cache import write_cache
-from plexdo.console import output, output_format
+from plexdo.cache import write_cache, write_word_caches
+from plexdo.console import clean_text, output, output_format
 from plexdo.constants import LOG, MediaItem
+from plexdo.identify import argument_words
 from plexdo.m3u import write_m3u
 from plexdo.paths import add_prefix_argument, mapper_for
 from plexdo.playlists import resolve_playlist
@@ -36,7 +37,23 @@ def cmd_list_playlists(plex: PlexServer, args: argparse.Namespace) -> None:
         for pl in user_plex.playlists()
     ]
     write_cache(f"playlists.{args.user_id}", rows)
+    write_word_caches("playlists", argument_words(args, "user_id"), rows)
     output(rows, args)
+
+
+def _export_m3u(
+    plex: PlexServer,
+    items: list[MediaItem],
+    path: str,
+    args: argparse.Namespace,
+) -> None:
+    """Write a playlist's items to an M3U file, for whichever command asked.
+
+    playlist-list --m3u and playlist-export are two ways to the same file,
+    so both come here and neither can write it differently.
+    """
+    LOG.info("Exporting %d item(s) to %s", len(items), path)
+    write_m3u(items, path, mapper_for(plex, args))
 
 
 def cmd_list_playlist(plex: PlexServer, args: argparse.Namespace) -> None:
@@ -56,7 +73,7 @@ def cmd_list_playlist(plex: PlexServer, args: argparse.Namespace) -> None:
     output(rows, args)
 
     if args.m3u:
-        write_m3u(items, args.m3u, mapper_for(plex, args))
+        _export_m3u(plex, items, args.m3u, args)
 
 
 def cmd_export_playlist(plex: PlexServer, args: argparse.Namespace) -> None:
@@ -68,13 +85,7 @@ def cmd_export_playlist(plex: PlexServer, args: argparse.Namespace) -> None:
     if not items:
         sys.exit(f"Playlist '{args.playlist}' is empty - nothing to export.")
 
-    LOG.info(
-        "Exporting %d items from '%s' to %s",
-        len(items),
-        args.playlist,
-        args.m3u,
-    )
-    write_m3u(items, args.m3u, mapper_for(plex, args))
+    _export_m3u(plex, items, args.m3u, args)
     print(f"Exported {len(items)} items to: {args.m3u}")
 
 
@@ -82,15 +93,20 @@ def cmd_remove_playlist(plex: PlexServer, args: argparse.Namespace) -> None:
     """Delete a playlist from a user's account."""
     user_plex = server_for_user(plex, args.user_id)
     playlist: Playlist = resolve_playlist(user_plex, args.playlist)
+    title = clean_text(getattr(playlist, "title", "") or args.playlist)
 
-    LOG.info(
-        "Removing playlist '%s' for user_id=%d", args.playlist, args.user_id
-    )
+    LOG.info("Removing playlist '%s' for user_id=%d", title, args.user_id)
     if args.dry_run:
-        LOG.info("--dry-run: skipping playlist deletion.")
+        # Said outright rather than left to --verbose: a rehearsal that
+        # prints nothing cannot be told from one that found nothing to do.
+        print(
+            f"--dry-run: would delete playlist {title!r} "
+            f"(ratingKey {int(playlist.ratingKey)}).",
+            file=sys.stderr,
+        )
         return
     playlist.delete()
-    print(f"Deleted playlist: {args.playlist!r}")
+    print(f"Deleted playlist: {title!r}")
 
 
 def _watched_label(item: MediaItem, include_partial: bool) -> str | None:
@@ -98,12 +114,12 @@ def _watched_label(item: MediaItem, include_partial: bool) -> str | None:
 
     A part-played item is not a watched one - it is the thing the user is in
     the middle of - so it is kept unless --include-partial asks otherwise.
+    That holds for an item played before and part way through again: the
+    resume point decides, not the view count.
     """
-    if item_is_played(item):
-        return "played"
-    if include_partial and item_view_offset(item) > 0:
-        return "partial"
-    return None
+    if item_view_offset(item) > 0:
+        return "partial" if include_partial else None
+    return "played" if item_is_played(item) else None
 
 
 def _watched_entries(

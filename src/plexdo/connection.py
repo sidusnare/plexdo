@@ -19,11 +19,11 @@ def read_token(username: str | None) -> str:
     token = admin_token(username)
     if not token:
         sys.exit(
-            f"No admin token in {secret_store.describe()}.\n"
+            f"No admin token in {secret_store.describe('tokens')}.\n"
             "Run `plexdo login` to authenticate, or set plex: username in "
             f"{CONFIG_PATH} to the account whose token should be used."
         )
-    LOG.debug("Admin token loaded from %s", secret_store.describe())
+    LOG.debug("Admin token loaded from %s", secret_store.describe("tokens"))
     return token
 
 

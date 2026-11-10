@@ -8,22 +8,15 @@ import argparse
 
 from plexapi.server import PlexServer
 
-from plexdo.accounts import account_type
+from plexdo.accounts import user_rows
 from plexdo.cache import write_cache
 from plexdo.console import output
 
 
 def cmd_list_users(plex: PlexServer, args: argparse.Namespace) -> None:
-    """List managed/home users visible to the admin token."""
-    account = plex.myPlexAccount()
-    rows = [
-        {
-            "id": int(u.id),
-            "type": account_type(u),
-            "title": u.title,
-        }
-        for u in account.users()
-    ]
+    """List the users the server is shared with."""
+    rows = user_rows(plex)
+    # Completion needs the ID and the title, which every row carries.
     write_cache("users", rows)
     output(rows, args)
 

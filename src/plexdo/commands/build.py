@@ -12,7 +12,7 @@ from collections.abc import Iterator, Sequence
 from functools import partial
 from typing import NamedTuple
 
-from plexapi.exceptions import NotFound
+from plexapi.exceptions import BadRequest, NotFound
 from plexapi.playlist import Playlist
 from plexapi.server import PlexServer
 from plexapi.video import Episode, Movie, Show
@@ -156,6 +156,14 @@ def _append(plex: PlexServer, args: argparse.Namespace) -> None:
     """Append one or more items to an existing playlist."""
     user_plex = server_for_user(plex, args.user_id)
     playlist: Playlist = resolve_playlist(user_plex, args.playlist)
+    if getattr(playlist, "smart", False):
+        # plexapi raises on this, and Plex would refuse it anyway: a smart
+        # playlist holds whatever its filter matches.
+        sys.exit(
+            f"Playlist {args.playlist!r} is smart - its contents come from "
+            "a filter, so items cannot be added to it. Nothing has been "
+            "changed."
+        )
 
     rating_keys = [int(k) for k in args.rating_keys]
     new_items: list[MediaItem] = []
@@ -184,7 +192,13 @@ def _append(plex: PlexServer, args: argparse.Namespace) -> None:
         LOG.info("--dry-run: skipping append.")
         return
 
-    playlist.addItems(new_items)
+    try:
+        playlist.addItems(new_items)
+    except BadRequest as exc:
+        sys.exit(
+            f"Plex refused to add to playlist {args.playlist!r}: {exc}. "
+            "Nothing has been changed."
+        )
     LOG.info("Appended %d item(s) to '%s'.", len(new_items), args.playlist)
 
 
@@ -464,6 +478,33 @@ def cmd_playlist_build(plex: PlexServer, args: argparse.Namespace) -> None:
     _BUILDERS[args.mode](plex, args)
 
 
+def _explain_missing_arguments(parser: argparse.ArgumentParser) -> None:
+    """Have the parser say what each mode takes when arguments are missing.
+
+    The positionals are collected unnamed, so argparse can only report
+    "the following arguments are required: ARG", which names nothing. It
+    reports that before any flag has been looked at, so which mode was
+    meant is not known here, and all of them are listed.
+    """
+    report = parser.error
+    # Modes taking the same arguments are named together: "-I and -C take".
+    flags: dict[str, list[str]] = {}
+    for mode, takes in _MODES.items():
+        flags.setdefault(takes, []).append(f"-{mode[0].upper()}")
+    forms = "; ".join(
+        f"{' and '.join(names)} {'take' if len(names) > 1 else 'takes'} {takes}"
+        for takes, names in flags.items()
+    )
+
+    def error(message: str) -> None:
+        if message.startswith("the following arguments are required: ARG"):
+            message = f"arguments are missing: {forms}"
+        report(message)
+
+    # Set on the instance, which argparse calls through self.
+    parser.error = error  # type: ignore[method-assign]
+
+
 def _register_build(
     sub: "argparse._SubParsersAction",
     parents: "list[argparse.ArgumentParser]",
@@ -478,6 +519,7 @@ def _register_build(
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.set_defaults(check_arguments=partial(_check_build, parser))
+    _explain_missing_arguments(parser)
 
     how = parser.add_argument_group("how to build (exactly one)")
     mode = how.add_mutually_exclusive_group(required=True)

@@ -26,6 +26,16 @@ progress when it is part way through.
 Played state is kept by Plex for each account, and what is shown is the
 state of the account plexdo is connected as.
 
+# NESTED ALBUMS
+
+A photo library is walked depth first: each album is opened, and the albums
+found inside it are opened in turn. An album met a second time is passed
+over, so one the server shows both at the top level and inside another is
+listed once, and albums that contain one another cannot keep the walk going
+for ever. Nesting is followed 16 albums deep; anything deeper is left out,
+with a warning naming where the walk stopped. *plexdo-library-list*(1) and
+*plexdo-titles-export*(1) walk a photo library the same way.
+
 # ARGUMENTS
 
 _LIBRARY_

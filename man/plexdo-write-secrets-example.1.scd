@@ -26,13 +26,11 @@ An existing secrets file is never replaced unasked: without *-o* the command
 refuses, and writes nothing, since that file may hold the only copy of a
 saved password or PIN.
 
-The secrets file is where *plexdo* keeps tokens, saved passwords, and Plex
-Home PINs when it does not use the system keyring: see *SECRETS* in
-*plexdo*(1), and *plex: secret_store* under *FILES* in
-*plexdo-conventions*(7). It is JSON, with one object for each kind:
-
-*tokens*
-	plex.tv tokens, by the username *plexdo-login*(1) saved each under.
+The example is the secrets file as it is with *plex: secret_store* set to
+*file*: the store of saved passwords and Plex Home PINs. Session tokens are
+not in it; with that setting they are kept in a session file of their own,
+which *plexdo-login*(1) writes. See *SECRETS* in *plexdo*(1), and *FILES*
+in *plexdo-conventions*(7). It is JSON, with one object for each kind:
 
 *passwords*
 	Passwords, by username, as *plexdo login --save-password* saves them.
@@ -42,9 +40,14 @@ Home PINs when it does not use the system keyring: see *SECRETS* in
 
 The example holds one placeholder entry of each kind, and a *\_comment*
 entry saying so, which *plexdo* ignores and keeps. Every value in it is a
-placeholder: a command that reads the example as it stands will be refused
-by plex.tv. Replace each value with a real one, or delete the entries and
-let *plexdo-login*(1) and *plexdo-set-pin*(1) fill the file in.
+placeholder: replace each with a real one, or delete the entries and let
+*plexdo login --save-password* and *plexdo-set-pin*(1) fill the file in. A
+placeholder left in place does no harm until that account is signed in
+without a prompt, when plex.tv refuses the password.
+
+Where the secrets file is used only because there is no keyring, with
+*secret_store* left at *auto*, it holds a *tokens* object as well, which
+*plexdo-login*(1) adds.
 
 *plexdo write-secrets-example --help* prints the exact example, without
 writing anything.
@@ -113,17 +116,15 @@ output:
   "_comment": [
     "Example plexdo secrets file: every value is a placeholder.",
     "Replace each with a real one, or delete this file and let",
-    "plexdo login, plexdo login --save-password, and plexdo",
-    "set-pin write it. Keep it readable by your account alone."
+    "plexdo login --save-password and plexdo set-pin write it.",
+    "Session tokens are not kept here. Keep this file readable",
+    "by your account alone."
   ],
   "passwords": {
     "you@example.com": "your-plex.tv-password"
   },
   "pins": {
     "12345678": "0000"
-  },
-  "tokens": {
-    "you@example.com": "your-plex.tv-token"
   }
 }
 ```

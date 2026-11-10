@@ -14,20 +14,18 @@ from plexapi.server import PlexServer
 
 from plexdo.console import clean_text, output
 from plexdo.constants import LOG, MediaItem
-from plexdo.titles import display_title, find_item
+from plexdo.titles import as_rating_key, display_title, find_item
 
 
 def resolve_playlist(user_plex: PlexServer, identifier: str) -> Playlist:
     """Return a Playlist located by name or ratingKey string.
 
-    If *identifier* parses as an integer it is treated as a ratingKey;
-    otherwise it is treated as a title.  Fails fast with a clear message if
-    not found or if the ratingKey refers to a non-playlist item.
+    If *identifier* is written as a ratingKey is, in ASCII digits alone, it
+    is treated as one; otherwise it is treated as a title. Fails fast with
+    a clear message if not found or if the ratingKey refers to a
+    non-playlist item.
     """
-    try:
-        rk = int(identifier)
-    except ValueError:
-        rk = None  # not numeric, so a title
+    rk = as_rating_key(identifier)
     if rk is not None:
         item = find_item(user_plex, rk)
         if item is None:

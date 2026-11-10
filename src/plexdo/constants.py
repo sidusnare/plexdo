@@ -8,6 +8,7 @@ import datetime
 import json
 import logging
 import os
+import tempfile
 import textwrap
 from collections.abc import Iterable, Mapping
 from pathlib import Path
@@ -90,10 +91,35 @@ def default_paths(is_windows: bool, env: Mapping[str, str]) -> Paths:
     )
 
 
+def session_file(
+    is_windows: bool, env: Mapping[str, str], tmpdir: str, uid: int | None
+) -> Path:
+    """Where session tokens go when secret_store is file.
+
+    The runtime directory is the place for what should not outlive the
+    login session: it is private to the user and cleared at logout or
+    reboot. Without one, as on Windows, macOS, or a bare cron environment,
+    it is a directory of the user's own under the temporary directory,
+    which honours TMPDIR, TEMP, and TMP; the user id keeps two accounts
+    sharing /tmp apart.
+    """
+    runtime = env.get("XDG_RUNTIME_DIR", "")
+    if not is_windows and runtime and Path(runtime).is_absolute():
+        return Path(runtime) / "plexdo" / "session.json"
+    name = "PlexDo" if is_windows or uid is None else f"plexdo-{uid}"
+    return Path(tmpdir) / name / "session.json"
+
+
 PATHS = default_paths(os.name == "nt", os.environ)
 CONFIG_PATH = PATHS.config
 DEFAULT_CACHE_DIR = PATHS.cache
 DEFAULT_SECRETS_FILE = PATHS.secrets_file
+DEFAULT_SESSION_FILE = session_file(
+    os.name == "nt",
+    os.environ,
+    tempfile.gettempdir(),
+    os.getuid() if hasattr(os, "getuid") else None,
+)
 
 
 LOG = logging.getLogger("plexdo")
@@ -242,7 +268,10 @@ def config_text(
             "there is one and secrets_file below otherwise, with a",
             'warning; "keyring" insists on the keyring; "file" always',
             "uses secrets_file, for a machine whose keyring is locked",
-            "when plexdo runs, as under cron.",
+            'when plexdo runs, as under cron. With "file", only saved',
+            "passwords and PINs go in secrets_file: session tokens are",
+            "kept apart, in the runtime or temporary directory, and are",
+            "gone after a reboot, when `plexdo login` is needed again.",
             indent=opt,
             default='"auto"',
         )
@@ -280,22 +309,23 @@ def config_text(
 CONFIG_EXAMPLE = config_text()
 
 
-# What write-secrets-example writes: the three kinds the secret store files,
-# each with one placeholder entry. JSON has no comments, so the note is an
-# entry of its own, a list to keep its lines short; plexdo reads only the
-# kinds it knows and keeps the rest.
+# What write-secrets-example writes: the secrets file as it is when
+# secret_store is file, which keeps passwords and PINs there and session
+# tokens elsewhere. Each kind has one placeholder entry. JSON has no
+# comments, so the note is an entry of its own, a list to keep its lines
+# short; plexdo reads only the kinds it knows and keeps the rest.
 SECRETS_EXAMPLE = (
     json.dumps(
         {
             "_comment": [
                 "Example plexdo secrets file: every value is a placeholder.",
                 "Replace each with a real one, or delete this file and let",
-                "plexdo login, plexdo login --save-password, and plexdo",
-                "set-pin write it. Keep it readable by your account alone.",
+                "plexdo login --save-password and plexdo set-pin write it.",
+                "Session tokens are not kept here. Keep this file readable",
+                "by your account alone.",
             ],
             "passwords": {"you@example.com": "your-plex.tv-password"},
             "pins": {"12345678": "0000"},
-            "tokens": {"you@example.com": "your-plex.tv-token"},
         },
         indent=2,
         sort_keys=True,

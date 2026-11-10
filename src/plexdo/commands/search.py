@@ -5,6 +5,7 @@
 """Library search command."""
 
 import argparse
+import sys
 from typing import Any
 
 from plexapi.server import PlexServer
@@ -39,21 +40,45 @@ def _search_result_row(item: Any) -> dict[str, Any]:
     }
 
 
+# The kind of library that holds each media type; a section's type is the
+# type of its top-level items, so a music library is "artist".
+_SECTION_FOR = {
+    "movie": "movie",
+    "show": "show",
+    "episode": "show",
+    "artist": "artist",
+    "album": "artist",
+    "track": "artist",
+    "photo": "photo",
+}
+
+
+def _holds(section: Any, media_type: str | None) -> bool:
+    """Whether a library can hold items of the media type asked for."""
+    return media_type is None or section.type == _SECTION_FOR[media_type]
+
+
 def _search_in_section(
     section: Any,
     query: str,
     media_type: str | None,
-) -> list[dict[str, Any]]:
-    """Search a single library section, optionally filtered by media type."""
+) -> tuple[list[dict[str, Any]], str | None]:
+    """Search one library: its rows, and why it failed if it did.
+
+    A failure is handed back rather than reported here: whether it is worth
+    a word depends on whether the search found anything anywhere else.
+    """
     kwargs: dict[str, Any] = {}
     if media_type:
         kwargs["libtype"] = media_type
     try:
         hits = section.search(query, **kwargs)
     except Exception as exc:  # pylint: disable=broad-except
-        LOG.warning("Search failed in library '%s': %s", section.title, exc)
-        return []
-    return [_search_result_row(item) for item in hits]  # type: ignore[arg-type]
+        # One library's failure must not cost the results of the others.
+        reason = (str(exc).strip().splitlines() or [type(exc).__name__])[0]
+        LOG.debug("Search failed in library '%s': %s", section.title, reason)
+        return [], f"library '{section.title}': {reason}"
+    return [_search_result_row(item) for item in hits], None  # type: ignore[arg-type]
 
 
 def _search_all_sections(
@@ -61,13 +86,35 @@ def _search_all_sections(
     query: str,
     media_type: str | None,
     library_id: int | None,
-) -> list[dict[str, Any]]:
-    """Run the search across one or all library sections."""
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Search one library or all of them: the rows, and what failed.
+
+    A library that cannot hold the media type asked for is passed over when
+    every library is searched, since asking it would only be refused. Named
+    outright, it is an error: the search could never find anything there.
+    """
     sections = resolve_sections(user_plex, library_id)
+    if library_id is not None and not _holds(sections[0], media_type):
+        sys.exit(
+            f"Library '{sections[0].title}' is a {sections[0].type} library "
+            f"and holds no {media_type} items, so --media-type {media_type} "
+            "can find nothing in it."
+        )
     rows: list[dict[str, Any]] = []
+    failures: list[str] = []
     for section in sections:
-        rows.extend(_search_in_section(section, query, media_type))
-    return rows
+        if not _holds(section, media_type):
+            LOG.debug(
+                "Library '%s' holds no %s items; not searched.",
+                section.title,
+                media_type,
+            )
+            continue
+        found, failure = _search_in_section(section, query, media_type)
+        rows.extend(found)
+        if failure:
+            failures.append(failure)
+    return rows, failures
 
 
 def cmd_search(plex: PlexServer, args: argparse.Namespace) -> None:
@@ -82,10 +129,17 @@ def cmd_search(plex: PlexServer, args: argparse.Namespace) -> None:
         media_type,
         library_id,
     )
-    rows = _search_all_sections(user_plex, args.query, media_type, library_id)
+    rows, failures = _search_all_sections(
+        user_plex, args.query, media_type, library_id
+    )
 
     if not rows:
-        LOG.info("No results found.")
+        # Only now is a failure worth reporting: with results in hand, a
+        # library that could not be searched is beside the point.
+        if failures:
+            LOG.warning("Search failed in %s", "; ".join(failures))
+        else:
+            LOG.info("No results found.")
     output(rows, args)
 
 

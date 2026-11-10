@@ -9,36 +9,61 @@
 #   System-wide: cp plexdo.fish /usr/local/share/fish/vendor_completions.d/
 #
 # Completion for user IDs, library IDs, rating keys, playlists, and albums is
-# read from the 15-minute cache under ~/.cache/plexdo that the list commands
-# populate. A stale cache is refreshed in the background so completion never
-# blocks; the values shown come from whatever is cached at that moment.
+# read from the 15-minute cache that the list commands populate, in plex:
+# cache_dir or else $XDG_CACHE_HOME/plexdo, by default ~/.cache/plexdo. A
+# stale cache is refreshed in the background so completion never blocks; the values shown come from whatever is cached at that moment.
 
 # ---------------------------------------------------------------------------
 # Cache helpers
 # ---------------------------------------------------------------------------
 
 function __plexdo_cache_dir --description 'Directory holding the completion caches'
-    # Memoised: reads the config file to honour [plex] cache_dir.
+    # Memoised: reads the config file to honour plex: cache_dir.
     if not set -q __plexdo_cache_resolved
         set -l py (__plexdo_python)
         set -g __plexdo_cache_resolved ($py -c '
-import configparser, os
+import json, os
 from pathlib import Path
+def xdg(name, fallback):
+    value = os.environ.get(name, "")
+    if value and Path(value).is_absolute():
+        return Path(value)
+    return Path(fallback).expanduser()
 if os.name == "nt":
-    base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
-    app = Path(base) / "PlexDo" if base else Path.home() / "AppData/Local/PlexDo"
-    cfg_path, default = app / "plexdo.ini", app / "Cache"
+    root = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+    app = Path(root) / "PlexDo" if root else Path.home() / "AppData/Local/PlexDo"
+    cfg_path, default = app / "config.yaml", app / "Cache"
 else:
-    cfg_path = Path("~/.local/etc/plexdo.ini").expanduser()
-    default = Path("~/.cache/plexdo").expanduser()
-value = ""
-if cfg_path.exists():
-    parser = configparser.ConfigParser(interpolation=None)
-    try:
-        parser.read(cfg_path, encoding="utf-8")
-        value = (parser.get("plex", "cache_dir", fallback="") or "").strip()
-    except Exception:
-        value = ""
+    cfg_path = xdg("XDG_CONFIG_HOME", "~/.config") / "plexdo" / "config.yaml"
+    default = xdg("XDG_CACHE_HOME", "~/.cache") / "plexdo"
+try:
+    lines = cfg_path.read_text(encoding="utf-8").splitlines()
+except OSError:
+    lines = []
+# The one value wanted is a scalar directly under plex:, so the file is
+# read a line at a time; PyYAML may not be importable from this python.
+value, in_plex, dq, sq = "", False, chr(34), chr(39)
+for line in lines:
+    text = line.strip()
+    if not text or text.startswith("#") or text == "---":
+        continue
+    if line[:1] not in (" ", chr(9)):
+        in_plex = text.split(":")[0].strip() == "plex"
+        continue
+    key, colon, rest = text.partition(":")
+    if not (in_plex and colon and key.strip() == "cache_dir"):
+        continue
+    rest = rest.strip()
+    if rest[:1] == dq:
+        try:
+            rest = json.JSONDecoder().raw_decode(rest)[0]
+        except ValueError:
+            rest = rest.strip(dq)
+    elif rest[:1] == sq and sq in rest[1:]:
+        rest = rest[1:rest.rindex(sq)].replace(sq + sq, sq)
+    else:
+        rest = rest.split(" #")[0].strip()
+    value = "" if rest in ("null", "~") else str(rest)
 print(Path(os.path.expandvars(value)).expanduser() if value else default)
 ' 2>/dev/null)
     end
@@ -209,10 +234,17 @@ function __plexdo_rating_keys
     return 0
 end
 
+function __plexdo_word_key --description 'A user or library word as plexdo names its by-word cache'
+    # Every character a file name cannot hold becomes "_", as plexdo's
+    # cache_key does. plexdo writes the by-word cache for the ID, the title,
+    # and the word as typed, so whichever is on the command line finds it.
+    string replace -ra '[/\\\\:*?"<>|]' _ -- $argv[1]
+end
+
 function __plexdo_playlists
     set -l user (__plexdo_nth $argv[1])
     test -n "$user"; or set user 0
-    set -l cache (__plexdo_cache_dir)/playlists.$user.json
+    set -l cache (__plexdo_cache_dir)/playlists-by-word.(__plexdo_word_key $user).json
     __plexdo_cache_fresh $cache; or __plexdo_refresh playlists-list $user
     __plexdo_read_cache $cache title
 end
@@ -222,13 +254,13 @@ function __plexdo_playlists_or_keys
     __plexdo_playlists $argv[1]
     set -l user (__plexdo_nth $argv[1])
     test -n "$user"; or set user 0
-    __plexdo_read_cache (__plexdo_cache_dir)/playlists.$user.json ratingKey title
+    __plexdo_read_cache (__plexdo_cache_dir)/playlists-by-word.(__plexdo_word_key $user).json ratingKey title
 end
 
 function __plexdo_albums
     set -l lib (__plexdo_nth $argv[1])
     test -n "$lib"; or return
-    set -l cache (__plexdo_cache_dir)/titles.$lib.json
+    set -l cache (__plexdo_cache_dir)/titles-by-word.(__plexdo_word_key $lib).json
     __plexdo_cache_fresh $cache; or __plexdo_refresh library-list $lib
     __plexdo_read_cache $cache title | string replace -r ' - .*$' '' | sort -u
 end
@@ -293,19 +325,19 @@ for prog in plexdo
     complete -c $prog -s h -l help -d 'Show this help message and exit'
 
     # -- positional arguments ------------------------------------------------
-    complete -c $prog -n "__fish_seen_subcommand_from library-list albums-list titles-export read; and __plexdo_at 0" \
+    complete -c $prog -n "__fish_seen_subcommand_from library-list albums-list titles-export; and __plexdo_at 0" \
         -a '(__plexdo_libraries)' -d 'library'
-    complete -c $prog -n "__fish_seen_subcommand_from rescan missing-find; and __plexdo_at 0" \
+    complete -c $prog -n "__fish_seen_subcommand_from rescan; and __plexdo_at 0" \
         -a '(__plexdo_libraries)' -d 'library'
     complete -c $prog -l include-specials -n '__fish_seen_subcommand_from missing-find' \
         -d 'Also check season 0'
     complete -c $prog -l include-partial -n '__fish_seen_subcommand_from playlist-clean' \
         -d 'Also remove part-played items'
-    complete -c $prog -n "__fish_seen_subcommand_from show-list show-metadata album-list; and __plexdo_at 0" \
+    complete -c $prog -n "__fish_seen_subcommand_from show-list show-metadata album-list read missing-find; and __plexdo_at 0" \
         -a '(__plexdo_rating_keys)' -d 'item'
     complete -c $prog -n "__fish_seen_subcommand_from player-remote-play; and __plexdo_at 0" \
         -a '(__fish_print_hostnames)' -d 'player host'
-    complete -c $prog -n "__fish_seen_subcommand_from read player-remote-play; and __plexdo_at 1" \
+    complete -c $prog -n "__fish_seen_subcommand_from player-remote-play; and __plexdo_at 1" \
         -a '(__plexdo_rating_keys)' -d 'item'
     # playlist-build: what an argument is depends on the mode flag.
     complete -c $prog -n "__fish_seen_subcommand_from playlist-build; and __plexdo_mode all-or-append; and not __plexdo_at 0; and not __plexdo_at 1" \
@@ -352,6 +384,7 @@ for prog in plexdo
     complete -c $prog -x -l library-id -n '__fish_seen_subcommand_from search' \
         -a '(__plexdo_libraries)' -d 'Restrict to one library'
     complete -c $prog -x -l section -n '__fish_seen_subcommand_from status' -a 'server sessions users accounts connections scans activities tasks' -d 'Show only one section'
+    complete -c $prog -s a -l all -n '__fish_seen_subcommand_from rescan' -d 'Rescan every library'
     complete -c $prog -s s -l status -n '__fish_seen_subcommand_from rescan' -d 'Print all active scan jobs'
     complete -c $prog -s n -l now -n '__fish_seen_subcommand_from rescan' -d 'Cancel pending scans first'
     complete -c $prog -s o -l overwrite \

@@ -415,6 +415,131 @@ def test_write_cache_creates_the_configured_directory(tmp_path, configured):
     assert (tmp_path / "made" / "users.json").exists()
 
 
+# --- the completion cache, by ID and by word ---------------------------------
+
+
+def test_a_cache_key_is_the_word_with_what_a_file_name_cannot_hold_replaced():
+    from plexdo.cache import cache_key
+
+    assert cache_key(7) == "7"
+    assert cache_key("TV Shows") == "TV Shows"
+    assert cache_key('a/b\\c:d*e?f"g<h>i|j') == "a_b_c_d_e_f_g_h_i_j"
+
+
+_COMPLETIONS = Path(__file__).resolve().parents[1] / "completions"
+
+# How each shell is asked for the cache name of the word in its last argument.
+_SHELL_KEY = {
+    "bash": [
+        "bash",
+        "-c",
+        'source "$1"; _plexdo_word_key "$2"',
+        "x",
+        str(_COMPLETIONS / "plexdo.bash"),
+    ],
+    "zsh": [
+        "zsh",
+        "-fc",
+        # All but the last line, which runs the completion itself.
+        'eval "$(sed \'$d\' "$1")" 2>/dev/null; _plexdo_word_key "$2"',
+        "x",
+        str(_COMPLETIONS / "_plexdo"),
+    ],
+    "fish": [
+        "fish",
+        "--no-config",
+        "-c",
+        "source $argv[1]; __plexdo_word_key $argv[2]",
+        str(_COMPLETIONS / "plexdo.fish"),
+    ],
+}
+
+
+@pytest.mark.parametrize("shell", sorted(_SHELL_KEY))
+@pytest.mark.parametrize(
+    "word", ["7", "TV Shows", 'a/b\\c:d*e?f"g<h>i|j', "Kids' Films"]
+)
+def test_each_completion_names_the_word_cache_as_plexdo_does(shell, word):
+    """A script that names the file differently never finds it."""
+    import shutil
+    import subprocess
+
+    from plexdo.cache import cache_key
+
+    if shutil.which(shell) is None:
+        pytest.skip(f"{shell} is not installed")
+    done = subprocess.run(
+        [*_SHELL_KEY[shell], word],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+        env={"HOME": "/nonexistent", "PATH": "/usr/bin:/bin:/usr/local/bin"},
+    )
+    assert done.stdout.rstrip("\n") == cache_key(word)
+
+
+def test_word_caches_are_written_once_per_spelling(tmp_path, configured):
+    from plexdo import cache
+
+    configured(f"plex:\n  url: x\n  cache_dir: {tmp_path}/c\n")
+    rows = [{"ratingKey": 1, "title": "Mix"}]
+    cache.write_word_caches(
+        "playlists", ["7", "alice", "Alice", None, ""], rows
+    )
+    written = sorted(p.name for p in (tmp_path / "c").iterdir())
+    assert written == [
+        "playlists-by-word.7.json",
+        "playlists-by-word.Alice.json",
+        "playlists-by-word.alice.json",
+    ]
+
+
+def test_resolving_an_argument_remembers_every_spelling():
+    import argparse
+
+    from plexdo.identify import argument_words, remember_words
+
+    args = argparse.Namespace(user_id=7)
+    assert argument_words(args, "user_id") == ["7"]
+    remember_words(args, "user_id", " alice ", [(0, "admin"), (7, "Alice")], 7)
+    assert argument_words(args, "user_id") == ["7", "alice", "Alice"]
+    assert argument_words(args, "library_id") == []
+
+
+def test_listing_playlists_files_them_by_id_and_by_word(
+    tmp_path, configured, monkeypatch
+):
+    """Completion holding "Alice" found nothing in a cache named for 7."""
+    import argparse
+
+    from plexdo.commands import playlists
+
+    configured(f"plex:\n  url: x\n  cache_dir: {tmp_path}/c\n")
+
+    class Playlist:
+        ratingKey, title, leafCount = 900, "Mix", 3
+
+    class Server:
+        def playlists(self):
+            return [Playlist()]
+
+    monkeypatch.setattr(playlists, "server_for_user", lambda p, uid: Server())
+    args = argparse.Namespace(
+        format="json",
+        user_id=7,
+        argument_words={"user_id": ["7", "alice", "Alice"]},
+    )
+    playlists.cmd_list_playlists(None, args)
+    written = sorted(p.name for p in (tmp_path / "c").iterdir())
+    assert written == [
+        "playlists-by-word.7.json",
+        "playlists-by-word.Alice.json",
+        "playlists-by-word.alice.json",
+        "playlists.7.json",
+    ]
+
+
 # --- the renamed and merged commands ---------------------------------------
 
 

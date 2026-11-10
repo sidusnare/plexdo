@@ -5,6 +5,8 @@
 """Completion cache written as a side effect of list commands."""
 
 import json
+import re
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -38,3 +40,32 @@ def write_cache(name: str, data: list[dict[str, Any]]) -> None:
         LOG.debug("Cache updated: %s", cache_file)
     except OSError:
         pass
+
+
+# What may not appear in a file name on one platform or another. Replaced
+# rather than encoded, so that each completion script can name the same
+# file with one substitution of its own.
+_UNSAFE_IN_NAMES = re.compile(r'[/\\:*?"<>|\x00-\x1f]')
+
+
+def cache_key(word: Any) -> str:
+    """A word a user may type for a user or library, as part of a file name."""
+    return _UNSAFE_IN_NAMES.sub("_", str(word))
+
+
+def write_word_caches(
+    kind: str, words: Iterable[Any], data: list[dict[str, Any]]
+) -> None:
+    """Write data once for each word its subject goes by.
+
+    The cache named for a numeric ID is no use to a completion script
+    holding "Alice": it would have to resolve the title as plexdo does. So
+    the same rows are filed under every spelling plexdo knows - the ID, the
+    title, and whatever was typed - as kind-by-word.WORD.json, and a script
+    looks up the word it has.
+    """
+    keys = dict.fromkeys(
+        cache_key(word) for word in words if word not in (None, "")
+    )
+    for key in keys:
+        write_cache(f"{kind}-by-word.{key}", data)

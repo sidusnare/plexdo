@@ -87,11 +87,13 @@ def _has_watch_data(state: WatchState) -> bool:
 
 
 def _states_match(first: WatchState, second: WatchState) -> bool:
-    """Return True if two states are close enough to need no update."""
+    """Return True if two states are close enough to need no update.
+
+    Played and the resume point are compared separately: an item played
+    before and part way through again has both, and both are copied.
+    """
     if first.played != second.played:
         return False
-    if first.played:
-        return True
     return abs(first.offset - second.offset) <= _OFFSET_TOLERANCE_MS
 
 
@@ -124,25 +126,83 @@ def _select_winner(
     return (first, second) if first_wins else (second, first)
 
 
-def _planned_action(winner: WatchState) -> str:
-    """Return the action label needed to adopt the winner's state."""
-    if winner.played:
-        return "markPlayed"
+def _planned_steps(winner: WatchState, loser: WatchState) -> list[str]:
+    """The calls that give the loser the winner's played flag and progress.
+
+    The two are copied as they stand, and nothing else: how many times the
+    winner has played the item is not carried over. Marking an item played
+    or unplayed clears its resume point on the server, so that call comes
+    first and the winner's resume point, if it has one, is set after it.
+    A resume point to clear with nothing else to change is cleared by
+    marking the item what it already is.
+    """
+    steps: list[str] = []
+    if winner.played != loser.played:
+        steps.append("markPlayed" if winner.played else "markUnplayed")
+    elif winner.offset == 0 and loser.offset > 0:
+        steps.append("clearProgress")
     if winner.offset > 0:
-        return "setProgress"
-    return "markUnplayed"
+        steps.append("setProgress")
+    return steps
+
+
+def _planned_action(winner: WatchState, loser: WatchState) -> str:
+    """The steps as one label for the plan, joined by "+"."""
+    return "+".join(_planned_steps(winner, loser))
+
+
+_MARK_PLAYED = ("markPlayed", "markWatched")
+_MARK_UNPLAYED = ("markUnplayed", "markUnwatched")
 
 
 def _apply_action(change: PlannedChange) -> None:
     """Perform one planned watch-state change on the target user's item."""
     item = change.loser.item
-    if change.action == "markPlayed":
-        _call_first_method(item, ("markPlayed", "markWatched"))
-        return
-    if change.loser.played:
-        _call_first_method(item, ("markUnplayed", "markUnwatched"))
-    if change.action == "setProgress":
-        _call_first_method(item, ("updateProgress",), change.winner.offset)
+    for step in _planned_steps(change.winner, change.loser):
+        if step == "markPlayed":
+            _call_first_method(item, _MARK_PLAYED)
+        elif step == "markUnplayed":
+            _call_first_method(item, _MARK_UNPLAYED)
+        elif step == "clearProgress":
+            _call_first_method(
+                item, _MARK_PLAYED if change.loser.played else _MARK_UNPLAYED
+            )
+        else:
+            _call_first_method(item, ("updateProgress",), change.winner.offset)
+
+
+# What a ratingKey given to --title may name, mapped to the method listing
+# the items under it that carry watched state; None when it carries its own.
+_MEMBERS = {
+    "movie": None,
+    "episode": None,
+    "track": None,
+    "clip": None,
+    "show": "episodes",
+    "season": "episodes",
+    "artist": "tracks",
+    "album": "tracks",
+}
+
+
+def _members(item: Any) -> list[Any]:
+    """The items carrying watched state that a ratingKey stands for.
+
+    A show, season, artist, or album has no state of its own worth copying:
+    its played flag only says whether every member is played, so one user
+    half way through looks the same as one who never started. Its members
+    are synchronised instead, each on its own.
+    """
+    kind = str(vars(item).get("type") or "")
+    if kind not in _MEMBERS:
+        sys.exit(
+            f"ratingKey {int(item.ratingKey)} is a {kind or 'unknown item'}, "
+            "which carries no watched state. Give a movie, episode, track, "
+            "or clip, or a show, season, artist, or album to synchronise "
+            "everything in it."
+        )
+    lister = _MEMBERS[kind]
+    return [item] if lister is None else list(getattr(item, lister)())
 
 
 def _watchable_sections(
@@ -160,8 +220,8 @@ def _collect_watch_states(
     states: dict[int, WatchState] = {}
 
     if rating_key is not None:
-        item = fetch_item(user_plex, rating_key)
-        states[int(item.ratingKey)] = _watch_state(item)
+        for item in _members(fetch_item(user_plex, rating_key)):
+            states[int(item.ratingKey)] = _watch_state(item)
         return states
 
     for section in _watchable_sections(user_plex, library_id):
@@ -195,7 +255,7 @@ def _build_sync_plan(
             PlannedChange(
                 rating_key=rating_key,
                 title=display_title(loser.item),
-                action=_planned_action(winner),
+                action=_planned_action(winner, loser),
                 target="a" if loser is first else "b",
                 winner=winner,
                 loser=loser,
@@ -299,7 +359,8 @@ def register(
         "-t",
         "--title",
         help_text=(
-            "Restrict to a single item ratingKey. Obtain with library-list or "
+            "Restrict to one item, by ratingKey, or to everything in a "
+            "show, season, artist, or album. Obtain with library-list or "
             "search."
         ),
     )

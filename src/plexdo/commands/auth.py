@@ -123,14 +123,29 @@ def cmd_login(_plex: PlexServer | None, args: argparse.Namespace) -> None:
     LOG.info("Authenticating %s against plex.tv", username)
     token = _obtain_token(username, password, code)
 
-    store = secret_store.describe()
-    if args.dry_run:
-        LOG.info("--dry-run: not saving the token.")
-        saving = " and the password" if args.remember_login else ""
+    store = secret_store.describe("tokens")
+    kept = secret_store.describe("passwords")
+    apart = secret_store.sessions_are_apart()
+    if apart:
+        # On stderr in every format: it is advice, not the command's result.
         print(
-            f"Authenticated. The token{saving} would be saved to {store}.",
+            f"Session tokens are kept in {store}, apart from the passwords "
+            f"and PINs in {kept}. A session lasts until that file is "
+            "cleared, as at a reboot; run `plexdo login` again then.",
             file=sys.stderr,
         )
+    if args.dry_run:
+        LOG.info("--dry-run: not saving the token.")
+        saving = ""
+        if args.remember_login:
+            saving = f", and the password to {kept}" if apart else ""
+            saving = saving or " and the password"
+        target = (
+            f" would be saved to {store}{saving}"
+            if apart
+            else f"{saving} would be saved to {store}"
+        )
+        print(f"Authenticated. The token{target}.", file=sys.stderr)
         return
 
     store_token(username or ADMIN_KEY, token)
@@ -141,8 +156,9 @@ def cmd_login(_plex: PlexServer | None, args: argparse.Namespace) -> None:
     if output_format(args) == "table":
         print(f"Token saved to {store}.")
         if args.remember_login:
+            where = f"to {kept}" if apart else "alongside it"
             print(
-                "Password saved alongside it, to sign in again when the "
+                f"Password saved {where}, to sign in again when the "
                 "token stops working."
             )
         if verified:
@@ -152,6 +168,7 @@ def cmd_login(_plex: PlexServer | None, args: argparse.Namespace) -> None:
             {
                 "user": username,
                 "store": store,
+                "passwordStore": kept,
                 "verified": verified,
                 "passwordSaved": bool(args.remember_login),
             },
@@ -219,7 +236,7 @@ def _logout_line(record: dict[str, str]) -> str:
 
 def cmd_logout(_plex: PlexServer | None, args: argparse.Namespace) -> None:
     """Sign out of plex.tv and remove the saved tokens and passwords."""
-    where = secret_store.describe()
+    where = secret_store.describe("tokens")
     store = load_store()
     names = _logout_targets(store, args.username, where)
     table = output_format(args) == "table"
@@ -281,7 +298,7 @@ def _prompt_pin() -> str | None:
 def cmd_set_pin(_plex: PlexServer | None, args: argparse.Namespace) -> None:
     """Save, or remove, the Plex Home PIN of one user."""
     pin = None if args.remove else _prompt_pin()
-    where = secret_store.describe()
+    where = secret_store.describe("pins")
     verb = "save the PIN for" if pin else "remove any PIN saved for"
     if args.dry_run:
         print(

@@ -4,6 +4,7 @@
 
 """Item title formatting and common item helpers."""
 
+import re
 import secrets
 import sys
 from typing import Any
@@ -65,6 +66,21 @@ def shuffle_list(lst: list[Any]) -> list[Any]:
         j = secrets.randbelow(i + 1)
         result[i], result[j] = result[j], result[i]
     return result
+
+
+# A ratingKey as Plex writes one: ASCII digits and nothing else.
+_RATING_KEY = re.compile(r"[0-9]+", re.ASCII)
+
+
+def as_rating_key(text: Any) -> int | None:
+    """The ratingKey a word spells, or None when it is not one.
+
+    int() is too generous a test for telling a key from a title: it takes
+    "1_000", "+7", " 12 ", and digits of other scripts, any of which may be
+    what a playlist or a show is called.
+    """
+    word = str(text)
+    return int(word) if _RATING_KEY.fullmatch(word) else None
 
 
 def find_item(plex: PlexServer, rating_key: Any, markers: bool = False) -> Any:

@@ -13,10 +13,11 @@ from plexapi.server import PlexServer
 from plexapi.video import Episode
 
 from plexdo.arguments import add_library_argument, add_m3u_argument
-from plexdo.cache import write_cache
+from plexdo.cache import write_cache, write_word_caches
 from plexdo.console import output, output_format
 from plexdo.constants import LOG
 from plexdo.gallery import write_gallery_html
+from plexdo.identify import argument_words
 from plexdo.m3u import write_m3u
 from plexdo.paths import add_prefix_argument, mapper_for
 from plexdo.photos import collect_library_items, collect_photos
@@ -78,7 +79,9 @@ def cmd_list_titles(plex: PlexServer, args: argparse.Namespace) -> None:
 
     # The completion cache only ever needs the key and the title, whatever
     # the caller asked to see.
-    write_cache(f"titles.{library_id}", [cache_row(item) for item in items])
+    cached = [cache_row(item) for item in items]
+    write_cache(f"titles.{library_id}", cached)
+    write_word_caches("titles", argument_words(args, "library_id"), cached)
 
     if output_format(args) == "table":
         output([summary_row(item) for item in items], args)
