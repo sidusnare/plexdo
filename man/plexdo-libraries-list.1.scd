@@ -110,5 +110,5 @@ plexdo libraries-list -f csv > libraries.csv
 
 # SEE ALSO
 
-*plexdo-library-list*(1), *plexdo-albums-list*(1), *plexdo-titles-export*(1),
+*plexdo-library-list*(1), *plexdo-titles-export*(1),
 *plexdo-rescan*(1), *plexdo-conventions*(7), *plexdo*(1)

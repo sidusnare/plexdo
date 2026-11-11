@@ -143,12 +143,12 @@ function __plexdo_positionals
             continue
         end
         switch $t
-            case --m3u --album --sort --media-type --library-id -l --library -t --title -u --user --username -p --password -c --code -f --format --section -p --prefix --throttle --season --port --player-user --server-url --ratio --debug-log
+            case --m3u --album --sort --media-type --library-id -l --library -t --title --type --path --filter --category -u --user --username -p --password -c --code -f --format --section -p --prefix --throttle --season --port --player-user --server-url --ratio --debug-log
                 set skip 1
                 continue
             case -s
                 # -s takes a value only where it is --session or --season.
-                contains -- "$cmd" wait missing-find; and set skip 1
+                contains -- "$cmd" wait find-missing; and set skip 1
                 continue
             case '-*'
                 continue
@@ -188,6 +188,9 @@ function __plexdo_mode --description 'True when the mode flag typed is one of th
                 return 1
             case -A --append --all
                 contains -- all-or-append $argv; and return 0
+                return 1
+            case -M --merge
+                contains -- merge $argv; and return 0
                 return 1
             case -T --to
                 contains -- to $argv; and return 0
@@ -262,18 +265,18 @@ function __plexdo_albums
     test -n "$lib"; or return
     set -l cache (__plexdo_cache_dir)/titles-by-word.(__plexdo_word_key $lib).json
     __plexdo_cache_fresh $cache; or __plexdo_refresh library-list $lib
-    __plexdo_read_cache $cache title | string replace -r ' - .*$' '' | sort -u
+    __plexdo_read_cache $cache title | sort -u
 end
 
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
 
-set -l plexdo_cmds album-list albums-list libraries-list library-list login logout \
-    merge-build missing-find player-remote-play playlist-build playlist-clean \
+set -l plexdo_cmds album-list find-missing libraries-list library-list login logout \
+    metadata player-remote-play playlist-build playlist-clean \
     playlist-copy playlist-export playlist-list playlist-remove playlists-list \
-    read rescan search set-pin show-list show-metadata show-watched-cp status \
-    titles-export users-list wait write-config-example write-secrets-example
+    read rescan search set-pin show-list show-watched-cp status titles-export \
+    users-list wait write-config-example write-secrets-example
 
 # No bare filename completion anywhere; each rule opts in explicitly.
 complete -c plexdo -f
@@ -284,14 +287,14 @@ function __plexdo_no_subcommand -V plexdo_cmds
 end
 
 for prog in plexdo
+
     complete -c $prog -n __plexdo_no_subcommand -a album-list -d 'Show one album with its played state and progress'
-    complete -c $prog -n __plexdo_no_subcommand -a albums-list -d 'List the albums in a music or photo library'
+    complete -c $prog -n __plexdo_no_subcommand -a find-missing -d 'Find gaps in the episode numbering of a show'
     complete -c $prog -n __plexdo_no_subcommand -a libraries-list -d 'List the server\'s libraries'
-    complete -c $prog -n __plexdo_no_subcommand -a library-list -d 'List the titles in a library'
+    complete -c $prog -n __plexdo_no_subcommand -a library-list -d 'List what a library holds, by type or by folder'
     complete -c $prog -n __plexdo_no_subcommand -a login -d 'Sign in to plex.tv and save the token'
     complete -c $prog -n __plexdo_no_subcommand -a logout -d 'Sign out of plex.tv and remove the saved tokens'
-    complete -c $prog -n __plexdo_no_subcommand -a merge-build -d 'Mix two playlists into a new one at a ratio'
-    complete -c $prog -n __plexdo_no_subcommand -a missing-find -d 'Find gaps in the episode numbering of a show'
+    complete -c $prog -n __plexdo_no_subcommand -a metadata -d 'Show the metadata of one item'
     complete -c $prog -n __plexdo_no_subcommand -a player-remote-play -d 'Tell a player, reached directly, to play an item'
     complete -c $prog -n __plexdo_no_subcommand -a playlist-build -d 'Build a playlist, or add items to one'
     complete -c $prog -n __plexdo_no_subcommand -a playlist-clean -d 'Remove the watched items from a playlist'
@@ -305,7 +308,6 @@ for prog in plexdo
     complete -c $prog -n __plexdo_no_subcommand -a search -d 'Search for titles matching a query'
     complete -c $prog -n __plexdo_no_subcommand -a set-pin -d 'Save or remove a Plex Home member\'s PIN'
     complete -c $prog -n __plexdo_no_subcommand -a show-list -d 'List a show\'s episodes'
-    complete -c $prog -n __plexdo_no_subcommand -a show-metadata -d 'Show the metadata of one item'
     complete -c $prog -n __plexdo_no_subcommand -a show-watched-cp -d 'Sync watched state and resume points of two users'
     complete -c $prog -n __plexdo_no_subcommand -a status -d 'Show the server\'s sessions, users, scans, and tasks'
     complete -c $prog -n __plexdo_no_subcommand -a titles-export -d 'Export a library to an M3U file or photo gallery'
@@ -325,15 +327,15 @@ for prog in plexdo
     complete -c $prog -s h -l help -d 'Show this help message and exit'
 
     # -- positional arguments ------------------------------------------------
-    complete -c $prog -n "__fish_seen_subcommand_from library-list albums-list titles-export; and __plexdo_at 0" \
+    complete -c $prog -n "__fish_seen_subcommand_from library-list titles-export; and __plexdo_at 0" \
         -a '(__plexdo_libraries)' -d 'library'
     complete -c $prog -n "__fish_seen_subcommand_from rescan; and __plexdo_at 0" \
         -a '(__plexdo_libraries)' -d 'library'
-    complete -c $prog -l include-specials -n '__fish_seen_subcommand_from missing-find' \
+    complete -c $prog -l include-specials -n '__fish_seen_subcommand_from find-missing' \
         -d 'Also check season 0'
     complete -c $prog -l include-partial -n '__fish_seen_subcommand_from playlist-clean' \
         -d 'Also remove part-played items'
-    complete -c $prog -n "__fish_seen_subcommand_from show-list show-metadata album-list read missing-find; and __plexdo_at 0" \
+    complete -c $prog -n "__fish_seen_subcommand_from show-list metadata album-list read find-missing; and __plexdo_at 0" \
         -a '(__plexdo_rating_keys)' -d 'item'
     complete -c $prog -n "__fish_seen_subcommand_from player-remote-play; and __plexdo_at 0" \
         -a '(__fish_print_hostnames)' -d 'player host'
@@ -344,12 +346,12 @@ for prog in plexdo
         -a '(__plexdo_rating_keys)' -d 'item'
     complete -c $prog -n "__fish_seen_subcommand_from playlist-build; and __plexdo_mode interleaved chronological; and not __plexdo_at 0" \
         -a '(__plexdo_rating_keys)' -d 'item'
-    complete -c $prog -n "__fish_seen_subcommand_from playlist-build; and __plexdo_mode randomize all-or-append; and __plexdo_at 0" \
+    complete -c $prog -n "__fish_seen_subcommand_from playlist-build; and __plexdo_mode randomize all-or-append merge; and __plexdo_at 0" \
         -a '(__plexdo_users)' -d 'user'
     complete -c $prog -n "__fish_seen_subcommand_from playlist-build; and __plexdo_mode randomize all-or-append; and __plexdo_at 1" \
         -a '(__plexdo_playlists_or_keys 0)' -d 'playlist'
 
-    complete -c $prog -n "__fish_seen_subcommand_from search playlists-list playlist-list playlist-export playlist-remove playlist-clean merge-build playlist-copy show-watched-cp set-pin; and __plexdo_at 0" \
+    complete -c $prog -n "__fish_seen_subcommand_from search playlists-list playlist-list playlist-export playlist-remove playlist-clean playlist-copy show-watched-cp set-pin; and __plexdo_at 0" \
         -a '(__plexdo_users)' -d 'user'
     complete -c $prog -n "__fish_seen_subcommand_from show-watched-cp; and __plexdo_at 1" \
         -a '(__plexdo_users)' -d 'user'
@@ -360,9 +362,9 @@ for prog in plexdo
         -a '(__plexdo_playlists_or_keys 0)' -d 'playlist'
     complete -c $prog -n "__fish_seen_subcommand_from playlist-export playlist-remove playlist-clean playlist-copy; and __plexdo_at 1" \
         -a '(__plexdo_playlists_or_keys 0)' -d 'playlist'
-    complete -c $prog -n "__fish_seen_subcommand_from merge-build; and __plexdo_at 2" \
+    complete -c $prog -n "__fish_seen_subcommand_from playlist-build; and __plexdo_mode merge; and __plexdo_at 2" \
         -a '(__plexdo_playlists_or_keys 0)' -d 'playlist'
-    complete -c $prog -n "__fish_seen_subcommand_from merge-build; and __plexdo_at 3" \
+    complete -c $prog -n "__fish_seen_subcommand_from playlist-build; and __plexdo_mode merge; and __plexdo_at 3" \
         -a '(__plexdo_playlists_or_keys 0)' -d 'playlist'
 
     complete -c $prog -rF -n "__fish_seen_subcommand_from titles-export; and __plexdo_at 1"
@@ -370,13 +372,23 @@ for prog in plexdo
 
     # -- per-command options -------------------------------------------------
     complete -c $prog -x -s p -l prefix \
-        -n '__fish_seen_subcommand_from playlist-list show-list playlist-export titles-export playlist-build merge-build' \
+        -n '__fish_seen_subcommand_from playlist-list show-list playlist-export titles-export playlist-build' \
         -d 'Rewrite exported paths onto this prefix'
     complete -c $prog -rF -l m3u \
-        -n '__fish_seen_subcommand_from playlist-list show-list playlist-build merge-build' \
+        -n '__fish_seen_subcommand_from playlist-list show-list playlist-build' \
         -d 'Also export an M3U file using Plex server paths'
     complete -c $prog -x -l album -n '__fish_seen_subcommand_from library-list titles-export' \
         -a '(__plexdo_albums 0)' -d 'Restrict to a single photo album'
+    complete -c $prog -x -s t -l type -n '__fish_seen_subcommand_from library-list' \
+        -a 'album artist clip collection episode folder movie photo season show track' -d 'What to list'
+    complete -c $prog -x -l path -n '__fish_seen_subcommand_from library-list' \
+        -d 'With --type folder, the folder to list'
+    complete -c $prog -x -l filter -n '__fish_seen_subcommand_from library-list' \
+        -d 'List only what matches FIELD=VALUE'
+    complete -c $prog -x -l category -n '__fish_seen_subcommand_from library-list' \
+        -d 'Short for --filter genre=CATEGORY'
+    complete -c $prog -l list-categories -n '__fish_seen_subcommand_from library-list' \
+        -d 'List the genres of the type listed'
     complete -c $prog -x -l sort -n '__fish_seen_subcommand_from titles-export' \
         -a 'alpha date random' -d 'Sort order'
     complete -c $prog -x -l media-type -n '__fish_seen_subcommand_from search' \
@@ -388,7 +400,7 @@ for prog in plexdo
     complete -c $prog -s s -l status -n '__fish_seen_subcommand_from rescan' -d 'Print all active scan jobs'
     complete -c $prog -s n -l now -n '__fish_seen_subcommand_from rescan' -d 'Cancel pending scans first'
     complete -c $prog -s o -l overwrite \
-        -n '__fish_seen_subcommand_from playlist-copy playlist-build merge-build' \
+        -n '__fish_seen_subcommand_from playlist-copy playlist-build' \
         -d 'Replace an existing playlist of the same name'
     complete -c $prog -s o -l overwrite -n '__fish_seen_subcommand_from write-config-example' \
         -d 'Replace an existing config file'
@@ -402,19 +414,21 @@ for prog in plexdo
         -d 'Shuffle an existing playlist into a new one'
     complete -c $prog -s A -l append -n '__fish_seen_subcommand_from playlist-build' \
         -d 'Add items to the end of an existing playlist'
+    complete -c $prog -s M -l merge -n '__fish_seen_subcommand_from playlist-build' \
+        -d 'Mix two existing playlists into a new one'
     complete -c $prog -s A -l all -n '__fish_seen_subcommand_from playlist-copy' \
         -d 'Copy to every user the server is shared with'
     complete -c $prog -s T -l to -n '__fish_seen_subcommand_from playlist-copy' \
         -d 'Copy to one user, under a title of your choosing'
-    complete -c $prog -x -l ratio -n '__fish_seen_subcommand_from merge-build' \
+    complete -c $prog -x -l ratio -n '__fish_seen_subcommand_from playlist-build; and __plexdo_mode merge' \
         -d 'A:B: take A items from the first, then B from the second'
-    complete -c $prog -s s -l stop-short -n '__fish_seen_subcommand_from merge-build' \
+    complete -c $prog -s s -l stop-short -n '__fish_seen_subcommand_from playlist-build; and __plexdo_mode merge' \
         -d 'Stop when either playlist runs out'
-    complete -c $prog -s U -l unique -n '__fish_seen_subcommand_from merge-build' \
+    complete -c $prog -s U -l unique -n '__fish_seen_subcommand_from playlist-build; and __plexdo_mode merge' \
         -d 'Skip an item already taken'
-    complete -c $prog -x -s u -l user -n '__fish_seen_subcommand_from playlist-build merge-build' \
+    complete -c $prog -x -s u -l user -n '__fish_seen_subcommand_from playlist-build' \
         -a '(__plexdo_users)' -d 'Create the playlist for this user instead'
-    complete -c $prog -s a -l all-users -n '__fish_seen_subcommand_from playlist-build merge-build' \
+    complete -c $prog -s a -l all-users -n '__fish_seen_subcommand_from playlist-build' \
         -d 'Create the playlist for every user on the server'
     complete -c $prog -x -s s -l session -n '__fish_seen_subcommand_from wait' -d 'Follow the session with this sessionKey'
     complete -c $prog -x -s r -l rating-key -n '__fish_seen_subcommand_from wait' \

@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
-"""albums-list and album-list: albums, what is in them, and what is played.
+"""Albums: what is in them, and what is played.
 
-albums-list covers every album of a music or photo library, album-list one
-album, item by item.
+library-list on a music or photo library lists every album through
+list_albums here, and album-list shows one album, item by item.
 
 Played state is the connected account's own, as Plex keeps it per user. An
 item that can be played (a track or a video clip) has a state: played, in
@@ -20,7 +20,6 @@ from typing import Any
 
 from plexapi.server import PlexServer
 
-from plexdo.arguments import add_library_argument
 from plexdo.console import (
     clean_text,
     output,
@@ -33,7 +32,6 @@ from plexdo.constants import LOG
 from plexdo.convert import format_duration, parse_date
 from plexdo.photos import album_children, is_album, walk_photo_albums
 from plexdo.records import file_paths
-from plexdo.sections import resolve_section
 from plexdo.throttle import paced
 from plexdo.titles import fetch_item
 
@@ -41,8 +39,8 @@ PLAYED = "played"
 IN_PROGRESS = "in progress"
 UNPLAYED = "unplayed"
 
-# The section types that hold albums: Plex calls a music library "artist".
-_MUSIC, _PHOTO = "artist", "photo"
+# A music library's section type: Plex names it for its top level, artists.
+_MUSIC = "artist"
 
 # An album's own type, mapped to whether it is a music album. A photo album
 # shares the type "photo" with the photos in it, and only TAG tells them
@@ -220,27 +218,42 @@ def _photo_albums(
     ]
 
 
-def cmd_list_albums(plex: PlexServer, args: argparse.Namespace) -> None:
-    """List the albums in a music or photo library.
+def list_albums(
+    section: Any, args: argparse.Namespace, filters: dict | None = None
+) -> list[Any]:
+    """Output the albums of a music or photo library; return them.
 
     A table shows one row per album. A machine-readable format adds each
-    album's contents, which costs one request per album.
+    album's contents, which costs one request per album. The albums are
+    returned for the completion cache.
+
+    With *filters*, plexapi's filter dictionary, the server picks the
+    albums: only those it returns are listed, a photo library's without
+    walking into the albums inside them, which its filtering does not do.
     """
-    section = resolve_section(plex, args.library_id)
-    if section.type not in (_MUSIC, _PHOTO):
-        sys.exit(
-            f"Library '{section.title}' is a {section.type} library; "
-            "albums-list takes a music or photo library."
-        )
     music = section.type == _MUSIC
     table = output_format(args) == "table"
 
-    if music:
+    if filters is not None:
+        albums = list(
+            section.search(
+                libtype="album" if music else "photoalbum", filters=filters
+            )
+        )
+        LOG.info("%d album(s) match in '%s'", len(albums), section.title)
+        if music and table:
+            output([table_row(album, None, True) for album in albums], args)
+            return albums
+        listed = [
+            (album, [c for c in album_children(album) if not is_album(c)])
+            for album in paced(albums, args, "albums")
+        ]
+    elif music:
         albums = list(section.albums())
         LOG.info("%d album(s) in '%s'", len(albums), section.title)
         if table:
             output([table_row(album, None, True) for album in albums], args)
-            return
+            return albums
         LOG.info("Reading the contents of %d album(s)", len(albums))
         listed = [
             (album, album_children(album))
@@ -254,6 +267,7 @@ def cmd_list_albums(plex: PlexServer, args: argparse.Namespace) -> None:
         output([table_row(a, c, music) for a, c in listed], args)
     else:
         output([album_record(a, c, music) for a, c in listed], args)
+    return [album for album, _ in listed]
 
 
 def _position_text(progress: Record) -> str:
@@ -283,7 +297,7 @@ def album_summary(record: Record, nested: int) -> Record:
         summary["year"] = record["year"]
     summary["items"] = record["items"]
     if nested:
-        summary["nested albums"] = f"{nested}, listed by albums-list"
+        summary["nested albums"] = f"{nested}, listed by library-list"
     if record["duration"]:
         summary["length"] = format_duration(record["duration"])
     if record["state"] is not None:
@@ -337,7 +351,7 @@ def cmd_list_album(plex: PlexServer, args: argparse.Namespace) -> None:
     """Show one album's contents, with each item's played state and progress.
 
     A table shows the album, then its items. JSON and YAML carry the same
-    record albums-list gives for each album; CSV and CLIXML, which cannot
+    record library-list gives for each album; CSV and CLIXML, which cannot
     nest, carry the item records alone.
     """
     album = fetch_item(plex, args.rating_key)
@@ -345,7 +359,7 @@ def cmd_list_album(plex: PlexServer, args: argparse.Namespace) -> None:
     if not is_album(album) or kind not in _ALBUM_TYPES:
         sys.exit(
             f"ratingKey {args.rating_key} is not an album (it is a "
-            f"{kind or type(album).__name__}); albums-list lists the albums "
+            f"{kind or type(album).__name__}); library-list lists the albums "
             "of a library."
         )
     children = album_children(album)
@@ -353,7 +367,7 @@ def cmd_list_album(plex: PlexServer, args: argparse.Namespace) -> None:
     nested = len(children) - len(contents)
     if nested:
         LOG.info(
-            "%d album(s) nested in '%s' are not listed here; albums-list "
+            "%d album(s) nested in '%s' are not listed here; library-list "
             "lists them.",
             nested,
             vars(album).get("title"),
@@ -378,25 +392,7 @@ def register(
     sub: "argparse._SubParsersAction",
     parents: "list[argparse.ArgumentParser]",
 ) -> None:
-    """Register the albums-list and album-list subparsers."""
-    parser = sub.add_parser(
-        "albums-list",
-        parents=parents,
-        help="List the albums in a music or photo library.",
-        description=textwrap.fill(
-            "List the albums in a music or photo library, nested photo "
-            "albums included. A table shows each album's rating key, "
-            "artist, title, year, how many items it holds, and how many of "
-            "them you have played. A machine-readable format (-f json, "
-            "yaml, csv, clixml) adds each album's played state and progress, "
-            "and its contents: every track, photo, or clip, with its own "
-            "played state, and its progress when it is part way through.",
-            width=78,
-        ),
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    add_library_argument(parser)
-
+    """Register the album-list subparser."""
     single = sub.add_parser(
         "album-list",
         parents=parents,
@@ -415,10 +411,10 @@ def register(
         "rating_key",
         type=int,
         metavar="ratingKey",
-        help="The album's ratingKey (int). Obtain with albums-list.",
+        help="The album's ratingKey (int). Obtain with library-list.",
     )
 
 
-COMMANDS = {"albums-list": cmd_list_albums, "album-list": cmd_list_album}
+COMMANDS = {"album-list": cmd_list_album}
 
 REQUIRES_PLEX = frozenset(COMMANDS)

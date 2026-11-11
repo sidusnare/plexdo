@@ -7,7 +7,7 @@
 Attribute access on a partial plexapi object triggers a reload whenever the
 value is None or empty, which would mean one HTTP request per item across a
 whole library. Everything here reads `vars()` instead, so a listing reports
-what the server already sent and costs no extra calls. `show-metadata` is the
+what the server already sent and costs no extra calls. `metadata` is the
 route to the complete picture for a single item.
 """
 

@@ -12,6 +12,49 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-11-11
+
+These changes are incompatible with 3.x, hence the MAJOR release:
+`albums-list` and `merge-build` are folded into `library-list` and
+`playlist-build`, two commands are renamed, and `library-list` lists a
+music or photo library's albums by default.
+
+### Changed
+
+- **Breaking:** `library-list` on a music or photo library lists its
+  albums by default, where it listed a music library's artists and a photo
+  library's photos. `-t artist` and `-t photo` list those.
+- `library-list -t TYPE` (`--type`) lists any type Plex serves for the
+  library's kind: `movie` and `collection` in a movie library; `show`,
+  `season`, `episode`, and `collection` in a show library; `album`,
+  `artist`, `track`, and `collection` in a music library; `album`,
+  `photo`, and `clip` in a photo library. A movie library lists its movies
+  by default and a show library its shows, as before. Table columns suit
+  the type: an episode shows its show and numbers, a track its artist and
+  album.
+- `library-list -t folder` lists a library by folder, as its files are
+  laid out on disk, and `--path A/B` opens a folder within it.
+- `library-list --filter FIELD=VALUE` lists only what matches, on any field
+  the library can be filtered by, such as `genre`, `collection`, `label`,
+  `contentRating`, or `year`; `!=` excludes, and `>` and `<` compare.
+  Repeated, every one must match. `--category NAME` is short for
+  `--filter genre=NAME`, and `--list-categories` lists the genres there
+  are.
+- `library-list --album` implies `-t photo`, and its completion offers the
+  album titles whole; one with " - " in its title was cut short.
+- **Breaking:** `missing-find` is renamed `find-missing`, and
+  `show-metadata` is renamed `metadata`. The old names are not kept.
+- **Breaking:** `merge-build` is folded into `playlist-build` as
+  `-M/--merge`: `merge-build USER NAME FIRST SECOND` is now
+  `playlist-build -M USER NAME FIRST SECOND`, with `--ratio`, `-s`, and `-U`
+  as before. Those three are refused with any other mode.
+
+### Removed
+
+- **Breaking:** `albums-list`. `library-list` lists a music or photo
+  library's albums by default, with the same table and the same records.
+- **Breaking:** `merge-build`, now `playlist-build --merge`.
+
 ## [3.0.0] - 2026-11-10
 
 These changes are incompatible with 2.x, hence the MAJOR release: commands
@@ -756,7 +799,8 @@ multi-user token handling, watched-state synchronisation, a status report,
 photo galleries, YAML/CSV/CLIXML output, shell completions for bash, zsh, and
 fish, a manual page, and packaging for PyPI. See the commit history.
 
-[Unreleased]: https://github.com/sidusnare/plexdo/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/sidusnare/plexdo/compare/v4.0.0...HEAD
+[4.0.0]: https://github.com/sidusnare/plexdo/compare/v3.0.0...v4.0.0
 [3.0.0]: https://github.com/sidusnare/plexdo/compare/v2.0.3...v3.0.0
 [2.1.0-rc.1]: https://github.com/sidusnare/plexdo/compare/v2.0.3...v2.1.0-rc.1
 [2.0.3]: https://github.com/sidusnare/plexdo/compare/v2.0.2...v2.0.3

@@ -66,7 +66,7 @@ def cmd_read(plex: PlexServer, args: argparse.Namespace) -> None:
     if len(item.media) > 1 or len(parts) > 1:
         LOG.warning(
             "Multiple media/parts found; streaming first part only. "
-            "Use show-list or show-metadata to inspect."
+            "Use show-list or metadata to inspect."
         )
 
     part = parts[0]

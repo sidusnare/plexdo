@@ -135,10 +135,10 @@ Find a film's ratingKey for another command:
 
 ```
 key=$(plexdo search 0 "Heat" --media-type movie --json | jq '.[0].ratingKey')
-plexdo show-metadata "$key"
+plexdo metadata "$key"
 ```
 
 # SEE ALSO
 
-*plexdo-library-list*(1), *plexdo-show-metadata*(1), *plexdo-users-list*(1),
+*plexdo-library-list*(1), *plexdo-metadata*(1), *plexdo-users-list*(1),
 *plexdo-conventions*(7), *plexdo*(1)

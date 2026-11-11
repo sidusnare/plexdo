@@ -192,7 +192,7 @@ _plexdo_albums() {
   [[ -z $lib ]] && { _message 'album name'; return }
   _plexdo_cache_fresh $cache || _plexdo_refresh library-list $lib
   local -a albums
-  albums=( ${(fu)"$(_plexdo_read_cache $cache title '' | sed -n 's/ - .*//p')"} )
+  albums=( ${(fu)"$(_plexdo_read_cache $cache title '')"} )
   if (( ${#albums} )); then
     _describe -t albums 'album' albums
   else
@@ -206,7 +206,8 @@ _plexdo_positional() {
   for (( i = 2; i <= $#words - 1; i++ )); do
     if (( skip )); then skip=0; continue; fi
     case ${words[i]} in
-      --m3u|--album|--sort|--media-type|--library-id|-l|--library|-t|--title|\
+      --m3u|--album|--sort|--media-type|--library-id|-l|--library|-t|--title|--type|--path|\
+      --filter|--category|\
       -u|--username|-p|--password|-c|--code|-f|--format|--section|-p|--prefix|--throttle|\
       --ratio|--debug-log) skip=1; continue ;;
       -*) continue ;;
@@ -220,13 +221,12 @@ _plexdo_commands() {
   local -a cmds
   cmds=(
     'album-list:Show one album with its played state and progress'
-    'albums-list:List the albums in a music or photo library'
+    'find-missing:Find gaps in the episode numbering of a show'
     'libraries-list:List the server'\''s libraries'
-    'library-list:List the titles in a library'
+    'library-list:List what a library holds, by type or by folder'
     'login:Sign in to plex.tv and save the token'
     'logout:Sign out of plex.tv and remove the saved tokens'
-    'merge-build:Mix two playlists into a new one at a ratio'
-    'missing-find:Find gaps in the episode numbering of a show'
+    'metadata:Show the metadata of one item'
     'player-remote-play:Tell a player, reached directly, to play an item'
     'playlist-build:Build a playlist, or add items to one'
     'playlist-clean:Remove the watched items from a playlist'
@@ -240,7 +240,6 @@ _plexdo_commands() {
     'search:Search for titles matching a query'
     'set-pin:Save or remove a Plex Home member'\''s PIN'
     'show-list:List a show'\''s episodes'
-    'show-metadata:Show the metadata of one item'
     'show-watched-cp:Sync watched state and resume points of two users'
     'status:Show the server'\''s sessions, users, scans, and tasks'
     'titles-export:Export a library to an M3U file or photo gallery'
@@ -262,6 +261,7 @@ _plexdo_mode() {
       -C|--chronological) echo chronological; return ;;
       -R|--randomize) echo randomize; return ;;
       -A|--append|--all) echo all-or-append; return ;;
+      -M|--merge) echo merge; return ;;
       -T|--to) echo to; return ;;
     esac
   done
@@ -291,16 +291,18 @@ _plexdo_subcommand() {
   case ${words[1]} in
     library-list)
       _arguments $_plexdo_global_opts \
-        '--album[Photo libraries only: restrict to one album]:album:{_plexdo_albums $(_plexdo_positional 0)}' \
+        '(-t --type)'{-t,--type}'[What to list]:type:(album artist clip collection episode folder movie photo season show track)' \
+        '--path[With --type folder, the folder to list]:path:' \
+        '*--filter[List only what matches FIELD=VALUE]:filter (FIELD=VALUE):' \
+        '*--category[Short for --filter genre=CATEGORY]:category:' \
+        '--list-categories[List the genres of the type listed]' \
+        '--album[Photo libraries only: one album and those inside it]:album:{_plexdo_albums $(_plexdo_positional 0)}' \
         '1:library id:_plexdo_libraries'
-      ;;
-    albums-list)
-      _arguments $_plexdo_global_opts '1:library id:_plexdo_libraries'
       ;;
     show-list)
       _arguments $_plexdo_global_opts $pfx $m3u '1:show rating key:_plexdo_rating_keys'
       ;;
-    show-metadata|album-list)
+    metadata|album-list)
       _arguments $_plexdo_global_opts '1:rating key:_plexdo_rating_keys'
       ;;
     titles-export)
@@ -380,7 +382,7 @@ _plexdo_subcommand() {
     read)
       _arguments $_plexdo_global_opts '1:rating key:_plexdo_rating_keys'
       ;;
-    missing-find)
+    find-missing)
       _arguments $_plexdo_global_opts \
         '(-l --library)'{-l,--library}'[Library to look in]:library:_plexdo_libraries' \
         '(-A --all)'{-A,--all}'[Check every show]' \
@@ -396,13 +398,19 @@ _plexdo_subcommand() {
         '1:library id:_plexdo_libraries'
       ;;
     playlist-build)
-      local modes='(-I --interleaved -C --chronological -R --randomize -A --append)'
-      local -a how
+      local modes='(-I --interleaved -C --chronological -R --randomize -A --append -M --merge)'
+      local -a how mixing
       how=(
         $modes{-I,--interleaved}'[Take one episode from each show in turn]'
         $modes{-C,--chronological}'[Sort the episodes and movies by air date]'
         $modes{-R,--randomize}'[Shuffle an existing playlist into a new one]'
         $modes{-A,--append}'[Add items to the end of an existing playlist]'
+        $modes{-M,--merge}'[Mix two existing playlists into a new one]'
+      )
+      mixing=(
+        '--ratio[Take A items from the first, then B from the second]:ratio (A\:B):'
+        '(-s --stop-short)'{-s,--stop-short}'[Stop when either playlist runs out]'
+        '(-U --unique)'{-U,--unique}'[Skip an item already taken]'
       )
       case $(_plexdo_mode) in
         interleaved|chronological)
@@ -422,22 +430,18 @@ _plexdo_subcommand() {
             '2:playlist:{_plexdo_playlists_or_keys $(_plexdo_positional 0)}' \
             '*:rating key:_plexdo_rating_keys'
           ;;
+        merge)
+          _arguments $_plexdo_global_opts $how $mixing $pfx $m3u $target $over \
+            '1:user:_plexdo_users' \
+            '2:new playlist name:' \
+            '3:first playlist:{_plexdo_playlists_or_keys $(_plexdo_positional 0)}' \
+            '4:second playlist:{_plexdo_playlists_or_keys $(_plexdo_positional 0)}'
+          ;;
         *)
           # No mode yet, so nothing says what an argument would be.
           _arguments $_plexdo_global_opts $how $pfx $m3u $target $over
           ;;
       esac
-      ;;
-    merge-build)
-      _arguments $_plexdo_global_opts $pfx $m3u $target \
-        '(-o --overwrite)'{-o,--overwrite}'[Replace an existing playlist of the same name]' \
-        '--ratio[Take A items from the first, then B from the second]:ratio (A\:B):' \
-        '(-s --stop-short)'{-s,--stop-short}'[Stop when either playlist runs out]' \
-        '(-U --unique)'{-U,--unique}'[Skip an item already taken]' \
-        '1:user:_plexdo_users' \
-        '2:new playlist name:' \
-        '3:first playlist:{_plexdo_playlists_or_keys $(_plexdo_positional 0)}' \
-        '4:second playlist:{_plexdo_playlists_or_keys $(_plexdo_positional 0)}'
       ;;
     playlist-copy)
       local -a whom

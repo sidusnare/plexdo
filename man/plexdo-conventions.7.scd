@@ -117,7 +117,7 @@ error.
 
 An argument shown as _ratingKey_ is the numeric key Plex gives every show,
 season, episode, film, track, and photo. *plexdo-library-list*(1),
-*plexdo-show-list*(1), *plexdo-search*(1), and *plexdo-show-metadata*(1)
+*plexdo-show-list*(1), *plexdo-search*(1), and *plexdo-metadata*(1)
 all report them. Items are named by ratingKey only; titles are not
 accepted, since many items share one.
 
@@ -382,13 +382,12 @@ _~/.local/etc/plexdo.ini_, _plexdo.ini.migrated_
 
 *plexdo*(1), and a page per command.
 
-Libraries and titles: *plexdo-album-list*(1), *plexdo-albums-list*(1),
-*plexdo-libraries-list*(1), *plexdo-library-list*(1),
-*plexdo-missing-find*(1), *plexdo-search*(1), *plexdo-show-list*(1),
-*plexdo-show-metadata*(1), *plexdo-titles-export*(1).
+Libraries and titles: *plexdo-album-list*(1), *plexdo-find-missing*(1),
+*plexdo-libraries-list*(1), *plexdo-library-list*(1), *plexdo-metadata*(1),
+*plexdo-search*(1), *plexdo-show-list*(1), *plexdo-titles-export*(1).
 
-Playlists: *plexdo-merge-build*(1), *plexdo-playlist-build*(1),
-*plexdo-playlist-clean*(1), *plexdo-playlist-copy*(1),
+Playlists: *plexdo-playlist-build*(1), *plexdo-playlist-clean*(1),
+*plexdo-playlist-copy*(1),
 *plexdo-playlist-export*(1), *plexdo-playlist-list*(1),
 *plexdo-playlist-remove*(1), *plexdo-playlists-list*(1).
 

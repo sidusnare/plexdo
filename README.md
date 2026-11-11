@@ -168,8 +168,8 @@ them in these groups, sorted by name within each:
 
 | Group | Commands |
 | --- | --- |
-| Libraries and titles | `album-list`, `albums-list`, `libraries-list`, `library-list`, `missing-find`, `search`, `show-list`, `show-metadata`, `titles-export` |
-| Playlists | `merge-build`, `playlist-build`, `playlist-clean`, `playlist-copy`, `playlist-export`, `playlist-list`, `playlist-remove`, `playlists-list` |
+| Libraries and titles | `album-list`, `find-missing`, `libraries-list`, `library-list`, `metadata`, `search`, `show-list`, `titles-export` |
+| Playlists | `playlist-build`, `playlist-clean`, `playlist-copy`, `playlist-export`, `playlist-list`, `playlist-remove`, `playlists-list` |
 | Playback and watched state | `player-remote-play`, `read`, `show-watched-cp`, `wait` |
 | Server | `rescan`, `status`, `users-list` |
 | Account and configuration | `login`, `logout`, `set-pin`, `write-config-example`, `write-secrets-example` |
@@ -247,8 +247,8 @@ large run does not flood the server or trip its rate limiting. Smaller runs
 are never paced.
 
 ```bash
-plexdo --throttle 0 missing-find      # as fast as the server will answer
-plexdo --throttle 1 missing-find      # gentler on a Raspberry Pi
+plexdo --throttle 0 find-missing      # as fast as the server will answer
+plexdo --throttle 1 find-missing      # gentler on a Raspberry Pi
 ```
 
 When pacing kicks in it says so, with the expected duration:
@@ -276,21 +276,63 @@ identical rules apply to library IDs and titles.
 | Command | Purpose |
 | --- | --- |
 | `libraries-list` | Library IDs, types, and titles |
-| `library-list <library> [--album A]` | Titles in a library |
-| `albums-list <library>` | Albums in a music or photo library, with played state |
+| `library-list <library> [-t TYPE] [--filter F=V] [--category C]` | What a library holds, by type, filter, or folder |
 | `album-list <rating_key>` | One album's tracks, photos, or clips, and how far through each you are |
-| `missing-find <show> [-l L] [-A] [-s N,N]` | Seasons with gaps in their episode numbering |
+| `find-missing <show> [-l L] [-A] [-s N,N]` | Seasons with gaps in their episode numbering |
 | `show-list <rating_key> [--m3u P]` | Every episode of a show, specials skipped |
 | `users-list` | User IDs, account types, titles, usernames, and emails |
 | `playlists-list <user_id>` | A user's playlists |
 | `playlist-list <user_id> <playlist\|ratingKey> [--m3u P]` | Items in one playlist |
-| `show-metadata <rating_key>` | Full metadata for one item, including its file paths |
+| `metadata <rating_key>` | Full metadata for one item, including its file paths |
 | `search <user_id> <query> [--media-type T] [--library-id N]` | Search as a given user |
 
-`library-list` shows the rating key, title, release date, rating, and studio as
-a table. A machine-readable format carries **every field the server returned**
-for each item, and for a show library nests each show's episodes under a
-`seasons` object:
+`library-list` lists one type of item. By default a movie library lists its
+movies, a show library its shows, and a music or photo library its albums;
+`-t/--type` names another, among those Plex serves for that kind of library
+through `/library/sections/ID/all?type=`:
+
+| Library | Types (default first) |
+| --- | --- |
+| movie | `movie`, `collection` |
+| show | `show`, `season`, `episode`, `collection` |
+| music | `album`, `artist`, `track`, `collection` |
+| photo | `album`, `photo`, `clip` |
+
+```bash
+plexdo library-list "TV Shows"                 # the shows
+plexdo library-list "TV Shows" -t episode      # every episode, with its show
+plexdo library-list Music -t track             # every track
+```
+
+Any library can also be listed by folder, as its files are laid out on disk.
+`-t folder` lists the folders at the top; `--path` opens one, as folder titles
+separated by `/`, one request per level:
+
+```bash
+plexdo library-list Movies -t folder
+plexdo library-list Movies --path "Films/Heat (1995)"
+```
+
+`--filter FIELD=VALUE` narrows a listing on any field the library can be
+filtered by, as Plex's own filters can: `genre`, `collection`, `label`,
+`contentRating`, `year`, `decade`, `studio`, and the rest. `!=` excludes, and
+`>` and `<` compare a number or a date; quote those, or the shell reads them
+as a redirection. Repeat it and every one must match.
+`--category NAME` is short for `--filter genre=NAME`, and `--list-categories`
+lists the genres there are:
+
+```bash
+plexdo library-list Movies --list-categories              # the genres
+plexdo library-list Movies --category Crime --filter 'year>1990'
+plexdo library-list "TV Shows" -t episode --filter 'genre!=Reality'
+plexdo library-list Movies --filter 'addedAt>-30d'        # the last month
+```
+
+A field the library does not have is an error that lists those it does.
+
+A table is kept compact, with columns to suit the type. A machine-readable
+format carries **every field the server returned** for each item, and for a
+show library nests each show's episodes under a `seasons` object:
 
 ```bash
 plexdo library-list "TV Shows" -f json | jq '.[0].seasons | keys'
@@ -307,15 +349,16 @@ plexdo library-list Movies -f json | jq -r '.[].files[]'
 Note that `sourceURI` is **not** a file name. It is the remote server URI of an
 item in someone else's playlist, and is null for anything on your own server.
 
-Those fields are the ones present in the library listing; `show-metadata` is
+Those fields are the ones present in the library listing; `metadata` is
 the route to the full picture for a single item.
 
 ### Albums
 
-`albums-list` lists the albums of a music or photo library, nested photo
-albums included. The table shows how many items each album holds and how
-many have been played. A machine-readable format adds each album's played
-state (`played`, `in progress`, or `unplayed`) and its contents, every
+`library-list` lists the albums of a music or photo library by default,
+nested photo albums included. The table shows how many items each album
+holds and how many have been played. A machine-readable format adds each
+album's played state (`played`, `in progress`, or `unplayed`) and its
+contents, every
 track, photo, or clip with its own state, view count, and last-played time.
 Anything part way through also carries `progress`, a percentage: for an
 item, how far its resume point is into it; for an album, how much of its
@@ -323,9 +366,10 @@ running time has been played. Photos have no played state, so theirs is
 null.
 
 ```bash
-plexdo albums-list Music                    # one row per album
-plexdo albums-list Music --json |           # albums part way through
-    jq -r '.[] | select(.state == "in progress") | "\(.progress)% \(.title)"'
+plexdo library-list Music                   # one row per album
+plexdo library-list Music --json |          # albums part way through
+    jq -r '.[] | select(.state == "in progress") |
+        "\(.progress)% \(.title)"'
 ```
 
 Played state is the connected account's own. The music table costs one
@@ -343,18 +387,18 @@ resume point, length, and percentage:
 | 3 | 4130      | 3     | Blue in Green      | 5:37   | unplayed    |                     |
 ```
 
-JSON and YAML carry the same record `albums-list` gives for each album; CSV
+JSON and YAML carry the same record `library-list` gives for each album; CSV
 and CLIXML, which cannot nest, carry one row per item.
 
 ### Finding gaps
 
 ```bash
-plexdo missing-find "Breaking Bad"          # one show, by title
-plexdo missing-find 1234                    # or by ratingKey
-plexdo missing-find "The Wire" -s 1,3       # only these seasons
-plexdo missing-find "The Wire" -l "TV Shows"
-plexdo missing-find -A                      # every show, every library
-plexdo missing-find -A -l "TV Shows"        # every show in one library
+plexdo find-missing "Breaking Bad"          # one show, by title
+plexdo find-missing 1234                    # or by ratingKey
+plexdo find-missing "The Wire" -s 1,3       # only these seasons
+plexdo find-missing "The Wire" -l "TV Shows"
+plexdo find-missing -A                      # every show, every library
+plexdo find-missing -A -l "TV Shows"        # every show in one library
 ```
 
 Reports the episode numbers missing between the start of a season and its
@@ -379,7 +423,7 @@ plexdo playlist-build -I "Mixed Run" 101 202       # round-robin across shows
 plexdo playlist-build -C "By Air Date" 101 202     # date-sorted, shows and movies
 plexdo playlist-build -R 0 "Source" "Shuffled"     # secrets-backed shuffle
 plexdo playlist-build -A 0 "Mix" 55 56 57          # add items to a playlist
-plexdo merge-build 0 "Mixed" "Shows" "Films" --ratio 2:1  # two shows per film
+plexdo playlist-build -M 0 Mixed Shows Films --ratio 2:1  # two shows per film
 ```
 
 `playlist-build` takes exactly one flag saying how to build, and with it what
@@ -391,6 +435,7 @@ the arguments are:
 | `-C/--chronological` | `NAME ratingKey...` | Shows and movies by original air date |
 | `-R/--randomize` | `USER SOURCE DEST` | A shuffle of an existing playlist |
 | `-A/--append` | `USER PLAYLIST ratingKey...` | Nothing new: adds items to an existing playlist |
+| `-M/--merge` | `USER NAME FIRST SECOND` | Two existing playlists mixed at a ratio |
 
 Playlists are always built fully in memory, validated, previewed, and then
 created in exactly one API call. `--dry-run` stops after the preview.
@@ -411,23 +456,24 @@ terminal to answer on, it stops and names the item that needs a date.
 unless all of them are found. Note the case: `-A` is `--append`, and `-a` is
 `--all-users`.
 
-`merge-build` mixes two playlists, taking items from each in turn at
+`-M` mixes two playlists, taking items from each in turn at
 `--ratio A:B`: A from the first, then B from the second. The default, 1:1,
 alternates them. Each keeps its own order, and once one runs out the rest of
 the other follows, so nothing is left out; `--verbose` says how many items
 that is. `-s/--stop-short` stops there instead, so the whole result keeps the
 ratio. `-U/--unique` skips an item already taken, and the next item of the
-same playlist takes its place. It reads both playlists before writing, so
-either may also be the destination:
+same playlist takes its place. `--ratio`, `-s`, and `-U` go only with `-M`.
+It reads both playlists before writing, so either may also be the
+destination:
 
 ```bash
-plexdo merge-build 0 "Mix" "Mix" "New Finds" --ratio 3:1 -o  # one new in four
-plexdo merge-build 0 "Weekend" Shows Films --ratio 2:1 -s -U  # ends with a film
+plexdo playlist-build -M 0 Mix Mix "New Finds" --ratio 3:1 -o  # one new in four
+plexdo playlist-build -M 0 Weekend Shows Films --ratio 2:1 -s -U  # ends with a film
 ```
 
 #### Who the playlist is built for
 
-`merge-build` and `playlist-build`, except with `-A`, take `-u/--user` and
+Every `playlist-build` mode but `-A` takes `-u/--user` and
 `-a/--all-users`. Without either, the playlist lands on the account the
 items came from.
 
@@ -578,8 +624,8 @@ Separators follow the prefix, so a Windows prefix produces backslashes. Note
 that the *library root* is what gets replaced, so one prefix maps every
 library onto the same place; export each library separately if they are
 mounted apart. A file below no known library root is appended whole, with one
-warning. `--prefix` applies to `--m3u` on `playlist-build`, `merge-build`,
-`playlist-list`, and `show-list` too, and
+warning. `--prefix` applies to `--m3u` on `playlist-build`, `playlist-list`,
+and `show-list` too, and
 to the photo gallery. Without it, exports keep the server's own paths.
 
 ### Streaming

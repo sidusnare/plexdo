@@ -234,9 +234,9 @@ def register(
     sub: "argparse._SubParsersAction",
     parents: "list[argparse.ArgumentParser]",
 ) -> None:
-    """Register the missing-find subparser."""
+    """Register the find-missing subparser."""
     parser = sub.add_parser(
-        "missing-find",
+        "find-missing",
         parents=parents,
         help="Find gaps in the episode numbering of a show.",
         description=textwrap.fill(
@@ -300,6 +300,6 @@ def register(
     )
 
 
-COMMANDS = {"missing-find": cmd_find_missing}
+COMMANDS = {"find-missing": cmd_find_missing}
 
 REQUIRES_PLEX = frozenset(COMMANDS)

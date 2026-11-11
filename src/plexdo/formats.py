@@ -5,7 +5,7 @@
 """Serialisers for the machine-readable output formats.
 
 Every renderer accepts either a list of records or a single record, so that a
-command emitting one object (``show-metadata``, ``login``) and a command
+command emitting one object (``metadata``, ``login``) and a command
 emitting many (``library-list``) can share one code path.
 """
 

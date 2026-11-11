@@ -19,18 +19,22 @@ or add items to one
 *plexdo playlist-build* *-A* _USER_ _PLAYLIST_ _ratingKey_...
 \[_GLOBAL OPTIONS_]
 
+*plexdo playlist-build* *-M* _USER_ _NAME_ _FIRST_ _SECOND_ [*--ratio* _A_:_B_]
+\[*-s*] [*-U*] [*-o*] [*--m3u* _PATH_ [*-p* _PREFIX_]] [*-u* _USER_ | *-a*]
+\[_GLOBAL OPTIONS_]
+
 # DESCRIPTION
 
 Builds a new playlist, or adds to an existing one. Exactly one of *-I*,
-*-C*, *-R*, and *-A* says which, and with it what the arguments are: see
-*MODES*.
+*-C*, *-R*, *-A*, and *-M* says which, and with it what the arguments are:
+see *MODES*.
 
-*-I*, *-C*, and *-R* build the whole list before anything is created, show
-it as a numbered preview, and create the playlist in a single request.
+*-I*, *-C*, *-R*, and *-M* build the whole list before anything is created,
+show it as a numbered preview, and create the playlist in a single request.
 Nothing is created when the list would be empty. By default the playlist
 goes to the account its items came from: the admin account for *-I* and
-*-C*, and _USER_'s own account for *-R*. *-u* creates it for another user
-instead, and *-a* for every user. See *USERS* below.
+*-C*, and _USER_'s own account for *-R* and *-M*. *-u* creates it for
+another user instead, and *-a* for every user. See *USERS* below.
 
 *-A* changes a playlist where it is, so it creates nothing and takes none
 of *-o*, *-u*, *-a*, *--m3u*, and *-p*.
@@ -67,6 +71,13 @@ of *-o*, *-u*, *-a*, *--m3u*, and *-p*.
 	same item more than once. A smart playlist is refused, and nothing
 	is looked up: its contents come from its filter.
 
+*-M*, *--merge*
+	Mix two of _USER_'s playlists into a new playlist titled _NAME_,
+	taking items from each in turn at a ratio: by default one from
+	_FIRST_, then one from _SECOND_, and so on. With *--ratio 2:1* it
+	takes two from _FIRST_, then one from _SECOND_. Each playlist keeps
+	its own order, and both are left as they were. See *MIXING*.
+
 # ARGUMENTS
 
 _NAME_ (*-I*, *-C*)
@@ -79,9 +90,10 @@ _ratingKey_... (*-I*, *-C*, *-A*)
 	a show or a film; with *-A* anything _USER_ can see. Anything that is
 	not a whole number is an error.
 
-_USER_ (*-R*, *-A*)
-	Whose playlist _SOURCE_ or _PLAYLIST_ is, by numeric user ID or
-	title; *0* is the admin account. See *plexdo-conventions*(7).
+_USER_ (*-R*, *-A*, *-M*)
+	Whose playlists _SOURCE_, _PLAYLIST_, or _FIRST_ and _SECOND_ are,
+	by numeric user ID or title; *0* is the admin account. See
+	*plexdo-conventions*(7).
 
 _SOURCE_ (*-R*)
 	The playlist to shuffle, by title or ratingKey. A value made only of
@@ -95,12 +107,38 @@ _PLAYLIST_ (*-A*)
 	The playlist to add to, by title or ratingKey. A value made only of
 	digits is always taken as a ratingKey.
 
+_NAME_ (*-M*)
+	The title of the new playlist.
+
+_FIRST_, _SECOND_ (*-M*)
+	The two playlists to mix, by title or ratingKey. _FIRST_ starts the
+	result. They may be the same playlist, and either may be _NAME_.
+
 The arguments may come before or after the options, but not either side of
 one: the arguments after _NAME_ or _USER_ must follow one another.
 
 # OPTIONS
 
-These apply to *-I*, *-C*, and *-R*, and are refused with *-A*.
+These apply to *-M* alone, and are refused with any other mode.
+
+*--ratio* _A_:_B_
+	Take _A_ items from _FIRST_, then _B_ from _SECOND_, in turn. Both are
+	whole numbers above 0. The default is *1:1*.
+
+*-s*, *--stop-short*
+	Stop when either playlist runs out, leaving out the rest of the other.
+	A turn cut short because a playlist had fewer items left than the
+	ratio asks for still counts: the result stops at the first turn a
+	playlist has nothing at all to give.
+
+*-U*, *--unique*
+	Skip an item already taken, so an item in both playlists, or twice in
+	one, is listed once, where it first appears. The next item of the same
+	playlist takes the place of one skipped, so the ratio still holds.
+	Items are matched by ratingKey rather than title, so two episodes
+	sharing a title are both kept.
+
+These apply to *-I*, *-C*, *-R*, and *-M*, and are refused with *-A*.
 
 *-o*, *--overwrite*
 	Replace an existing playlist of the same title. Without it, a taken
@@ -124,6 +162,27 @@ These apply to *-I*, *-C*, and *-R*, and are refused with *-A*.
 	Rewrite the paths written by *--m3u* so the server's library root is
 	replaced by _PREFIX_. See *REWRITING EXPORTED PATHS* in
 	*plexdo-conventions*(7).
+
+# MIXING
+
+Under *-M*, a playlist has run out on the first turn it has nothing to
+give. By default the rest of the other then follows on its own, so nothing
+is left out; *--verbose* says how many items that is. With *-s* the result
+stops there instead, ending with the last turn both playlists took part in,
+so all of it keeps the ratio. Playlists whose sizes match the ratio, such as
+20 and 10 items at 2:1, run out together, and *-s* changes nothing.
+
+Both playlists are read before anything is written, so either may also be
+_NAME_: with *-o*, *playlist-build -M 0 Mix Mix Extras -o* mixes Extras into
+Mix.
+
+By default an item in both playlists appears twice, as Plex permits; *-U*
+keeps only its first appearance. An empty playlist is reported with a
+warning, since a mistyped name that matched the wrong playlist looks exactly
+like one that happens to be empty; the result is then the other playlist
+unchanged, or, with *-s*, nothing. *--ratio 1:1* and *--ratio 3:3* differ:
+the second takes runs of three. Under *-U* and *-s* together, a playlist
+with only repeats left has run out: it has nothing new to give.
 
 # MISSING AIR DATES
 
@@ -208,7 +267,12 @@ to be created for them.
 
 # OPTION INTERACTIONS
 
-- *-I*, *-C*, *-R*, and *-A* are mutually exclusive, and one is required.
+- *-I*, *-C*, *-R*, *-A*, and *-M* are mutually exclusive, and one is
+  required.
+- *--ratio*, *-s*, and *-U* go only with *-M*. *-u* is *--user*, the
+  account the playlist is created for; *-U* is *--unique*.
+- Under *-M*, _USER_ always names where the playlists are read from; *-u*
+  and *-a* only change where _NAME_ is created.
 - *-A* refuses *-o*, *-u*, *-a*, *--m3u*, and *-p*: it adds to a playlist
   where it is. *-A* is *--append*; *-a* is *--all-users*.
 - *-u* and *-a* are mutually exclusive; giving both is an error.
@@ -217,7 +281,8 @@ to be created for them.
   the preview, and nothing is created or removed. Under *-u* or *-a* it
   makes that user *skipped*, and the others carry on.
 - *-o* replaces the existing playlist; under *-u* or *-a*, on every user
-  who has one, reported as *replaced*.
+  who has one, reported as *replaced*. Under *-M* that may be _FIRST_ or
+  _SECOND_: both are read first, so their items are not lost.
 - *--prefix* only changes the paths written by *--m3u*; without *--m3u* it
   has no effect.
 - *--m3u* is written once, whichever users the playlist is created for,
@@ -229,15 +294,18 @@ to be created for them.
 failed; their lines say so.
 
 *1* when a ratingKey is not found, or is not a show (*-I*) or a show or film
-(*-C*); when _USER_, _SOURCE_, or _PLAYLIST_ is not found, or _USER_ has
+(*-C*); when _USER_, _SOURCE_, _PLAYLIST_, _FIRST_, or _SECOND_ is not
+found, or _USER_ has
 nothing shared and cannot be acted on; when the list would be empty; when a
 date has to be asked for and there is no input to answer with; or when the
 new title is taken without *-o* on the default account. Under *-A*, one
 ratingKey not found means nothing is added, and a smart playlist is refused.
 
 *2* for a usage error: no mode or more than one, the wrong number of
-arguments for the mode, a ratingKey that is not a whole number, *-u* with
-*-a*, or *-A* with an option it refuses. See *plexdo-conventions*(7).
+arguments for the mode, a ratingKey that is not a whole number, a ratio
+that is not two whole numbers above 0, *-u* with *-a*, *-A* with an option
+it refuses, or *--ratio*, *-s*, or *-U* without *-M*. See
+*plexdo-conventions*(7).
 
 # EXAMPLES
 
@@ -285,6 +353,25 @@ Shuffle the admin account's playlist and give the result to Alice:
 plexdo playlist-build -R 0 "Movie Night" "Shuffled for you" -u Alice
 ```
 
+Alternate two playlists, one item from each:
+
+```
+plexdo playlist-build -M 0 "Date Night" "Her Picks" "His Picks"
+```
+
+Two shows for every film, ending with the last film, and without an episode
+the two playlists share appearing twice:
+
+```
+plexdo playlist-build -M 0 Weekend Shows Films --ratio 2:1 -s -U
+```
+
+Mix new finds into an existing playlist, one for every three, in place:
+
+```
+plexdo playlist-build -M 0 Mix Mix "New Finds" --ratio 3:1 -o
+```
+
 Add three episodes to a playlist:
 
 ```
@@ -300,6 +387,6 @@ plexdo playlist-build -A Alice "The Wire" \\
 
 # SEE ALSO
 
-*plexdo-merge-build*(1), *plexdo-playlist-copy*(1),
+*plexdo-playlist-copy*(1),
 *plexdo-playlist-list*(1), *plexdo-playlist-clean*(1),
 *plexdo-show-list*(1), *plexdo-conventions*(7), *plexdo*(1)

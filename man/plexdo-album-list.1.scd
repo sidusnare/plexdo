@@ -20,11 +20,11 @@ through.
 
 Played state is kept by Plex for each account, and what is shown is the
 state of the account plexdo is connected as. *PLAYED STATE* in
-*plexdo-albums-list*(1) says what *played*, *in progress*, and *unplayed*
+*plexdo-library-list*(1) says what *played*, *in progress*, and *unplayed*
 mean, and how progress is worked out, for an item and for an album.
 
 An album inside a photo album is not one of its items. It is left out, and
-the table's summary says how many there are; *plexdo-albums-list*(1) lists
+the table's summary says how many there are; *plexdo-library-list*(1) lists
 them, and *album-list* shows any one of them by its own ratingKey.
 
 The album and its contents take two requests in all, whatever its size.
@@ -32,7 +32,7 @@ The album and its contents take two requests in all, whatever its size.
 # ARGUMENTS
 
 _ratingKey_
-	The album's ratingKey, as *plexdo-albums-list*(1) shows it. Anything
+	The album's ratingKey, as *plexdo-library-list*(1) shows it. Anything
 	that is not an album, such as a track, an artist, or a show, is
 	refused.
 
@@ -110,7 +110,7 @@ The *state*, *progress*, and *last played* columns are left out for an album
 of photos alone.
 
 In JSON and YAML, the album is one record, the same record
-*plexdo-albums-list*(1) gives for each album, with its items under
+*plexdo-library-list*(1) gives for each album, with its items under
 *contents*: see *OUTPUT* in that page for every field. In CSV and CLIXML,
 each row is one of those item records.
 
@@ -131,7 +131,7 @@ plexdo album-list 4127
 Find an album's ratingKey first, then show it:
 
 ```
-plexdo albums-list Music | grep "Kind of Blue"
+plexdo library-list Music | grep "Kind of Blue"
 plexdo album-list 4127
 ```
 
@@ -151,5 +151,5 @@ plexdo album-list 4127 -f csv > tracks.csv
 
 # SEE ALSO
 
-*plexdo-albums-list*(1), *plexdo-show-metadata*(1), *plexdo-show-watched-cp*(1),
+*plexdo-library-list*(1), *plexdo-metadata*(1), *plexdo-show-watched-cp*(1),
 *plexdo-conventions*(7), *plexdo*(1)

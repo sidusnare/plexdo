@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
-"""albums-list and album-list: albums, contents, played state, progress."""
+"""Albums, through library-list and album-list: contents, state, progress."""
 
 import datetime
 import json
@@ -16,7 +16,6 @@ from plexdo.commands.albums import (
     album_record,
     album_summary,
     cmd_list_album,
-    cmd_list_albums,
     content_record,
     item_rows,
     item_state,
@@ -96,11 +95,34 @@ class Plex:
         self.library = Library(section)
 
 
-def run(section, capsys, fmt="json"):
+@pytest.fixture(autouse=True)
+def no_cache(monkeypatch):
+    """Listing writes the completion cache, which is not under test here."""
+    from plexdo.commands import libraries
+
+    monkeypatch.setattr(libraries, "write_cache", lambda *a: None)
+    monkeypatch.setattr(libraries, "write_word_caches", lambda *a: None)
+
+
+def run(section, capsys, fmt="json", list_type=None):
+    """library-list on the section, as a music or photo library defaults."""
     import argparse
 
-    args = argparse.Namespace(library_id=1, format=fmt, throttle=0, wide=True)
-    cmd_list_albums(Plex(section), args)
+    from plexdo.commands.libraries import cmd_list_titles
+
+    args = argparse.Namespace(
+        library_id=1,
+        format=fmt,
+        throttle=0,
+        wide=True,
+        list_type=list_type,
+        path=None,
+        album=None,
+        filters=None,
+        categories=None,
+        list_categories=False,
+    )
+    cmd_list_titles(Plex(section), args)
     out = capsys.readouterr().out
     return json.loads(out) if fmt == "json" else out
 
@@ -357,7 +379,7 @@ def test_nested_photo_albums_follow_their_parent(capsys):
     assert [c["title"] for c in rows[0]["contents"]] == ["q"]
 
 
-def test_an_list_albumsed_at_the_top_and_nested_is_listed_once(capsys):
+def test_an_album_listed_at_the_top_and_nested_is_listed_once(capsys):
     inner = Album(2, "Day 1", [Photo(20, "p")])
     outer = Album(1, "Trip", [inner])
     rows = run(Section("photo", [outer, inner]), capsys)
@@ -365,21 +387,33 @@ def test_an_list_albumsed_at_the_top_and_nested_is_listed_once(capsys):
 
 
 @pytest.mark.parametrize("stype", ["movie", "show"])
-def test_other_libraries_are_refused(stype, capsys):
-    with pytest.raises(SystemExit, match="music or photo library"):
-        run(Section(stype, [], title="Films"), capsys)
+def test_albums_are_refused_where_a_library_holds_none(stype, capsys):
+    with pytest.raises(SystemExit, match="holds no album items"):
+        run(Section(stype, [], title="Films"), capsys, list_type="album")
+
+
+@pytest.mark.parametrize("stype", ["artist", "photo"])
+def test_album_is_the_default_and_may_be_named(stype, capsys):
+    album = Album(1, "Trip", [], parentTitle="Band")
+    assert [r["title"] for r in run(Section(stype, [album]), capsys)] == [
+        "Trip"
+    ]
+    named = run(Section(stype, [album]), capsys, list_type="album")
+    assert [r["title"] for r in named] == ["Trip"]
 
 
 def test_an_empty_library_lists_nothing(capsys):
     assert run(Section("artist", []), capsys) == []
 
 
-def test_the_command_takes_a_library_by_id_or_title():
+def test_albums_list_is_gone_and_library_list_takes_its_place():
     from plexdo.cli import build_parser
 
     parser = build_parser()
-    assert parser.parse_args(["albums-list", "Music"]).library_id == "Music"
-    assert parser.parse_args(["albums-list", "4", "--json"]).format == "json"
+    with pytest.raises(SystemExit):
+        parser.parse_args(["albums-list", "Music"])
+    args = parser.parse_args(["library-list", "Music", "-t", "album"])
+    assert (args.library_id, args.list_type) == ("Music", "album")
 
 
 # --- album-list -----------------------------------------------------------
@@ -479,7 +513,7 @@ def test_nested_photo_albums_are_not_contents(capsys):
     record = show(album, capsys)
     assert [c["title"] for c in record["contents"]] == ["a"]
     summary = album_summary(record, 1)
-    assert summary["nested albums"] == "1, listed by albums-list"
+    assert summary["nested albums"] == "1, listed by library-list"
 
 
 def test_the_summary_shows_only_what_applies():

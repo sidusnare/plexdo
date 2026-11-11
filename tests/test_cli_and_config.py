@@ -109,20 +109,63 @@ def test_minus_one_parses_as_the_one_way_flag_not_a_negative_number(parser):
     )
 
 
-def test_build_merge_keeps_minus_u_for_the_target_user(parser):
-    """-U is --unique; -u stays --user, as on every build command."""
-    args = parser.parse_args(
-        ["merge-build", "0", "Mix", "a", "b", "-s", "-U", "-u", "7"]
+def test_merge_keeps_minus_u_for_the_target_user(parser):
+    """-U is --unique; -u stays --user, as in every playlist-build mode."""
+    args = parse_arguments(
+        parser,
+        ["playlist-build", "-M", "0", "Mix", "a", "b", "-s", "-U", "-u", "7"],
     )
     assert args.stop_short and args.unique
     assert args.dest_user_id == "7"
-    default = parser.parse_args(["merge-build", "0", "Mix", "a", "b"])
+    default = parse_arguments(
+        parser, ["playlist-build", "-M", "0", "Mix", "a", "b"]
+    )
     assert default.ratio == (1, 1)
 
 
+@pytest.mark.parametrize("flag", ["-M", "--merge"])
+def test_merge_names_its_four_arguments(parser, flag):
+    args = parse_arguments(
+        parser,
+        [
+            "playlist-build",
+            flag,
+            "0",
+            "Mix",
+            "Shows",
+            "Films",
+            "--ratio",
+            "2:1",
+        ],
+    )
+    assert (args.mode, args.user_id, args.name) == ("merge", "0", "Mix")
+    assert (args.first, args.second, args.ratio) == ("Shows", "Films", (2, 1))
+
+
 @pytest.mark.parametrize(
-    "command", ["playlist-build", "merge-build", "playlist-copy"]
+    "argv,said",
+    [
+        (["-M", "0", "Mix", "a"], "--merge takes USER NAME FIRST SECOND"),
+        (["-M", "0", "Mix", "a", "b", "c"], "got 5 argument(s)"),
+        (["-I", "Mix", "1", "--ratio", "2:1"], "--ratio can only be used"),
+        (["-R", "0", "a", "b", "-s"], "--stop-short can only be used"),
+        (["-A", "0", "a", "1", "-U"], "--unique can only be used"),
+        (["-M", "0", "Mix", "a", "b", "--ratio", "0:1"], "above 0"),
+    ],
 )
+def test_merge_usage_errors_exit_2(parser, argv, said, capsys):
+    with pytest.raises(SystemExit) as exc:
+        parse_arguments(parser, ["playlist-build", *argv])
+    assert exc.value.code == 2
+    assert said in capsys.readouterr().err
+
+
+def test_merge_build_is_gone(parser):
+    with pytest.raises(SystemExit):
+        parser.parse_args(["merge-build", "0", "Mix", "a", "b"])
+
+
+@pytest.mark.parametrize("command", ["playlist-build", "playlist-copy"])
 def test_every_creating_command_offers_overwrite(parser, command):
     action = {
         a.dest
@@ -140,7 +183,6 @@ def test_every_creating_command_offers_overwrite(parser, command):
         "playlist-export",
         "titles-export",
         "playlist-build",
-        "merge-build",
     ],
 )
 def test_every_export_command_offers_a_path_prefix(parser, command):

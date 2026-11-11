@@ -783,7 +783,7 @@ naming rule above.
 ## OUTPUT
 
 `output(data, args)` dispatches on `output_format(args)`, accepting **either**
-a single record or a list so `show-metadata` and `library-list` share the path.
+a single record or a list so `metadata` and `library-list` share the path.
 No command reaches for `json.dumps` directly.
 
 ### Formats
@@ -845,12 +845,12 @@ no benefit. Announce once at info level with the expected duration and how to
 turn it off.
 
 Apply wherever a loop makes one request per element and the count can exceed
-50: the seasons walk in `library-list`, `missing-find -A`, applying watched
+50: the seasons walk in `library-list`, `find-missing -A`, applying watched
 state in `show-watched-cp`, removing entries in `playlist-clean`, reading each
-source in `merge-build`, `collect_photos`, the walk of a show library in
+source of `playlist-build --merge`, `collect_photos`, the walk of a show library in
 `collect_library_items`, and the per-user loop in
 `fanout.run_per_user`, which serves `playlist-copy --all`, and
-`playlist-build` and `merge-build` given `-a`. Functions needing it take an optional `args`.
+`playlist-build` given `-a`. Functions needing it take an optional `args`.
 
 ## RECORDS
 
@@ -880,7 +880,7 @@ since a self-referential object or one using `__slots__` would otherwise
 recurse or raise. Reduce tag objects to their `.tag` and dates to text.
 
 `records.file_paths(item)` is the **only** media traversal in the project:
-M3U export, the photo gallery, `show-metadata`, and `loaded_fields` all use
+M3U export, the photo gallery, `metadata`, and `loaded_fields` all use
 it. An item may have several versions each with several parts, so it returns a
 list. `loaded_fields` also lifts the paths to a top-level `files` key, because
 they are otherwise three levels down.
@@ -933,10 +933,12 @@ A command is named `<object>-<action>`: what it acts on, then what it does
 to it (`playlist-list`, `playlist-export`, `libraries-list`). Plural objects
 list many (`playlists-list USER`), singular ones show one (`playlist-list
 USER PLAYLIST`). The exceptions are fixed names, kept exactly:
-`merge-build`, `show-watched-cp`, `missing-find`, `titles-export`, the
-single words (`search`, `read`, `rescan`, `status`, `wait`, `login`,
-`logout`), and `show-metadata`, `player-remote-play`, `set-pin`,
-`write-config-example`, and `write-secrets-example`. There are no aliases:
+`show-watched-cp`, `find-missing`, `titles-export`, the
+single words (`metadata`, `search`, `read`, `rescan`, `status`, `wait`,
+`login`, `logout`), and `player-remote-play`, `set-pin`,
+`write-config-example`, and `write-secrets-example`. 3.0.0 called two of
+them `missing-find` and `show-metadata`; the next release named them
+`find-missing` and `metadata`, again with no alias. There are no aliases:
 one command, one name, so `COMMANDS` has exactly one entry per command.
 
 Releases up to 2.1.0-rc.1 named commands `<action>-<object>`. 3.0.0 renamed
@@ -953,8 +955,8 @@ command must be in exactly one group (a test holds it to the registry):
 
 | Group | Commands |
 | --- | --- |
-| libraries and titles | `album-list`, `albums-list`, `libraries-list`, `library-list`, `missing-find`, `search`, `show-list`, `show-metadata`, `titles-export` |
-| playlists | `merge-build`, `playlist-build`, `playlist-clean`, `playlist-copy`, `playlist-export`, `playlist-list`, `playlist-remove`, `playlists-list` |
+| libraries and titles | `album-list`, `find-missing`, `libraries-list`, `library-list`, `metadata`, `search`, `show-list`, `titles-export` |
+| playlists | `playlist-build`, `playlist-clean`, `playlist-copy`, `playlist-export`, `playlist-list`, `playlist-remove`, `playlists-list` |
 | playback and watched state | `player-remote-play`, `read`, `show-watched-cp`, `wait` |
 | server | `rescan`, `status`, `users-list` |
 | account and configuration | `login`, `logout`, `set-pin`, `write-config-example`, `write-secrets-example` |
@@ -995,13 +997,39 @@ and a description saying what each mode takes.
 ### Listing and searching
 
 - `libraries-list` - columns `id`, `type`, `title`; writes the libraries cache.
-- `library-list LIBRARY [--album A]` - table columns are
-  `ratingKey`, `title`, `releaseDate`, `rating`, `studio`; a machine-readable
-  format carries every listed field and, for a show library, nests each show's
-  episodes under a `seasons` object keyed by season name. Always cache the
-  minimal `ratingKey`/`title` rows whatever the caller asked to see.
-- `albums-list LIBRARY` (`commands/albums.py`) - the albums of a music
-  (section type `artist`) or photo library; any other type exits 1. Music
+- `library-list LIBRARY [-t TYPE] [--filter F=V]... [--category C]...
+  [--list-categories] [--path PATH] [--album A]` - lists one
+  type of item. `libraries.LIST_TYPES` gives, for each section type, the
+  types Plex serves for it through `/library/sections/ID/all?type=`, the
+  default first: `movie` (movie, collection), `show` (show, season,
+  episode, collection), `artist`, a music library (album, artist, track,
+  collection), `photo` (album, photo, clip). `-t` choices are their union
+  plus `folder`; one the library cannot hold is a `sys.exit` naming those
+  it can. Kept as a table rather than asked of the server's
+  `filterTypes()`, which costs one or two requests a listing. Every type
+  but `album` is `section.all(libtype=TYPE)`, which plexapi sends as
+  `?type=N` with no validation request. `--album` lists photos through
+  `collect_photos` and implies `-t photo`; `--path` implies `-t folder`;
+  either with another `-t`, or the two together, is a usage error through a
+  `check_arguments` hook. `--album` outside a photo library is ignored with
+  a warning, as before.
+
+  A table row suits the type (`_table_row`): `ratingKey`, `title`,
+  `releaseDate`, `rating`, `studio` for movies, shows, and artists; an
+  episode adds `show`, `season`, `episode`; a season `show`, `season`; a
+  track `artist` (its own `originalTitle`, else the album artist), `album`,
+  `track`; seasons, tracks, photos, and clips show `date` in place of the
+  last three; a collection `items`. A machine-readable format carries every
+  listed field and, for shows, nests each show's episodes under a `seasons`
+  object keyed by season name. Write the completion cache, minimal
+  `ratingKey`/`title` rows, **only for the default listing** with no
+  `--album`, so what completion offers does not change with whatever was
+  listed last; for a photo library that is its albums, which is what
+  `--album` completion offers.
+
+  `album` goes to `albums.list_albums(section, args)`, which outputs and
+  returns the albums: the albums of a music (section type `artist`) or
+  photo library. Music
   albums come from `section.albums()`. A photo library is walked depth
   first from `section.all()`, opening each album with one
   `fetchItems(f"{album.key}/children")` and splitting the children by
@@ -1027,13 +1055,44 @@ and a description saying what each mode takes.
   album's played running time (played items in full, items in progress up
   to their resume point) over the total of its playable items. `viewOffset`
   is likewise null unless in progress.
+- `--filter FIELD=VALUE` (repeatable) narrows any listing but a folder's
+  through plexapi's `filters=` argument, which validates the field against
+  the library's own filter list (one or two requests) and sends Plex's
+  `/all?type=N&field=value`, or for several its advanced search. So any
+  field the library offers works, tags and dates and numbers alike, and the
+  error for one it lacks is plexapi's, which names the fields it has: catch
+  `NotFound` and `BadRequest` around the listing and exit with its first
+  line, prefixed "Cannot filter library 'X':", rather than letting the
+  top-level handler call it a refused request. `parse_filter` is the
+  argparse type: `FIELD` (letters, then letters or digits), an operator,
+  and a non-empty value, `=` as is, `!=` as plexapi's `!`, `>` as `>>`,
+  `<` as `<<`; anything else is a usage error. Several are joined as
+  `{"and": [...]}`, so every one must hold. `--category NAME` (repeatable)
+  is exactly `--filter genre=NAME`. `--list-categories` lists
+  `section.listFilterChoices("genre", libtype)` as one `category` record
+  each, in place of the items. A photo library's `album` is plexapi's
+  `photoalbum` for both. Filtered albums come from
+  `section.search(libtype=..., filters=...)` in `list_albums`, without
+  walking into nested photo albums, which the server's filtering does not
+  do. All three are usage errors with a folder listing or `--album`, and
+  `--list-categories` takes neither of the others. A filtered listing is
+  not cached.
+- `-t folder` lists `/library/sections/ID/folder`, and `--path A/B` opens
+  folder `A`, then `B` inside it, one request a level (`list_folder`).
+  The XML is read with `plex.query` and walked directly: plexapi's `Folder`
+  class drops the media items a folder holds alongside its subfolders. An
+  element with no `ratingKey` is a subfolder, matched by title exactly
+  before ignoring case; anything else is an item. Each record is `type`
+  (`folder`, or the item's type), `ratingKey` (null for a folder), `title`,
+  and `path`, the `--path` that opens a folder (null for an item). A folder
+  not found is a `sys.exit` naming those there are.
 - `album-list RATINGKEY` (also `commands/albums.py`) - one album, by
   `fetch_item` and one `/children` fetch. Refused with exit 1 unless the
   item is a Directory whose `type` is `album` (music) or `photo` (a photo
   album; a photo shares the type but not the TAG), since shows, seasons,
   and artists are Directories too. Nested photo albums are split off,
   logged at INFO, and counted in the table summary as `nested albums`, not
-  listed. JSON and YAML output the same `album_record` as `albums-list`;
+  listed. JSON and YAML output the same `album_record` as `library-list`;
   CSV and CLIXML output its `contents` alone. A table prints the album as a
   metadata block with only the keys that apply (`ratingKey`, `artist`,
   `title`, `year`, `items`, `nested albums`, `length`, `state`, `played` as
@@ -1052,7 +1111,7 @@ and a description saying what each mode takes.
   XML **string**, so `"0"` is truthy and a naive check labels every account
   managed.
 - `playlists-list USER`, `playlist-list USER PLAYLIST [--m3u P] [-p PREFIX]`.
-- `show-metadata RATINGKEY` - type-specific builders via `_METADATA_BUILDERS`
+- `metadata RATINGKEY` - type-specific builders via `_METADATA_BUILDERS`
   keyed on `item.type`, plus the file paths. A table names a lone file `file`
   and numbers several `file 1`, `file 2`; other formats carry a `files` list.
 - `search USER QUERY [--media-type T] [--library-id L]` - with
@@ -1064,7 +1123,7 @@ and a description saying what each mode takes.
   and the rest are searched; the failures are reported, as **one** warning
   starting `Search failed in`, **only when no result came back at all**.
   With results in hand a library that could not be searched is noise.
-- `missing-find SHOW [-l LIBRARY] [-A] [-s SEASONS] [--include-specials]` -
+- `find-missing SHOW [-l LIBRARY] [-A] [-s SEASONS] [--include-specials]` -
   names one show by default, resolved through `resolve_identifier`. A SHOW
   written as a ratingKey is fetched outright first, and used if it is a
   show: listing every show of every library to look up a number was the
@@ -1086,15 +1145,16 @@ and a description saying what each mode takes.
 
 - `playlist-build (-I | -C) NAME RATINGKEY...`,
   `playlist-build -R USER SOURCE DEST`,
-  `playlist-build -A USER PLAYLIST RATINGKEY...` - one command, four modes,
+  `playlist-build -A USER PLAYLIST RATINGKEY...`,
+  `playlist-build -M USER NAME FIRST SECOND` - one command, five modes,
   as a required mutually exclusive group of `store_const` flags writing
-  `dest="mode"`. The positionals are `first` and `rest` (`nargs="+"`), both
+  `dest="mode"`. The positionals are `operand` and `operands` (`nargs="+"`), both
   shown as `ARG`, so that an option between the first argument and the
   others still parses; `_check_build` names them for the mode. The wrong
   count for the mode, or a ratingKey that is not an integer, is a usage
   error, exit 2, as is `-A` with any of `-o`, `-u`, `-a`, `--m3u`, and
   `-p`, which only make sense for a playlist being created. With too few
-  arguments for `first` and `rest` at all, argparse reports only "the
+  arguments for `operand` and `operands` at all, argparse reports only "the
   following arguments are required: ARG", before any flag is looked at;
   the parser's `error` is wrapped to say instead what each mode takes,
   naming together the modes that take the same ("-I and -C take ..."). `-A` is
@@ -1118,25 +1178,30 @@ and a description saying what each mode takes.
     Refuse a smart playlist before fetching anything, as `playlist-clean`
     does: plexapi raises `BadRequest` from `addItems`, which is also
     caught there and turned into a `sys.exit`.
-- `merge-build USER NAME FIRST SECOND [--ratio A:B] [-s] [-U]` - mixes two
-  playlists in turn, A items from FIRST then B from SECOND, default 1:1,
-  each keeping its own order. Parse the ratio in argparse (`type=`), so a
-  bad one is a usage error, exit 2: two ASCII whole numbers above 0 joined
-  by `:`. A side has run out on the first turn it has nothing to give; a
-  turn cut short because fewer items were left still counts. From that turn
-  the rest of the other follows by default, rather than being dropped, and
-  `--verbose` reports how many items follow unmixed; `-s/--stop-short`
-  leaves them out instead, the turn included, and reports how many. Sizes
-  that match the ratio run out together, with no tail, so `-s` changes
-  nothing. Repeats are kept; `-U/--unique` passes over an item already
-  taken, by ratingKey, and the next item of the same side takes its place,
-  so the ratio holds, and under `-s` a side left with only repeats has run
-  out. `-U`, not `-u`: `-u` is `--user`, as on `playlist-build`. Read both
-  sources before writing anything, so either may be the destination under
-  `--overwrite`: the items are already in memory when the old playlist
-  goes. Warn about an empty side rather than passing over it: a typo that
-  resolved to the wrong playlist looks exactly like a playlist that happens
-  to be empty.
+  - `-M/--merge USER NAME FIRST SECOND [--ratio A:B] [-s] [-U]` - mixes two
+    playlists in turn. It was the command `merge-build` until it was folded
+    in here; `--ratio`, `-s/--stop-short`, and `-U/--unique` are refused, exit
+    2, with any other mode, and `--ratio` defaults to None so a given one can
+    be told from the default, 1:1, which `_check_build` fills in. The mode
+    names its operands `user_id`, `name`, `first`, and `second`, which is why
+    the unnamed positionals are `operand` and `operands`. It mixes A items
+    from FIRST then B from SECOND, default 1:1, each keeping its own order. Parse the ratio in argparse (`type=`), so a
+    bad one is a usage error, exit 2: two ASCII whole numbers above 0 joined
+    by `:`. A side has run out on the first turn it has nothing to give; a
+    turn cut short because fewer items were left still counts. From that turn
+    the rest of the other follows by default, rather than being dropped, and
+    `--verbose` reports how many items follow unmixed; `-s/--stop-short`
+    leaves them out instead, the turn included, and reports how many. Sizes
+    that match the ratio run out together, with no tail, so `-s` changes
+    nothing. Repeats are kept; `-U/--unique` passes over an item already
+    taken, by ratingKey, and the next item of the same side takes its place,
+    so the ratio holds, and under `-s` a side left with only repeats has run
+    out. `-U`, not `-u`: `-u` is `--user`, as on `playlist-build`. Read both
+    sources before writing anything, so either may be the destination under
+    `--overwrite`: the items are already in memory when the old playlist
+    goes. Warn about an empty side rather than passing over it: a typo that
+    resolved to the wrong playlist looks exactly like a playlist that happens
+    to be empty.
 - `playlist-copy -A USER PLAYLIST [-o]`,
   `playlist-copy -T USER PLAYLIST TO_USER DEST [-o]` - one command, two
   modes, as a required mutually exclusive group writing `dest="copy_to"`.
@@ -1175,12 +1240,12 @@ and a description saying what each mode takes.
 
 #### Who a built playlist is for
 
-`playlist-build`, except under `-A`, and `merge-build` take `-u/--user` and
+Every `playlist-build` mode but `-A` takes `-u/--user` and
 `-a/--all-users`, registered through `fanout.add_user_target_arguments` as a
 mutually exclusive group - writing the pair out on each parser is what trips
 `duplicate-code`. Without either, the playlist goes to the account the items
 came from, which is the admin server for `-I` and `-C`, which take rating
-keys, and the source user's server for `-R` and `merge-build`, which take
+keys, and the source user's server for `-R` and `-M`, which take
 playlists. `deliver_playlist`
 takes both servers for exactly that reason. `-a` targets
 `accounts.user_roster`, which **includes the admin** at id 0, because the
@@ -1265,7 +1330,7 @@ Watch state lives on leaf items: map `movie`->`movie`, `show`->`episode`,
 - Photo libraries export a self-contained Spotlight.js gallery. **No Plex HTTP
   URLs anywhere in it**: both `href` and `src` are server filesystem paths.
 - `-p/--prefix` on every command that exports (`playlist-list`, `show-list`,
-  `playlist-export`, `titles-export`, `playlist-build`, `merge-build`),
+  `playlist-export`, `titles-export`, `playlist-build`),
   registered through
   `paths.add_prefix_argument` - repeating the help text inline trips
   `duplicate-code`. `mapper_for(plex, args)` returns `identity` without a
@@ -1278,7 +1343,8 @@ Watch state lives on leaf items: map `movie`->`movie`, `show`->`episode`,
 ### Photos
 
 `photos.walk_photo_albums(section, args)` is the one walk of a photo
-library, used by `albums-list`, `library-list`, and `titles-export`. It
+library, used by `library-list`'s album listing, its `--album`, and
+`titles-export`. It
 starts from `section.all()` and opens each album with one
 `fetchItems(f"{album.key}/children")`, splitting the children by
 `TAG == "Directory"` into nested albums, walked next so they follow their
@@ -1669,7 +1735,11 @@ a file name `cache.cache_key` replaces each of `/ \ : * ? " < > |` and
 the control characters with `_`, chosen so every shell can make the same
 name with one substitution of its own; each script has that function and
 a test compares them. Playlist and album-name completion read the by-word
-cache for the word typed, dequoted; ratingKey completion still gathers
+cache for the word typed, dequoted. An album name is a whole title from
+that cache, which for a photo library holds its albums, the default
+listing; titles are no longer split at " - ", which mangled an album titled
+with one. `library-list -t` completes the types, all of them, since the
+library's kind is not known to the script; ratingKey completion still gathers
 every `titles.*.json`, which the by-word names do not match, so no key is
 offered twice.
 
@@ -1896,7 +1966,7 @@ and SEE ALSO. GLOBAL OPTIONS says what **each** global flag does for that
 particular command - "no effect" is an answer, and `--dry-run` writing a
 file anyway is worth saying. OPTION INTERACTIONS covers every conflict and
 dependency, whether argparse enforces it (`-u`/`-a`) or the handler does
-(`missing-find -A` with SHOW, `wait --now` without `-r`). Document what the
+(`find-missing -A` with SHOW, `wait --now` without `-r`). Document what the
 code does, checked against it, not what a help string implies. Sample tables
 are real output from `print_table` with an ASCII console, never hand-drawn.
 

@@ -215,7 +215,7 @@ def test_an_object_without_a_dict_falls_back_to_text():
     assert isinstance(loaded_fields(Item(thing=Slotted()))["thing"], str)
 
 
-# --- missing-find arguments ----------------------------------------------
+# --- find-missing arguments ----------------------------------------------
 
 
 @pytest.mark.parametrize(

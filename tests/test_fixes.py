@@ -172,7 +172,7 @@ def test_a_new_config_is_written_private(config):
         assert config.stat().st_mode & 0o777 == 0o600
 
 
-# --- missing-find keeps machine-readable output parseable -----------------
+# --- find-missing keeps machine-readable output parseable -----------------
 
 
 def find_missing_args(fmt):
@@ -594,7 +594,7 @@ def test_a_playlist_titled_like_a_number_is_found_by_title():
     assert resolve_playlist(Server(), "1_000") == "playlist 1_000"
 
 
-# --- missing-find: a ratingKey needs no list of every show -------------------
+# --- find-missing: a ratingKey needs no list of every show -------------------
 
 
 class KeyedShow(Show):

@@ -143,7 +143,7 @@ def test_an_untouched_playlist_yields_nothing_to_remove():
 A, B, C = FakeItem(1, "A"), FakeItem(2, "B"), FakeItem(3, "C")
 
 
-# --- merge-build: mixing two playlists at a ratio --------------------------
+# --- playlist-build --merge: mixing two playlists at a ratio --------------
 
 
 def merged(first, second, ratio=(1, 1), **flags):

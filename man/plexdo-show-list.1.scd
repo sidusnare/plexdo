@@ -128,5 +128,5 @@ plexdo show-list 4102 --json | jq length
 
 # SEE ALSO
 
-*plexdo-library-list*(1), *plexdo-titles-export*(1), *plexdo-missing-find*(1),
+*plexdo-library-list*(1), *plexdo-titles-export*(1), *plexdo-find-missing*(1),
 *plexdo-playlist-build*(1), *plexdo-conventions*(7), *plexdo*(1)

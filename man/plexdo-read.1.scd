@@ -24,7 +24,7 @@ otherwise be written to the screen.
 
 When an item has several versions or a version is split across several
 files, only the first file of the first version is streamed, with a warning.
-*plexdo-show-metadata*(1) lists them all.
+*plexdo-metadata*(1) lists them all.
 
 # ARGUMENTS
 
@@ -124,5 +124,5 @@ plexdo read 881 --dry-run
 
 # SEE ALSO
 
-*plexdo-show-metadata*(1), *plexdo-show-list*(1), *mpv*(1),
+*plexdo-metadata*(1), *plexdo-show-list*(1), *mpv*(1),
 *plexdo-conventions*(7), *plexdo*(1)

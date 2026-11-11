@@ -69,20 +69,18 @@ GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
         "libraries and titles",
         (
             "album-list",
-            "albums-list",
+            "find-missing",
             "libraries-list",
             "library-list",
-            "missing-find",
+            "metadata",
             "search",
             "show-list",
-            "show-metadata",
             "titles-export",
         ),
     ),
     (
         "playlists",
         (
-            "merge-build",
             "playlist-build",
             "playlist-clean",
             "playlist-copy",

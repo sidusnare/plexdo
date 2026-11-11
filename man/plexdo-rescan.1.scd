@@ -167,5 +167,5 @@ plexdo rescan 2 > /dev/null
 
 # SEE ALSO
 
-*plexdo-status*(1), *plexdo-missing-find*(1), *plexdo-libraries-list*(1),
+*plexdo-status*(1), *plexdo-find-missing*(1), *plexdo-libraries-list*(1),
 *plexdo-conventions*(7), *plexdo*(1)

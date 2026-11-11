@@ -4,7 +4,7 @@
 .\" Man page for plexdo (plexdo).
 .\" Edit alongside AI.prompt.txt. The version and date on the .TH line are
 .\" written by tools/derive.py from pyproject.toml; do not edit them here.
-.TH PLEXDO 1 "2026-11-10" "plexdo 3.0.0" "User Commands"
+.TH PLEXDO 1 "2026-11-11" "plexdo 4.0.0" "User Commands"
 .
 .SH NAME
 plexdo \- command\-line interface for Plex Media Server
@@ -136,54 +136,12 @@ progress, then a row per track, photo, or clip, with its state and, when in
 progress, its resume point, length, and percentage, as
 .BR "3:20 / 9:46 (34.1%)" .
 JSON and YAML carry the same record
-.B albums\-list
+.B library\-list
 gives for each album; CSV and CLIXML, which cannot nest, carry one row per
 item. Albums nested in a photo album are left out, and counted. Anything but
 an album is refused.
 .TP
-.BI albums\-list " library"
-List the albums in a music or photo library, nested photo albums included.
-Table output shows each album\(aqs rating key, artist (music only), title,
-year, item count, and how many items you have played. A machine\-readable
-format adds each album\(aqs
-.B state
-.RB ( played ", " "in progress" ", or " unplayed ),
-its
-.B progress
-as a percentage of its running time when in progress, and its
-.B contents
-in order: every track, photo, or clip, with its own state, view count, last
-viewed time,
-.BR viewOffset ,
-.BR progress ,
-and files. A music library\(aqs table costs one request; its other formats,
-and any photo library, which must be opened to find nested albums, cost one
-per album. Photos have no played state, so theirs is null. Other library
-types are refused.
-.TP
-.B libraries\-list
-List every library with its ID, type, and title.
-.TP
-.BI library\-list " library " [ \-\-album " ALBUM" ]
-List the titles in a library. Table output shows the rating key, title,
-release date, rating, and studio; a photo library lists its photos, those in
-albums inside albums included. A machine\-readable format carries every
-field the server returned for each item, and for a show library nests each
-show\(aqs episodes under a
-.B seasons
-object keyed by season name. Nested objects such as media and their parts are
-expanded, so a file name is at
-.BR media[].parts[].file ,
-and the paths are repeated in a top\-level
-.B files
-list for convenience. Note that
-.B sourceURI
-is not a file name: it is the remote server URI of an item in someone else\(aqs
-playlist, and is null for anything on your own server. \fB\-\-album\fR restricts a photo library to one
-album and is ignored elsewhere.
-.
-.TP
-.BI missing\-find " SHOW " [ \-l " LIBRARY" "] [" \-A "] [" \-s " SEASONS" "] [" \-\-include\-specials ]
+.BI find\-missing " SHOW " [ \-l " LIBRARY" "] [" \-A "] [" \-s " SEASONS" "] [" \-\-include\-specials ]
 Report the episode numbers missing between the start of a season and its
 highest episode.
 .I SHOW
@@ -215,6 +173,121 @@ irregularly, so this is off by default.
 .RE
 .
 .TP
+.B libraries\-list
+List every library with its ID, type, and title.
+.TP
+.BI library\-list " library " [ \-t " TYPE" "] [" \-\-filter " FIELD=VALUE" "] [" \-\-category " CATEGORY" ]
+.TQ
+.BI library\-list " library " [ \-t " TYPE" ] " \-\-list\-categories"
+.TQ
+.BI library\-list " library " "\-t folder " [ \-\-path " PATH" ]
+.TQ
+.BI library\-list " library " \-\-album " ALBUM"
+List what a library holds, of one type.
+.B \-t
+.RB ( \-\-type )
+names it; by default a movie library lists its movies, a show library its
+shows, and a music or photo library its albums. The types are those Plex
+serves through
+.I /library/sections/ID/all?type=
+for each kind of library:
+.RS
+.TP
+movie
+.BR movie ", " collection
+.TP
+show
+.BR show ", " season ", " episode ", " collection
+.TP
+music
+.BR album ", " artist ", " track ", " collection
+.TP
+photo
+.BR album ", " photo ", " clip
+.RE
+.IP
+A type the library cannot hold is an error naming those it can. Any library
+can also be listed by
+.BR folder ,
+through
+.IR /library/sections/ID/folder :
+the folders at the top of the library, or with
+.B \-\-path
+the folder that path of folder titles, separated by
+.BR / ,
+names, with its subfolders and the items it holds.
+.B \-\-album
+lists the photos of one photo album and of the albums inside it.
+.IP
+.BI \-\-filter " FIELD=VALUE"
+lists only what matches, on any field the library can be filtered by, as
+Plex\(aqs own filters can:
+.BR genre=Drama ,
+.BR collection=Marvel ,
+.BR contentRating=PG\-13 ,
+.BR label=Kids .
+.B !=
+excludes, and
+.B >
+and
+.B <
+compare a number or a date, as
+.B year>1990
+or
+.BR addedAt>\-30d ,
+quoted so the shell does not take them for a redirection.
+Repeated, every one must match. A field the library does not have is an
+error listing those it does.
+.BI \-\-category " CATEGORY"
+is short for
+.BI "\-\-filter genre=" CATEGORY ,
+and
+.B \-\-list\-categories
+lists the genres of the type listed in place of the items. A filtered
+listing of a photo library\(aqs albums does not walk into the albums inside
+them.
+.IP
+Table output is compact, with columns to suit the type: an episode carries
+its show, season, and episode numbers, a track its artist, album, and track
+number, and an album how many items it holds and how many you have played.
+A machine\-readable format carries every field the server returned for each
+item, and for a show library nests each show\(aqs episodes under a
+.B seasons
+object keyed by season name. Nested objects such as media and their parts are
+expanded, so a file name is at
+.BR media[].parts[].file ,
+and the paths are repeated in a top\-level
+.B files
+list for convenience. Note that
+.B sourceURI
+is not a file name: it is the remote server URI of an item in someone else\(aqs
+playlist, and is null for anything on your own server.
+.IP
+An album carries its
+.B state
+.RB ( played ", " "in progress" ", or " unplayed ),
+its
+.B progress
+as a percentage of its running time when in progress, and its
+.B contents
+in order: every track, photo, or clip, with its own state, view count, last
+viewed time,
+.BR viewOffset ,
+.BR progress ,
+and files. A photo library\(aqs albums are walked into the albums inside
+them, to a depth of 16, each listed once. Photos have no played state, so
+theirs is null.
+.TP
+.BI metadata " ratingKey"
+Show full metadata for one item, with fields varying by media type, including
+the server\-side path of every file backing it. A table names a lone file
+.BR file ,
+and numbers them when there are several; a machine\-readable format carries
+them as a
+.B files
+list. Shows and seasons have no media of their own, so they list none: those
+files belong to the episodes.
+.TP
 .BI search " user query " [ \-\-media\-type " TYPE" "] [" \-\-library\-id " LIBRARY" ]
 Search as the given user. \fITYPE\fR is one of \fBmovie\fR, \fBshow\fR,
 \fBepisode\fR, \fBtrack\fR, \fBphoto\fR, \fBalbum\fR, \fBartist\fR, and only
@@ -224,16 +297,6 @@ search found nothing at all.
 .TP
 .BI show\-list " ratingKey " [ \-\-m3u " PATH" ]
 List every episode of a show, skipping specials.
-.TP
-.BI show\-metadata " ratingKey"
-Show full metadata for one item, with fields varying by media type, including
-the server\-side path of every file backing it. A table names a lone file
-.BR file ,
-and numbers them when there are several; a machine\-readable format carries
-them as a
-.B files
-list. Shows and seasons have no media of their own, so they list none: those
-files belong to the episodes.
 .TP
 .BI titles\-export " library path " [ \-\-sort " ORDER" "] [" \-\-album " ALBUM" ]
 Write a whole library to an M3U file, or to a self\-contained HTML gallery for
@@ -246,25 +309,14 @@ and then created in exactly one API call.
 .B \-\-dry\-run
 stops after the preview.
 .TP
-.BI merge\-build " user name first second " [ \-\-ratio " A:B" "] [" \-s "] [" \-U ]
-Mix two playlists into one new playlist, taking
-.I A
-items from the first, then
-.I B
-from the second, in turn; the default ratio is 1:1. Each keeps its own order,
-and once one runs out the rest of the other follows;
-.BR \-s ", " \-\-stop\-short
-stops there instead.
-.BR \-U ", " \-\-unique
-skips an item already taken, and the next takes its place. Both are read
-before anything is written, so either may also be the destination.
-.TP
 .BR playlist\-build " (" \-I " | " \-C ") \fIname ratingKey\fR ..."
 .TQ
 .BI "playlist\-build \-R" " user source dest"
 .TQ
 .BI "playlist\-build \-A" " user playlist ratingKey ..."
-Build a playlist, or add to one. Exactly one of the four flags says how, and
+.TQ
+.BI "playlist\-build \-M" " user name first second " [ \-\-ratio " A:B" "] [" \-s "] [" \-U ]
+Build a playlist, or add to one. Exactly one of the five flags says how, and
 with it what the arguments are.
 .RS
 .TP
@@ -293,6 +345,31 @@ Append items to the existing playlist
 .IR playlist .
 Nothing is created, so none of the options below apply, and giving one is an
 error. A smart playlist is refused.
+.TP
+.BR \-M ", " \-\-merge
+Mix the playlists
+.I first
+and
+.I second
+into the new playlist
+.IR name ,
+taking
+.I A
+items from the first, then
+.I B
+from the second, in turn; the default ratio is 1:1. Each keeps its own order,
+and once one runs out the rest of the other follows;
+.BR \-s ", " \-\-stop\-short
+stops there instead.
+.BR \-U ", " \-\-unique
+skips an item already taken, and the next takes its place. Both are read
+before anything is written, so either may also be the destination.
+.BR \-\-ratio ,
+.BR \-s ,
+and
+.B \-U
+go only with
+.BR \-M .
 .RE
 .TP
 .BI playlist\-clean " user playlist " [ \-\-include\-partial ]
@@ -346,12 +423,10 @@ Delete a playlist.
 .BI playlists\-list " user"
 List a user\(aqs playlists.
 .PP
-.B merge\-build
-and
 .BR playlist\-build ,
 except with
 .BR \-A ,
-accept
+accepts
 .BR \-o ", " \-\-overwrite ,
 .BI \-\-m3u " PATH",
 .BR \-p ", " \-\-prefix ,

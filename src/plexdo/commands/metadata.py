@@ -134,13 +134,13 @@ def register(
 ) -> None:
     """Register the metadata subparser."""
     parser = sub.add_parser(
-        "show-metadata",
+        "metadata",
         parents=parents,
         help="Show the metadata of one item, by ratingKey.",
     )
     add_rating_key_argument(parser)
 
 
-COMMANDS = {"show-metadata": cmd_show_metadata}
+COMMANDS = {"metadata": cmd_show_metadata}
 
 REQUIRES_PLEX = frozenset(COMMANDS)

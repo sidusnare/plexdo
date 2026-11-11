@@ -307,5 +307,5 @@ plexdo wait --json | ForEach-Object { $_ | ConvertFrom-Json }
 
 # SEE ALSO
 
-*plexdo-status*(1), *plexdo-show-metadata*(1), *plexdo-conventions*(7),
+*plexdo-status*(1), *plexdo-metadata*(1), *plexdo-conventions*(7),
 *plexdo*(1)

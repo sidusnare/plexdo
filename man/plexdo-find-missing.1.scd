@@ -1,18 +1,18 @@
-plexdo-missing-find(1) "plexdo" "User Commands"
+plexdo-find-missing(1) "plexdo" "User Commands"
 ; SPDX-FileCopyrightText: 2026 SidusNare
 ; SPDX-License-Identifier: GPL-3.0-or-later
 ; SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 # NAME
 
-plexdo-missing-find - report gaps in the episode numbering of a show's seasons
+plexdo-find-missing - report gaps in the episode numbering of a show's seasons
 
 # SYNOPSIS
 
-*plexdo missing-find* _SHOW_ [*-l* _LIBRARY_] [*-s* _SEASONS_]
+*plexdo find-missing* _SHOW_ [*-l* _LIBRARY_] [*-s* _SEASONS_]
 \[*--include-specials*] [_GLOBAL OPTIONS_]
 
-*plexdo missing-find* *-A* [*-l* _LIBRARY_] [*--include-specials*]
+*plexdo find-missing* *-A* [*-l* _LIBRARY_] [*--include-specials*]
 \[_GLOBAL OPTIONS_]
 
 # DESCRIPTION
@@ -139,7 +139,7 @@ read. See *plexdo-conventions*(7).
 Check one show by title:
 
 ```
-$ plexdo missing-find "The Wire"
+$ plexdo find-missing "The Wire"
 +----------+-----------+--------+---------+--------------+------+---------+
 | show     | ratingKey | season | missing | missingCount | have | highest |
 +----------+-----------+--------+---------+--------------+------+---------+
@@ -150,32 +150,32 @@ $ plexdo missing-find "The Wire"
 Check only seasons 1 and 3 of a show named by ratingKey:
 
 ```
-plexdo missing-find 4102 -s 1,3
+plexdo find-missing 4102 -s 1,3
 ```
 
 Check the specials alone; naming season 0 includes them:
 
 ```
-plexdo missing-find 4102 -s 0
+plexdo find-missing 4102 -s 0
 ```
 
 A title found in two libraries is ambiguous; narrow it to one:
 
 ```
-plexdo missing-find "Doctor Who" -l "TV Shows"
+plexdo find-missing "Doctor Who" -l "TV Shows"
 ```
 
 Sweep every show in every show library, including their specials, and save
 the result for a script:
 
 ```
-plexdo missing-find -A --include-specials --json > gaps.json
+plexdo find-missing -A --include-specials --json > gaps.json
 ```
 
 Sweep one library without pacing on a fast local network:
 
 ```
-plexdo missing-find -A -l 2 --throttle 0
+plexdo find-missing -A -l 2 --throttle 0
 ```
 
 # SEE ALSO

@@ -26,7 +26,6 @@ from plexdo.airdates import (
 from plexdo.arguments import (
     add_m3u_argument,
     add_overwrite_argument,
-    add_user_argument,
 )
 from plexdo.console import output
 from plexdo.constants import LOG, MediaItem
@@ -327,7 +326,7 @@ def _merge(
     )
 
 
-def cmd_build_merge(plex: PlexServer, args: argparse.Namespace) -> None:
+def _build_merge(plex: PlexServer, args: argparse.Namespace) -> None:
     """Build one playlist from two others, mixed at a ratio."""
     user_plex = server_for_user(plex, args.user_id)
 
@@ -386,15 +385,24 @@ _MODES = {
     "chronological": "NAME ratingKey [ratingKey ...]",
     "randomize": "USER SOURCE DEST",
     "append": "USER PLAYLIST ratingKey [ratingKey ...]",
+    "merge": "USER NAME FIRST SECOND",
 }
+
+# The options only --merge takes, as (flag, attribute).
+_MERGE_OPTIONS = (
+    ("--ratio", "ratio"),
+    ("--stop-short", "stop_short"),
+    ("--unique", "unique"),
+)
 
 _BUILD_USAGE = """%(prog)s (-I | -C) NAME ratingKey [ratingKey ...] [options]
        %(prog)s -R USER SOURCE DEST [options]
-       %(prog)s -A USER PLAYLIST ratingKey [ratingKey ...]"""
+       %(prog)s -A USER PLAYLIST ratingKey [ratingKey ...]
+       %(prog)s -M USER NAME FIRST SECOND [--ratio A:B] [-s] [-U]"""
 
 _BUILD_DESCRIPTION = """\
-Build a playlist, or add to one. Exactly one of -I, -C, -R, and -A says how,
-and what the arguments are:
+Build a playlist, or add to one. Exactly one of -I, -C, -R, -A, and -M says
+how, and what the arguments are:
 
   -I, -C  NAME is the new playlist; each ratingKey is a show (-C also takes
           movies), as library-list shows it.
@@ -402,11 +410,14 @@ and what the arguments are:
           playlist DEST.
   -A      USER owns PLAYLIST; each ratingKey is an item to add to its end,
           as library-list or show-list shows it.
+  -M      USER owns the playlists FIRST and SECOND, which are mixed into the
+          new playlist NAME, --ratio A:B taking A items from FIRST and then
+          B from SECOND in turn.
 
 USER is a user ID or title, 0 for the admin account (see users-list).
 SOURCE and PLAYLIST are a playlist name or ratingKey (see playlists-list).
 -A changes an existing playlist, so it takes none of -o, -u, -a, --m3u,
-and -p."""
+and -p. --ratio, -s, and -U go only with -M."""
 
 
 def _rating_keys(
@@ -427,13 +438,28 @@ def _check_build(
 ) -> None:
     """Name playlist-build's operands for its mode, or exit 2.
 
-    The four modes take different arguments, so the parser collects them
+    The five modes take different arguments, so the parser collects them
     unnamed and this gives each its place: argparse cannot make what a
     positional means depend on a flag.
     """
-    words = [args.first, *args.rest]
+    words = [args.operand, *args.operands]
     mode = args.mode
     expected = f"--{mode} takes {_MODES[mode]}"
+    if mode != "merge":
+        stray = [
+            flag
+            for flag, name in _MERGE_OPTIONS
+            if getattr(args, name) not in (None, False)
+        ]
+        if stray:
+            parser.error(f"{', '.join(stray)} can only be used with --merge")
+    if mode == "merge":
+        if len(words) != 4:
+            parser.error(f"{expected}; got {len(words)} argument(s)")
+        args.user_id, args.name, args.first, args.second = words
+        if args.ratio is None:
+            args.ratio = (1, 1)
+        return
     if mode == "randomize":
         if len(words) != 3:
             parser.error(f"{expected}; got {len(words)} argument(s)")
@@ -470,6 +496,7 @@ _BUILDERS = {
     "chronological": _build_chronological,
     "randomize": _build_randomize,
     "append": _append,
+    "merge": _build_merge,
 }
 
 
@@ -532,6 +559,7 @@ def _register_build(
         ),
         ("-R", "randomize", "Shuffle an existing playlist into a new one."),
         ("-A", "append", "Add items to the end of an existing playlist."),
+        ("-M", "merge", "Mix two existing playlists into a new one."),
     ):
         mode.add_argument(
             short,
@@ -543,12 +571,45 @@ def _register_build(
         )
 
     parser.add_argument(
-        "first",
+        "operand",
         metavar="ARG",
         help="The mode's arguments, in the order the usage shows.",
     )
     parser.add_argument(
-        "rest", nargs="+", metavar="ARG", help=argparse.SUPPRESS
+        "operands", nargs="+", metavar="ARG", help=argparse.SUPPRESS
+    )
+
+    mixing = parser.add_argument_group("mixing (-M only)")
+    mixing.add_argument(
+        "--ratio",
+        type=_parse_ratio,
+        default=None,
+        metavar="A:B",
+        help=(
+            "Take A items from FIRST, then B from SECOND, in turn (default "
+            "1:1). Once one runs out, the rest of the other follows, unless "
+            "--stop-short is given."
+        ),
+    )
+    mixing.add_argument(
+        "-s",
+        "--stop-short",
+        action="store_true",
+        default=False,
+        help=(
+            "Stop when either playlist runs out, leaving out the rest of "
+            "the other, so the whole result keeps the ratio."
+        ),
+    )
+    mixing.add_argument(
+        "-U",
+        "--unique",
+        action="store_true",
+        default=False,
+        help=(
+            "Skip an item already taken, so a title in both playlists is "
+            "listed once; the next item takes its place in the ratio."
+        ),
     )
 
     made = parser.add_argument_group("the new playlist (not with -A)")
@@ -565,64 +626,7 @@ def register(
     """Register the playlist building subparsers."""
     _register_build(sub, parents)
 
-    p_bm = sub.add_parser(
-        "merge-build",
-        parents=parents,
-        help="Mix two playlists into a new one at a ratio.",
-    )
-    add_user_argument(p_bm)
-    p_bm.add_argument(
-        "name", metavar="NAME", help="Name for the new playlist (str)."
-    )
-    for which in ("first", "second"):
-        p_bm.add_argument(
-            which,
-            metavar=which.upper(),
-            help=(
-                f"The {which} playlist to mix. Playlist name (str) or "
-                "ratingKey (int). Obtain either with playlists-list."
-            ),
-        )
-    p_bm.add_argument(
-        "--ratio",
-        type=_parse_ratio,
-        default="1:1",
-        metavar="A:B",
-        help=(
-            "Take A items from FIRST, then B from SECOND, in turn (default "
-            "1:1). Once one runs out, the rest of the other follows, unless "
-            "--stop-short is given."
-        ),
-    )
-    p_bm.add_argument(
-        "-s",
-        "--stop-short",
-        action="store_true",
-        default=False,
-        help=(
-            "Stop when either playlist runs out, leaving out the rest of "
-            "the other, so the whole result keeps the ratio."
-        ),
-    )
-    p_bm.add_argument(
-        "-U",
-        "--unique",
-        action="store_true",
-        default=False,
-        help=(
-            "Skip an item already taken, so a title in both playlists is "
-            "listed once; the next item takes its place in the ratio."
-        ),
-    )
-    add_overwrite_argument(p_bm)
-    add_m3u_argument(p_bm)
-    add_prefix_argument(p_bm)
-    add_user_target_arguments(p_bm)
 
-
-COMMANDS = {
-    "merge-build": cmd_build_merge,
-    "playlist-build": cmd_playlist_build,
-}
+COMMANDS = {"playlist-build": cmd_playlist_build}
 
 REQUIRES_PLEX = frozenset(COMMANDS)

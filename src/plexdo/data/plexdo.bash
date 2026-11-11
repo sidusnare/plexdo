@@ -289,8 +289,8 @@ _plexdo_complete_playlist() {
     COMPREPLY=(); _plexdo_compreply < <( _plexdo_json_candidates "$cache" "title" )
 }
 
-# Album names for a given library_id - drawn from the titles cache.
-# Emits the unique set of parentTitle values (album names) stored in the cache.
+# Album names for a given library_id, from the titles cache: library-list
+# lists a photo library's albums by default, and that is what it caches.
 _plexdo_complete_album() {
     local lib_id
     lib_id="$(_plexdo_word "$1")"
@@ -298,21 +298,7 @@ _plexdo_complete_album() {
     cache="$_PLEXDO_CACHE/titles-by-word.$(_plexdo_word_key "$1").json"
     _plexdo_cache_is_fresh "$cache" || _plexdo_bg_refresh library-list "$lib_id"
     COMPREPLY=(); _plexdo_compreply < <(
-        python3 - "$cur" "$cache" 2>/dev/null << 'PYEOF'
-import json, sys
-cur, path = sys.argv[1], sys.argv[2]
-try:
-    seen = set()
-    for r in json.load(open(path, encoding="utf-8")):
-        t = str(r.get("title", ""))
-        # titles for photo entries are "Album - Photo", strip after " - "
-        album = t.split(" - ")[0] if " - " in t else t
-        if album and album not in seen and album.startswith(cur):
-            seen.add(album)
-            print(album)
-except Exception:
-    pass
-PYEOF
+        _plexdo_json_candidates "$cache" "title" | sort -u
     )
 }
 
@@ -321,11 +307,11 @@ PYEOF
 # ---------------------------------------------------------------------------
 
 _plexdo_commands() {
-    echo "album-list albums-list libraries-list library-list login logout \
-merge-build missing-find player-remote-play playlist-build playlist-clean \
+    echo "album-list find-missing libraries-list library-list login logout \
+metadata player-remote-play playlist-build playlist-clean \
 playlist-copy playlist-export playlist-list playlist-remove playlists-list \
-read rescan search set-pin show-list show-metadata show-watched-cp status \
-titles-export users-list wait write-config-example write-secrets-example"
+read rescan search set-pin show-list show-watched-cp status titles-export \
+users-list wait write-config-example write-secrets-example"
 }
 
 # The mode flag given to playlist-build or playlist-copy, as its long name
@@ -339,6 +325,7 @@ _plexdo_mode() {
             -C|--chronological) echo chronological; return ;;
             -R|--randomize) echo randomize; return ;;
             -A|--append|--all) echo all-or-append; return ;;
+            -M|--merge) echo merge; return ;;
             -T|--to) echo to; return ;;
         esac
     done
@@ -374,10 +361,10 @@ _plexdo_positional_count() {
     for (( i=1; i < cword; i++ )); do
         word="${words[$i]}"
         if (( skip_next )); then skip_next=0; continue; fi
-        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle|--season|-l|--library|-u|--user|--port|--player-user|--server-url|--ratio|--debug-log) skip_next=1; continue ;; esac
+        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle|--season|-l|--library|-u|--user|--port|--player-user|--server-url|--ratio|--debug-log|-t|--title|--type|--path|--album|--sort|--media-type|--library-id|--filter|--category) skip_next=1; continue ;; esac
         # -s takes a value only where it is --session or --season.
         if [[ "$word" == -s ]]; then
-            case "$cmd" in wait|missing-find) skip_next=1 ;; esac
+            case "$cmd" in wait|find-missing) skip_next=1 ;; esac
             continue
         fi
         if [[ "$word" == -* ]]; then continue; fi
@@ -397,10 +384,10 @@ _plexdo_nth_positional() {
     for (( i=1; i < cword; i++ )); do
         word="${words[$i]}"
         if (( skip_next )); then skip_next=0; continue; fi
-        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle|--season|-l|--library|-u|--user|--port|--player-user|--server-url|--ratio|--debug-log) skip_next=1; continue ;; esac
+        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle|--season|-l|--library|-u|--user|--port|--player-user|--server-url|--ratio|--debug-log|-t|--title|--type|--path|--album|--sort|--media-type|--library-id|--filter|--category) skip_next=1; continue ;; esac
         # -s takes a value only where it is --session or --season.
         if [[ "$word" == -s ]]; then
-            case "$cmd" in wait|missing-find) skip_next=1 ;; esac
+            case "$cmd" in wait|find-missing) skip_next=1 ;; esac
             continue
         fi
         if [[ "$word" == -* ]]; then continue; fi
@@ -433,10 +420,10 @@ _plexdo_complete() {
         return
     fi
 
-    # -u USER on playlist-build and merge-build -> a user id or title
+    # -u USER on playlist-build -> a user id or title
     if [[ "$prev" == "-u" || "$prev" == "--user" ]]; then
         case "$cmd" in
-            playlist-build|merge-build) _plexdo_complete_user_id; return ;;
+            playlist-build) _plexdo_complete_user_id; return ;;
         esac
     fi
 
@@ -446,13 +433,15 @@ _plexdo_complete() {
             playlist-list|show-list)
                 COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --m3u --prefix -p" -- "$cur") ;;
             playlist-build)
-                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --interleaved -I --chronological -C --randomize -R --append -A --m3u --prefix -p -o --overwrite --user -u --all-users -a" -- "$cur") ;;
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --interleaved -I --chronological -C --randomize -R --append -A --merge -M --ratio --stop-short -s --unique -U --m3u --overwrite -o --prefix -p --user -u --all-users -a" -- "$cur") ;;
             playlist-copy)
                 COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --all -A --to -T --overwrite -o" -- "$cur") ;;
-            merge-build)
-                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --m3u --prefix -p -o --overwrite --ratio --stop-short -s --unique -U --user -u --all-users -a" -- "$cur") ;;
-            playlist-export|titles-export)
+            playlist-export)
                 COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --prefix -p" -- "$cur") ;;
+            titles-export)
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --prefix -p --sort --album" -- "$cur") ;;
+            library-list)
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --type -t --path --album --filter --category --list-categories" -- "$cur") ;;
             playlist-clean)
                 COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --include-partial" -- "$cur") ;;
             write-config-example|write-secrets-example)
@@ -496,24 +485,17 @@ _plexdo_complete() {
                 COMPREPLY=()
             fi ;;
 
-        # <library_id>
-        albums-list)
-            if [[ "$cur" == -* ]]; then
-                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags)" -- "$cur")
-            else
-                case $pos in
-                    0) _plexdo_complete_library_id ;;
-                    *) COMPREPLY=() ;;
-                esac
-            fi ;;
-
-        # <library_id> [--album ALBUM]
+        # <library_id> [-t TYPE] [--path PATH] [--album ALBUM]
         library-list)
             if [[ "$prev" == "--album" ]]; then
                 lib_id="$(_plexdo_nth_positional "$cmd" 0)"
                 _plexdo_complete_album "$lib_id"
-            elif [[ "$cur" == --* ]]; then
-                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --album" -- "$cur")
+            elif [[ "$prev" == "-t" || "$prev" == "--type" ]]; then
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "album artist clip collection episode folder movie photo season show track" -- "$cur")
+            elif [[ "$prev" == "--path" || "$prev" == "--filter" || "$prev" == "--category" ]]; then
+                COMPREPLY=()
+            elif [[ "$cur" == -* ]]; then
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --type -t --path --album --filter --category --list-categories" -- "$cur")
             else
                 case $pos in
                     0) _plexdo_complete_library_id ;;
@@ -538,7 +520,7 @@ _plexdo_complete() {
             esac ;;
 
         # <rating_key> [--m3u]
-        show-list|show-metadata|album-list)
+        show-list|metadata|album-list)
             case $pos in
                 0) _plexdo_complete_rating_key ;;
                 *) COMPREPLY=() ;;
@@ -555,7 +537,7 @@ _plexdo_complete() {
             fi ;;
 
         # <show> [-l LIBRARY] [-A] [-s SEASONS] [--include-specials]
-        missing-find)
+        find-missing)
             if [[ "$prev" == "-l" || "$prev" == "--library" ]]; then
                 _plexdo_complete_library_id
             elif [[ "$cur" == -* ]]; then
@@ -622,9 +604,10 @@ _plexdo_complete() {
         # (-I | -C) <name> <ratingKey...> [--m3u] [-o] [-u USER | -a]
         # -R <user_id> <source> <dest> [--m3u] [-o] [-u USER | -a]
         # -A <user_id> <playlist> <ratingKey...>
+        # -M <user_id> <name> <first> <second> [--ratio A:B] [-s] [-U] [--m3u] [-o] [-u USER | -a]
         playlist-build)
             if [[ "$cur" == -* ]]; then
-                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --interleaved -I --chronological -C --randomize -R --append -A --m3u --overwrite -o --prefix -p --user -u --all-users -a" -- "$cur")
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --interleaved -I --chronological -C --randomize -R --append -A --merge -M --ratio --stop-short -s --unique -U --m3u --overwrite -o --prefix -p --user -u --all-users -a" -- "$cur")
                 return
             fi
             case "$(_plexdo_mode)" in
@@ -647,21 +630,15 @@ _plexdo_complete() {
                            _plexdo_complete_playlist_id_or_name "$uid" ;;
                         *) _plexdo_complete_rating_key ;;
                     esac ;;
+                merge)
+                    case $pos in
+                        0) _plexdo_complete_user_id ;;
+                        2|3) uid="$(_plexdo_nth_positional "$cmd" 0)"
+                           _plexdo_complete_playlist_id_or_name "$uid" ;;
+                        *) COMPREPLY=() ;;
+                    esac ;;
                 # No mode yet, so nothing says what this argument is.
-                *) COMPREPLY=(); _plexdo_compreply < <(compgen -W "-I -C -R -A" -- "$cur") ;;
-            esac ;;
-
-        # <user_id> <name> <first> <second> [--ratio A:B] [-s] [-U] [--m3u] [-o] [-u USER | -a]
-        merge-build)
-            if [[ "$cur" == -* ]]; then
-                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --ratio --stop-short -s --unique -U --m3u --overwrite -o --prefix -p --user -u --all-users -a" -- "$cur")
-                return
-            fi
-            case $pos in
-                0) _plexdo_complete_user_id ;;
-                2|3) uid="$(_plexdo_nth_positional "$cmd" 0)"
-                   _plexdo_complete_playlist_id_or_name "$uid" ;;
-                *) COMPREPLY=() ;;
+                *) COMPREPLY=(); _plexdo_compreply < <(compgen -W "-I -C -R -A -M" -- "$cur") ;;
             esac ;;
 
         # -A <source_user_id> <source_playlist> [-o]

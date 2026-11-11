@@ -1,15 +1,15 @@
-plexdo-show-metadata(1) "plexdo" "User Commands"
+plexdo-metadata(1) "plexdo" "User Commands"
 ; SPDX-FileCopyrightText: 2026 SidusNare
 ; SPDX-License-Identifier: GPL-3.0-or-later
 ; SPDX-FileContributor: Claude Opus 5.5 (AI-generated)
 
 # NAME
 
-plexdo-show-metadata - show the metadata and file paths of one item
+plexdo-metadata - show the metadata and file paths of one item
 
 # SYNOPSIS
 
-*plexdo show-metadata* _ratingKey_ [_GLOBAL OPTIONS_]
+*plexdo metadata* _ratingKey_ [_GLOBAL OPTIONS_]
 
 # DESCRIPTION
 
@@ -110,7 +110,7 @@ its files belong to its episodes or tracks.
 Show a film's details:
 
 ```
-$ plexdo show-metadata 881
+$ plexdo metadata 881
 +---------------+-----------------------------------------------+
 | ratingKey     | 881                                           |
 | type          | movie                                         |
@@ -134,13 +134,13 @@ $ plexdo show-metadata 881
 Print just the file paths, one per line:
 
 ```
-plexdo show-metadata 881 --json | jq -r '.files[]'
+plexdo metadata 881 --json | jq -r '.files[]'
 ```
 
 Check that an episode's file is where it should be, from the server:
 
 ```
-ls -l "$(plexdo show-metadata 4180 --json | jq -r '.files[0]')"
+ls -l "$(plexdo metadata 4180 --json | jq -r '.files[0]')"
 ```
 
 # SEE ALSO
