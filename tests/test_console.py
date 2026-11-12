@@ -176,3 +176,23 @@ def test_metadata_numbers_files_only_when_there_are_several():
         "file 2": "/b.avi",
     }
     assert _file_fields([]) == {}
+
+
+def test_metadata_omits_files_when_the_item_has_none(monkeypatch, capsys):
+    import json
+
+    from plexdo.commands import metadata
+
+    class Show:
+        type = "show"
+        ratingKey = 7
+        title = "A Show"
+        _data = None
+        media = []
+
+    monkeypatch.setattr(metadata, "fetch_item", lambda plex, key: Show())
+    args = argparse.Namespace(
+        rating_key="7", format="json", json=True, wide=False
+    )
+    metadata.cmd_show_metadata(None, args)
+    assert "files" not in json.loads(capsys.readouterr().out)

@@ -12,6 +12,38 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [4.1.0-rc.1] - 2026-11-12
+
+The first release candidate for 4.1.0. On PyPI this version is
+`4.1.0rc1`, the PEP 440 spelling of the same pre-release.
+
+### Added
+
+- `metadata -u FILE` (`--update`) edits an item's metadata from a JSON file
+  shaped like `metadata --json`, or from standard input with `-`. Keys left
+  out, and keys matching the server, are left alone. A changed value for a
+  field that cannot be edited stops the command with nothing changed and
+  every offending key named. Changes go in one request and are locked
+  against agent refreshes, and `--dry-run` lists them instead.
+
+### Fixed
+
+- `metadata` no longer gives a show, season, or album an empty `files`
+  list in JSON and the other structured formats; like the table, it leaves
+  the files out when the item has none of its own.
+
+### Security
+
+- The Markdown linter used in development is markdownlint-cli2 0.24.1,
+  whose markdownlint 0.42.1 brings re2js 2.9.1 and with it the fix for
+  GHSA-gg6h-894w-4m9c, without forcing any version. The low-severity KaTeX
+  advisory remains, as before; plexdo does not ship KaTeX.
+- Values CodeQL mistook for secrets because of their names are renamed:
+  the secrets file example is `STORE_FILE_EXAMPLE`, and what
+  `secret_store.load` builds is `entries`. Nothing sensitive was printed:
+  the example holds placeholders, and `logout` prints account names, not
+  tokens.
+
 ## [4.0.0] - 2026-11-11
 
 These changes are incompatible with 3.x, hence the MAJOR release:
@@ -799,7 +831,8 @@ multi-user token handling, watched-state synchronisation, a status report,
 photo galleries, YAML/CSV/CLIXML output, shell completions for bash, zsh, and
 fish, a manual page, and packaging for PyPI. See the commit history.
 
-[Unreleased]: https://github.com/sidusnare/plexdo/compare/v4.0.0...HEAD
+[Unreleased]: https://github.com/sidusnare/plexdo/compare/v4.1.0-rc.1...HEAD
+[4.1.0-rc.1]: https://github.com/sidusnare/plexdo/compare/v4.0.0...v4.1.0-rc.1
 [4.0.0]: https://github.com/sidusnare/plexdo/compare/v3.0.0...v4.0.0
 [3.0.0]: https://github.com/sidusnare/plexdo/compare/v2.0.3...v3.0.0
 [2.1.0-rc.1]: https://github.com/sidusnare/plexdo/compare/v2.0.3...v2.1.0-rc.1

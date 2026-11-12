@@ -305,16 +305,6 @@ nothing to do with this version.
     patched KaTeX release satisfies. markdownlint imports only that
     package's syntax extension; its KaTeX renderer is loaded and never
     called, and plexdo ships none of it.
-  - re2js's GHSA-gg6h-894w-4m9c (high), quadratic time matching a
-    lookbehind, fixed in 2.8.7. markdownlint-cli2 0.24.0 pins markdownlint
-    0.42.0, which pins re2js 2.8.6 exactly; markdownlint 0.42.1 moves to
-    2.9.1, so the fix arrives with the markdownlint-cli2 release that takes
-    it up, and is not forced in early. markdownlint's own patterns (MD011,
-    MD013, MD039, and the default front-matter pattern) have no lookbehind,
-    `.markdownlint-cli2.yaml` adds no custom rule or pattern, and the only
-    input is this repository's own Markdown, so the slow path is not
-    reached. Check for that markdownlint-cli2 release before each commit,
-    and drop this entry once it is taken.
 - A linter suppression covers one line and one rule, with a comment saying
   why the code cannot change instead.
 - One Google rule is knowingly not followed: its guide imports modules, not
@@ -390,7 +380,7 @@ src/plexdo/
     constants.py    windows_app_dir, default_paths, Paths, PATHS, CONFIG_PATH,
                     DEFAULT_CACHE_DIR, DEFAULT_SECRETS_FILE, session_file,
                     DEFAULT_SESSION_FILE, STORE_CHOICES, config_text,
-                    CONFIG_EXAMPLE, SECRETS_EXAMPLE, LOG
+                    CONFIG_EXAMPLE, STORE_FILE_EXAMPLE, LOG
     logs.py         configure_logging, open_debug_log, RedactingFormatter,
                     TimestampedFormatter
     profiling.py    profiled, span, usage, Run, Usage
@@ -1114,6 +1104,34 @@ and a description saying what each mode takes.
 - `metadata RATINGKEY` - type-specific builders via `_METADATA_BUILDERS`
   keyed on `item.type`, plus the file paths. A table names a lone file `file`
   and numbers several `file 1`, `file 2`; other formats carry a `files` list.
+  An item with no files of its own (a show, season, or album) has neither:
+  no file rows and no `files` key, never an empty list.
+- `metadata RATINGKEY -u FILE` (`--update`, `-` for stdin) edits the item
+  from a JSON object shaped like `metadata --json`. A `check_arguments` hook
+  reads and parses the file before connecting (exit 1 if unreadable, not
+  JSON, or not one object). The file is compared with the item's record
+  plus its `files` list:
+  - a key the file leaves out is not touched;
+  - a key whose value matches the server is skipped silently, changeable or
+    not (null equals empty text, 7 equals 7.0, text compared stripped);
+  - a changed value is a change when the field is in `_EDITABLE` and the
+    item has its plexapi method (`hasattr`, so the type decides); otherwise
+    it is an error, as is a key the record lacks or an invalid value.
+  Errors are collected and reported together, naming each key with the
+  server's and the file's value and why it is fixed (`year` follows the
+  release date, `show`/`season`/`album`/`artist` belong to the parent), and
+  nothing is changed. Changeable: `title` (non-empty; an episode's
+  "Show - " prefix is stripped), `summary`, `contentRating`, `studio`,
+  `tagline` (text), `rating` (`editCriticRating`, 0-10), `airDate` and
+  `firstAired` (`editOriginallyAvailable`, date only), `addedAt` (cannot be
+  cleared), `trackNumber`, `genres` and `directors` (comma text or a JSON
+  list; order-insensitive). All changes go in one `batchEdits`/`saveEdits`
+  request, locked as plexapi does by default. Tags are set with
+  `_tagHelper` directly, the full new list plus a removal key for dropped
+  tags, because `addGenre` prepends the current tags, dropped ones
+  included. Each change is listed on stderr ("Changing" or, with
+  `--dry-run`, "Would change", which then sends and prints nothing); after
+  saving, the item is fetched again and shown in the chosen format.
 - `search USER QUERY [--media-type T] [--library-id L]` - with
   `--media-type`, search only the libraries whose section type can hold it
   (`episode` in `show`, `track` and `album` in `artist`): asked for a type
@@ -1625,7 +1643,7 @@ command would not repeat them and trip `duplicate-code`.
   prints the exact template, which needs `RawDescriptionHelpFormatter` for the
   epilog's newlines; that same formatter stops argparse wrapping the
   description, so pre-wrap it with `textwrap.fill(..., width=78)`.
-- `write-secrets-example [-o]` - writes `constants.SECRETS_EXAMPLE` to the
+- `write-secrets-example [-o]` - writes `constants.STORE_FILE_EXAMPLE` to the
   path `plex: secrets_file` names, after `expanduser`, creating its
   directory. **When `secrets_file` is not set, write nothing**: say so on
   stderr, naming the config path, and print the example to stdout, exit 0.

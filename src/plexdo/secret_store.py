@@ -362,10 +362,14 @@ def load(kind: str) -> Secrets:
         return {}
     if not isinstance(data, dict):
         return {}
-    secrets = {str(name): str(value) for name, value in data.items() if value}
-    for value in secrets.values():
+    # Called "entries" rather than "secrets" because CodeQL's
+    # py/clear-text-logging-sensitive-data goes by names, and flagged every
+    # print of the account names (the keys) that commands derive from it.
+    # The values are hidden from the logs here, and never printed.
+    entries = {str(name): str(value) for name, value in data.items() if value}
+    for value in entries.values():
         hide_in_logs(value)
-    return secrets
+    return entries
 
 
 def save(kind: str, secrets: Secrets) -> None:

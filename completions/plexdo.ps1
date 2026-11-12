@@ -24,7 +24,7 @@ $script:PlexdoValueOptions = @(
     '--m3u', '--album', '--sort', '--media-type', '--library-id', '--section',
     '--prefix', '--throttle', '-p', '-l', '--library', '-t', '--title', '-u', '--user',
     '--username', '--port', '--player-user', '--server-url', '--ratio', '--debug-log',
-    '--type', '--path', '--filter', '--category',
+    '--type', '--path', '--filter', '--category', '--update',
     '-c', '--code', '-f', '--format'
 )
 
@@ -35,7 +35,7 @@ $script:PlexdoCommands = [ordered]@{
     'library-list'          = 'List what a library holds, by type or by folder'
     'login'                 = 'Sign in to plex.tv and save the token'
     'logout'                = 'Sign out of plex.tv and remove the saved tokens'
-    'metadata'              = 'Show the metadata of one item'
+    'metadata'              = 'Show or update the metadata of one item'
     'player-remote-play'    = 'Tell a player, reached directly, to play an item'
     'playlist-build'        = 'Build a playlist, or add items to one'
     'playlist-clean'        = 'Remove the watched items from a playlist'
@@ -353,6 +353,9 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
     $results = @()
 
     # A value expected by the option just typed.
+    # metadata -u FILE: return nothing, so PowerShell completes a path.
+    if ($command -eq 'metadata' -and $previous -in '-u', '--update') { return }
+
     switch ($previous) {
         { $_ -in '-u', '--user' } {
             if ($command -eq 'playlist-build') { $results = Get-PlexdoUsers }
@@ -413,6 +416,7 @@ Register-ArgumentCompleter -Native -CommandName plexdo -ScriptBlock {
                 '^playlist-copy$'                   { $flags['--all'] = 'Copy to every user the server is shared with'; $flags['--to'] = 'Copy to one user, under a title of your choosing' }
                 '^playlist-build$'                  { $flags['--ratio'] = 'A:B: take A items from the first, then B from the second'; $flags['--stop-short'] = 'Stop when either playlist runs out'; $flags['--unique'] = 'Skip an item already taken' }
                 '^(library-list|titles-export)$'    { $flags['--album'] = 'Restrict to a single photo album' }
+                '^metadata$'                        { $flags['--update'] = 'Change the item to match a JSON file' }
                 '^library-list$'                    { $flags['--type'] = 'What to list'; $flags['--path'] = 'With --type folder, the folder to list'; $flags['--filter'] = 'List only what matches FIELD=VALUE'; $flags['--category'] = 'Short for --filter genre=CATEGORY'; $flags['--list-categories'] = 'List the genres of the type listed' }
                 '^titles-export$'                   { $flags['--sort'] = 'Sort order' }
                 '^search$'                          { $flags['--media-type'] = 'Restrict to one media type'; $flags['--library-id'] = 'Restrict to one library' }

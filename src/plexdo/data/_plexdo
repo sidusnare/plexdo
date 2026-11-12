@@ -207,7 +207,7 @@ _plexdo_positional() {
     if (( skip )); then skip=0; continue; fi
     case ${words[i]} in
       --m3u|--album|--sort|--media-type|--library-id|-l|--library|-t|--title|--type|--path|\
-      --filter|--category|\
+      --filter|--category|--update|\
       -u|--username|-p|--password|-c|--code|-f|--format|--section|-p|--prefix|--throttle|\
       --ratio|--debug-log) skip=1; continue ;;
       -*) continue ;;
@@ -226,7 +226,7 @@ _plexdo_commands() {
     'library-list:List what a library holds, by type or by folder'
     'login:Sign in to plex.tv and save the token'
     'logout:Sign out of plex.tv and remove the saved tokens'
-    'metadata:Show the metadata of one item'
+    'metadata:Show or update the metadata of one item'
     'player-remote-play:Tell a player, reached directly, to play an item'
     'playlist-build:Build a playlist, or add items to one'
     'playlist-clean:Remove the watched items from a playlist'
@@ -302,7 +302,12 @@ _plexdo_subcommand() {
     show-list)
       _arguments $_plexdo_global_opts $pfx $m3u '1:show rating key:_plexdo_rating_keys'
       ;;
-    metadata|album-list)
+    metadata)
+      _arguments $_plexdo_global_opts \
+        '(-u --update)'{-u,--update}'[Change the item to match a JSON file]:JSON file:_files' \
+        '1:rating key:_plexdo_rating_keys'
+      ;;
+    album-list)
       _arguments $_plexdo_global_opts '1:rating key:_plexdo_rating_keys'
       ;;
     titles-export)

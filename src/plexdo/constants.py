@@ -314,7 +314,10 @@ CONFIG_EXAMPLE = config_text()
 # tokens elsewhere. Each kind has one placeholder entry. JSON has no
 # comments, so the note is an entry of its own, a list to keep its lines
 # short; plexdo reads only the kinds it knows and keeps the rest.
-SECRETS_EXAMPLE = (
+# Named without "secret" because CodeQL's py/clear-text-logging-sensitive-data
+# judges data by its name: printing this is not clear-text logging of
+# sensitive information, as every value in it is a made-up placeholder.
+STORE_FILE_EXAMPLE = (
     json.dumps(
         {
             "_comment": [

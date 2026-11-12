@@ -361,7 +361,7 @@ _plexdo_positional_count() {
     for (( i=1; i < cword; i++ )); do
         word="${words[$i]}"
         if (( skip_next )); then skip_next=0; continue; fi
-        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle|--season|-l|--library|-u|--user|--port|--player-user|--server-url|--ratio|--debug-log|-t|--title|--type|--path|--album|--sort|--media-type|--library-id|--filter|--category) skip_next=1; continue ;; esac
+        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle|--season|-l|--library|-u|--user|--port|--player-user|--server-url|--ratio|--debug-log|-t|--title|--type|--path|--album|--sort|--media-type|--library-id|--filter|--category|--update) skip_next=1; continue ;; esac
         # -s takes a value only where it is --session or --season.
         if [[ "$word" == -s ]]; then
             case "$cmd" in wait|find-missing) skip_next=1 ;; esac
@@ -384,7 +384,7 @@ _plexdo_nth_positional() {
     for (( i=1; i < cword; i++ )); do
         word="${words[$i]}"
         if (( skip_next )); then skip_next=0; continue; fi
-        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle|--season|-l|--library|-u|--user|--port|--player-user|--server-url|--ratio|--debug-log|-t|--title|--type|--path|--album|--sort|--media-type|--library-id|--filter|--category) skip_next=1; continue ;; esac
+        case "$word" in --m3u|-f|--format|--section|-p|--prefix|--throttle|--season|-l|--library|-u|--user|--port|--player-user|--server-url|--ratio|--debug-log|-t|--title|--type|--path|--album|--sort|--media-type|--library-id|--filter|--category|--update) skip_next=1; continue ;; esac
         # -s takes a value only where it is --session or --season.
         if [[ "$word" == -s ]]; then
             case "$cmd" in wait|find-missing) skip_next=1 ;; esac
@@ -427,6 +427,12 @@ _plexdo_complete() {
         esac
     fi
 
+    # -u FILE on metadata -> a JSON file
+    if [[ "$cmd" == metadata && ( "$prev" == "-u" || "$prev" == "--update" ) ]]; then
+        COMPREPLY=(); _plexdo_compreply < <(compgen -f -- "$cur")
+        return
+    fi
+
     # Flag completion
     if [[ "$cur" == --* ]]; then
         case "$cmd" in
@@ -444,6 +450,8 @@ _plexdo_complete() {
                 COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --type -t --path --album --filter --category --list-categories" -- "$cur") ;;
             playlist-clean)
                 COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --include-partial" -- "$cur") ;;
+            metadata)
+                COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --update -u" -- "$cur") ;;
             write-config-example|write-secrets-example)
                 COMPREPLY=(); _plexdo_compreply < <(compgen -W "$(_plexdo_global_flags) --overwrite -o" -- "$cur") ;;
             rescan)

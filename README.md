@@ -283,7 +283,7 @@ identical rules apply to library IDs and titles.
 | `users-list` | User IDs, account types, titles, usernames, and emails |
 | `playlists-list <user_id>` | A user's playlists |
 | `playlist-list <user_id> <playlist\|ratingKey> [--m3u P]` | Items in one playlist |
-| `metadata <rating_key>` | Full metadata for one item, including its file paths |
+| `metadata <rating_key> [-u FILE]` | Full metadata for one item, including its file paths; `-u` edits it from a JSON file |
 | `search <user_id> <query> [--media-type T] [--library-id N]` | Search as a given user |
 
 `library-list` lists one type of item. By default a movie library lists its

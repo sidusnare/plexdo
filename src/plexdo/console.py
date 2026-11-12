@@ -37,6 +37,8 @@ def output(data: Any, args: "argparse.Namespace") -> None:
     elif isinstance(data, list) and data and isinstance(data[0], dict):
         print_table(data, limit)
     elif data or not isinstance(data, list):
+        # Not clear-text logging of sensitive information: CodeQL traced
+        # logout's records here, which name accounts, never their tokens.
         print(data)
 
 

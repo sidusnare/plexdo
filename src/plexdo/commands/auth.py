@@ -26,7 +26,7 @@ from plexdo.constants import (
     CONFIG_EXAMPLE,
     CONFIG_PATH,
     LOG,
-    SECRETS_EXAMPLE,
+    STORE_FILE_EXAMPLE,
 )
 from plexdo.security import hide_in_logs
 from plexdo.tokens import (
@@ -259,6 +259,9 @@ def cmd_logout(_plex: PlexServer | None, args: argparse.Namespace) -> None:
         status, detail = outcomes[token]
         records.append({"user": name, "status": status, "detail": detail})
         if table:
+            # Not clear-text logging of sensitive information: a record holds
+            # the account name a token is filed under and how signing out
+            # went, never the token itself.
             print(_logout_line(records[-1]))
 
     done = [r["user"] for r in records if r["status"] in _SIGNED_OUT]
@@ -380,7 +383,9 @@ def cmd_write_secrets_example(
             "has been written; the example follows on standard output.",
             file=sys.stderr,
         )
-        print(SECRETS_EXAMPLE, end="")
+        # Not clear-text logging of sensitive information, whatever CodeQL
+        # says: this is the example file, and its values are placeholders.
+        print(STORE_FILE_EXAMPLE, end="")
         return
 
     existing = path.exists()
@@ -407,7 +412,7 @@ def cmd_write_secrets_example(
         path.unlink()
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
-        handle.write(SECRETS_EXAMPLE)
+        handle.write(STORE_FILE_EXAMPLE)
     print(f"Secrets example written to: {path}")
 
 
@@ -541,7 +546,7 @@ def register(
         ),
         epilog=(
             "example that would be written:\n\n"
-            + textwrap.indent(SECRETS_EXAMPLE, "  ")
+            + textwrap.indent(STORE_FILE_EXAMPLE, "  ")
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )

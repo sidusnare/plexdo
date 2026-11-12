@@ -4,7 +4,7 @@
 .\" Man page for plexdo (plexdo).
 .\" Edit alongside AI.prompt.txt. The version and date on the .TH line are
 .\" written by tools/derive.py from pyproject.toml; do not edit them here.
-.TH PLEXDO 1 "2026-11-11" "plexdo 4.0.0" "User Commands"
+.TH PLEXDO 1 "2026-11-12" "plexdo 4.1.0rc1" "User Commands"
 .
 .SH NAME
 plexdo \- command\-line interface for Plex Media Server
@@ -278,15 +278,29 @@ and files. A photo library\(aqs albums are walked into the albums inside
 them, to a depth of 16, each listed once. Photos have no played state, so
 theirs is null.
 .TP
-.BI metadata " ratingKey"
+.BI metadata " ratingKey " [ \-u " FILE" ]
 Show full metadata for one item, with fields varying by media type, including
 the server\-side path of every file backing it. A table names a lone file
 .BR file ,
 and numbers them when there are several; a machine\-readable format carries
 them as a
 .B files
-list. Shows and seasons have no media of their own, so they list none: those
-files belong to the episodes.
+list. Shows and seasons have no media of their own, so they have neither:
+those files belong to the episodes.
+.IP
+.BR \-u ", " \-\-update " \fIFILE\fR"
+changes the item first, to match a JSON object shaped like the
+.B \-\-json
+output, or standard input for
+.BR \- .
+Keys left out, and keys whose value matches the server, are left alone; a
+changed value for a field that cannot be edited, such as
+.B year
+or
+.BR duration ,
+stops the command with nothing changed.
+.B \-\-dry\-run
+lists the changes instead. Edited fields are locked against agent refreshes.
 .TP
 .BI search " user query " [ \-\-media\-type " TYPE" "] [" \-\-library\-id " LIBRARY" ]
 Search as the given user. \fITYPE\fR is one of \fBmovie\fR, \fBshow\fR,

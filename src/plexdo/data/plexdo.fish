@@ -143,7 +143,7 @@ function __plexdo_positionals
             continue
         end
         switch $t
-            case --m3u --album --sort --media-type --library-id -l --library -t --title --type --path --filter --category -u --user --username -p --password -c --code -f --format --section -p --prefix --throttle --season --port --player-user --server-url --ratio --debug-log
+            case --m3u --album --sort --media-type --library-id -l --library -t --title --type --path --filter --category --update -u --user --username -p --password -c --code -f --format --section -p --prefix --throttle --season --port --player-user --server-url --ratio --debug-log
                 set skip 1
                 continue
             case -s
@@ -294,7 +294,7 @@ for prog in plexdo
     complete -c $prog -n __plexdo_no_subcommand -a library-list -d 'List what a library holds, by type or by folder'
     complete -c $prog -n __plexdo_no_subcommand -a login -d 'Sign in to plex.tv and save the token'
     complete -c $prog -n __plexdo_no_subcommand -a logout -d 'Sign out of plex.tv and remove the saved tokens'
-    complete -c $prog -n __plexdo_no_subcommand -a metadata -d 'Show the metadata of one item'
+    complete -c $prog -n __plexdo_no_subcommand -a metadata -d 'Show or update the metadata of one item'
     complete -c $prog -n __plexdo_no_subcommand -a player-remote-play -d 'Tell a player, reached directly, to play an item'
     complete -c $prog -n __plexdo_no_subcommand -a playlist-build -d 'Build a playlist, or add items to one'
     complete -c $prog -n __plexdo_no_subcommand -a playlist-clean -d 'Remove the watched items from a playlist'
@@ -374,6 +374,8 @@ for prog in plexdo
     complete -c $prog -x -s p -l prefix \
         -n '__fish_seen_subcommand_from playlist-list show-list playlist-export titles-export playlist-build' \
         -d 'Rewrite exported paths onto this prefix'
+    complete -c $prog -rF -s u -l update -n '__fish_seen_subcommand_from metadata' \
+        -d 'Change the item to match a JSON file'
     complete -c $prog -rF -l m3u \
         -n '__fish_seen_subcommand_from playlist-list show-list playlist-build' \
         -d 'Also export an M3U file using Plex server paths'

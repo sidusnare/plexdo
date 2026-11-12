@@ -17,7 +17,7 @@ from keyring.backends import chainer, fail
 from conftest import REAL_BACKEND, REAL_SESSION_BACKEND
 from plexdo import config, migrate, secret_store
 from plexdo.commands import auth
-from plexdo.constants import SECRETS_EXAMPLE, session_file
+from plexdo.constants import STORE_FILE_EXAMPLE, session_file
 from plexdo.tokens import ADMIN_KEY, lookup, saved_password, saved_pin
 
 
@@ -359,7 +359,7 @@ def test_with_no_secrets_file_set_the_example_is_printed(
     before = sorted(tmp_path.iterdir())
     write_secrets_example()
     captured = capsys.readouterr()
-    assert captured.out == SECRETS_EXAMPLE
+    assert captured.out == STORE_FILE_EXAMPLE
     assert "secrets_file is not set" in captured.err
     assert str(config_file) in captured.err
     assert sorted(tmp_path.iterdir()) == before
@@ -372,7 +372,7 @@ def test_the_example_is_written_where_secrets_file_says(
     config_file.write_text(f"plex:\n  url: x\n  secrets_file: {target}\n")
     write_secrets_example()
     captured = capsys.readouterr()
-    assert target.read_text() == SECRETS_EXAMPLE
+    assert target.read_text() == STORE_FILE_EXAMPLE
     assert str(target) in captured.out
     assert captured.err == ""
     if os.name != "nt":
@@ -398,7 +398,7 @@ def test_overwrite_replaces_the_secrets_file_privately(config_file, tmp_path):
     target.chmod(0o644)
     config_file.write_text(f"plex:\n  url: x\n  secrets_file: {target}\n")
     write_secrets_example(overwrite=True)
-    assert target.read_text() == SECRETS_EXAMPLE
+    assert target.read_text() == STORE_FILE_EXAMPLE
     if os.name != "nt":
         assert stat.S_IMODE(target.stat().st_mode) == 0o600
 
@@ -416,7 +416,7 @@ def test_write_secrets_example_dry_run_writes_nothing(
 def test_the_example_is_a_password_store_the_store_can_read(tmp_path):
     """Passwords and PINs load, no token is offered, and the note survives."""
     path = tmp_path / "secrets.json"
-    path.write_text(SECRETS_EXAMPLE)
+    path.write_text(STORE_FILE_EXAMPLE)
     path.chmod(0o600)
     store = secret_store.FileStore(path)
     for kind in ("passwords", "pins"):
