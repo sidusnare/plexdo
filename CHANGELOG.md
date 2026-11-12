@@ -12,10 +12,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [4.1.0-rc.1] - 2026-11-12
+## [4.1.0] - 2026-11-12
 
-The first release candidate for 4.1.0. On PyPI this version is
-`4.1.0rc1`, the PEP 440 spelling of the same pre-release.
+`metadata` can now edit an item, from the JSON it prints. Everything in
+4.1.0-rc.1 is here, unchanged.
 
 ### Added
 
@@ -831,8 +831,8 @@ multi-user token handling, watched-state synchronisation, a status report,
 photo galleries, YAML/CSV/CLIXML output, shell completions for bash, zsh, and
 fish, a manual page, and packaging for PyPI. See the commit history.
 
-[Unreleased]: https://github.com/sidusnare/plexdo/compare/v4.1.0-rc.1...HEAD
-[4.1.0-rc.1]: https://github.com/sidusnare/plexdo/compare/v4.0.0...v4.1.0-rc.1
+[Unreleased]: https://github.com/sidusnare/plexdo/compare/v4.1.0...HEAD
+[4.1.0]: https://github.com/sidusnare/plexdo/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/sidusnare/plexdo/compare/v3.0.0...v4.0.0
 [3.0.0]: https://github.com/sidusnare/plexdo/compare/v2.0.3...v3.0.0
 [2.1.0-rc.1]: https://github.com/sidusnare/plexdo/compare/v2.0.3...v2.1.0-rc.1
